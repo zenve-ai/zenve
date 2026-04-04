@@ -1,0 +1,12 @@
+scratchpad
+.venv
+.env
+.git
+.gitignore
+.ruff_cache
+.vscode
+__pycache__
+*.py[cod]
+*.db
+*.egg-info
+.DS_Store
