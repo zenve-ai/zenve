@@ -91,3 +91,12 @@ just docker-logs  # tail logs
 5. **Route** → `api/routes/{domain}.py` (thin wrapper)
 6. **Register router** → `api/routes/__init__.py` + `main.py`
 7. **Agent** (if AI needed) → `agents/{domain}.py`, inject service via constructor
+
+
+## Using Custom Agents
+
+When asked to "use the {name} agent", follow these steps:
+0. Spawn a subagent to handle the entire task below
+1. Read `agents/{name}/AGENTS.md`
+2. Follow all instructions in that file exactly
+3. Apply the agent's rules to the current task
