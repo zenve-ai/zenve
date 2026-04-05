@@ -2,8 +2,18 @@ from fastapi import Depends
 from sqlalchemy.orm import Session
 
 from zenve.db.database import get_db
+from zenve.services.api_key import ApiKeyService
 from zenve.services.auth import AuthService
+from zenve.services.org import OrgService
 
 
 def get_auth_service(db: Session = Depends(get_db)) -> AuthService:
     return AuthService(db)
+
+
+def get_org_service(db: Session = Depends(get_db)) -> OrgService:
+    return OrgService(db)
+
+
+def get_api_key_service(db: Session = Depends(get_db)) -> ApiKeyService:
+    return ApiKeyService(db)

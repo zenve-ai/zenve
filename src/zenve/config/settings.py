@@ -15,6 +15,12 @@ class Settings(BaseSettings):
     # Full PostgreSQL connection string
     pg_database_url: str | None = None
 
+    # Base directory for org/agent data on disk
+    data_dir: str = "/data"
+
+    # Optional token to protect the org bootstrap endpoint
+    setup_token: str | None = None
+
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
 
 
