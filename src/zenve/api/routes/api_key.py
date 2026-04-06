@@ -17,9 +17,8 @@ def create_api_key(
 ):
     org, _ = auth
     record, raw_key = service.create(org.id, body)
-    return ApiKeyCreated.model_validate(record, from_attributes=True).model_copy(
-        update={"raw_key": raw_key}
-    )
+    base = ApiKeyResponse.model_validate(record, from_attributes=True)
+    return ApiKeyCreated(**base.model_dump(), raw_key=raw_key)
 
 
 @router.get("", response_model=list[ApiKeyResponse])

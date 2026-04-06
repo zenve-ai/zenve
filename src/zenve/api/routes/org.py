@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, Header, HTTPException, status
 
 from zenve.config.settings import settings
 from zenve.db.models import ApiKeyRecord, Organization
-from zenve.models.api_key import ApiKeyCreate, ApiKeyCreated
+from zenve.models.api_key import ApiKeyCreate, ApiKeyCreated, ApiKeyResponse
 from zenve.models.org import OrgCreate, OrgResponse, OrgUpdate
 from zenve.services import get_api_key_service, get_org_service
 from zenve.services.api_key import ApiKeyService
@@ -35,9 +35,8 @@ def create_org(
     key_data = ApiKeyCreate(name="Default API Key")
     record, raw_key = api_key_service.create(org.id, key_data)
 
-    api_key_resp = ApiKeyCreated.model_validate(record, from_attributes=True).model_copy(
-        update={"raw_key": raw_key}
-    )
+    base = ApiKeyResponse.model_validate(record, from_attributes=True)
+    api_key_resp = ApiKeyCreated(**base.model_dump(), raw_key=raw_key)
     return OrgCreatedResponse(
         **OrgResponse.model_validate(org, from_attributes=True).model_dump(),
         api_key=api_key_resp,

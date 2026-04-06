@@ -7,7 +7,6 @@ build/
 
 # Virtual environment
 .venv/
-agents/
 
 # Environment
 .env

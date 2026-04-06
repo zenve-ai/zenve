@@ -3,6 +3,7 @@ import uuid
 from pathlib import Path
 
 from fastapi import HTTPException
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from zenve.config.settings import settings
@@ -14,6 +15,15 @@ def _slugify(name: str) -> str:
     slug = name.lower().strip()
     slug = re.sub(r"[^a-z0-9]+", "-", slug)
     return slug.strip("-")
+
+
+def _conflict_detail(exc: IntegrityError) -> str:
+    msg = str(exc.orig) if exc.orig is not None else str(exc)
+    if "organizations.slug" in msg:
+        return "An organization with this slug already exists"
+    if "organizations.name" in msg:
+        return "An organization with this name already exists"
+    return "This organization conflicts with an existing record"
 
 
 class OrgService:
@@ -31,7 +41,14 @@ class OrgService:
             base_path=base_path,
         )
         self.db.add(org)
-        self.db.commit()
+        try:
+            self.db.commit()
+        except IntegrityError as exc:
+            self.db.rollback()
+            raise HTTPException(
+                status_code=409,
+                detail=_conflict_detail(exc),
+            ) from exc
         self.db.refresh(org)
 
         Path(base_path).mkdir(parents=True, exist_ok=True)
@@ -66,6 +83,13 @@ class OrgService:
             org.name = data.name
         if data.slug is not None:
             org.slug = data.slug
-        self.db.commit()
+        try:
+            self.db.commit()
+        except IntegrityError as exc:
+            self.db.rollback()
+            raise HTTPException(
+                status_code=409,
+                detail=_conflict_detail(exc),
+            ) from exc
         self.db.refresh(org)
         return org
