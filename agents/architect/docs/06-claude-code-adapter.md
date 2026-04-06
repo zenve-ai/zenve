@@ -13,8 +13,17 @@ Implement the first concrete adapter: ClaudeCodeAdapter, which spawns the `claud
 ```python
 class ClaudeCodeAdapter(BaseAdapter):
 
-    def name(self) -> str:
-        return "claude_code"
+    adapter_type: ClassVar[str] = "claude_code"
+
+    @classmethod
+    def get_default_config(cls) -> ClaudeCodeConfig:
+        """Return a ClaudeCodeConfig with all defaults."""
+        return ClaudeCodeConfig()
+
+    @classmethod
+    def validate_config(cls, raw_config: dict) -> ClaudeCodeConfig:
+        """Validate and coerce raw adapter_config dict into ClaudeCodeConfig."""
+        return ClaudeCodeConfig.model_validate(raw_config)
 
     async def health_check(self) -> bool:
         """Check if `claude` CLI is installed and accessible."""
@@ -84,8 +93,11 @@ class ClaudeCodeAdapter(BaseAdapter):
 
 ### 2. CLI Args Builder
 
+`adapter_config` in `RunContext` is already merged (defaults + overrides) and validated as a `ClaudeCodeConfig` dict.
+
 ```python
 def _build_cli_args(self, ctx: RunContext, message: str, system_prompt: str) -> list[str]:
+    cfg = ClaudeCodeConfig.model_validate(ctx.adapter_config)
     args = ["claude"]
 
     # Non-interactive mode
@@ -97,13 +109,21 @@ def _build_cli_args(self, ctx: RunContext, message: str, system_prompt: str) -> 
     # System prompt (SOUL.md content)
     args.extend(["--system-prompt", system_prompt])
 
-    # Model override from adapter_config
-    if model := ctx.adapter_config.get("model"):
-        args.extend(["--model", model])
+    # Model override
+    if cfg.model:
+        args.extend(["--model", cfg.model])
 
-    # Max tokens from adapter_config
-    if max_tokens := ctx.adapter_config.get("max_tokens"):
-        args.extend(["--max-tokens", str(max_tokens)])
+    # Max tokens
+    if cfg.max_tokens:
+        args.extend(["--max-tokens", str(cfg.max_tokens)])
+
+    # Max turns
+    if cfg.max_turns:
+        args.extend(["--max-turns", str(cfg.max_turns)])
+
+    # Allowed tools
+    if cfg.allowed_tools:
+        args.extend(["--allowedTools", ",".join(cfg.allowed_tools)])
 
     # Output format
     args.extend(["--output-format", "json"])
@@ -132,14 +152,22 @@ adapter_registry.register(ClaudeCodeAdapter())
 
 ### 5. Adapter Config Schema
 
-Document expected `adapter_config` fields for Claude Code:
+Typed by `ClaudeCodeConfig` (defined in `models/adapter.py`). All fields are optional with `None` defaults — missing fields mean "use CLI default".
+
+| Field           | Type             | Default | Description                          |
+|-----------------|------------------|---------|--------------------------------------|
+| `model`         | `str \| None`    | `None`  | Model override (e.g. `claude-sonnet-4-6`) |
+| `max_tokens`    | `int \| None`    | `None`  | Max output tokens                    |
+| `allowed_tools` | `list[str] \| None` | `None` | Restrict tool access               |
+| `max_turns`     | `int \| None`    | `None`  | Max agentic turns                    |
+
+Example stored `adapter_config` (only overrides, not full defaults):
 
 ```json
 {
-  "model": "claude-sonnet-4-6",         // optional, default: CLI default
-  "max_tokens": 4096,                    // optional
-  "allowed_tools": ["Read", "Write"],    // optional, restrict tools
-  "max_turns": 10                        // optional
+  "model": "claude-sonnet-4-6",
+  "allowed_tools": ["Read", "Write"],
+  "max_turns": 10
 }
 ```
 
@@ -149,4 +177,16 @@ Document expected `adapter_config` fields for Claude Code:
 - Gateway env vars are injected so the agent can discover the gateway at runtime.
 - `--print` flag (or equivalent) ensures non-interactive execution.
 - Token usage parsing depends on Claude CLI output format — may need adjustment.
+- `adapter_type = "claude_code"` class variable drives `name()` via `BaseAdapter`.
+- `validate_config()` raises `pydantic.ValidationError` on unknown or invalid fields; callers surface as HTTP 422.
 - Future: support `--resume` for session persistence across heartbeats (Open Question #1).
+
+## Change Log
+
+| Date       | Change                                                                                          |
+|------------|-------------------------------------------------------------------------------------------------|
+| 2026-04-06 | Added `adapter_type: ClassVar[str] = "claude_code"` class variable                             |
+| 2026-04-06 | Added `get_default_config()` classmethod returning `ClaudeCodeConfig()`                        |
+| 2026-04-06 | Added `validate_config()` classmethod returning `ClaudeCodeConfig.model_validate(raw_config)`  |
+| 2026-04-06 | Updated CLI args builder to use typed `ClaudeCodeConfig` (added `max_turns`, `allowed_tools`)  |
+| 2026-04-06 | Replaced JSON schema block with typed `ClaudeCodeConfig` field table referencing `models/adapter.py` |

@@ -7,8 +7,9 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from zenve.config.settings import settings
+from zenve.agents.registry import AdapterRegistry
 from zenve.db.models import Agent, Organization
-from zenve.models.agent import AgentCreate, AgentUpdate, KNOWN_ADAPTER_TYPES
+from zenve.models.agent import AgentCreate, AgentUpdate
 from zenve.services.filesystem import FilesystemService
 
 
@@ -19,16 +20,22 @@ def _slugify(name: str) -> str:
 
 
 class AgentService:
-    def __init__(self, db: Session, filesystem: FilesystemService):
+    def __init__(self, db: Session, filesystem: FilesystemService, adapter_registry: AdapterRegistry):
         self.db = db
         self.filesystem = filesystem
+        self.adapter_registry = adapter_registry
 
     def create(self, org: Organization, data: AgentCreate) -> Agent:
-        if data.adapter_type not in KNOWN_ADAPTER_TYPES:
+        if not self.adapter_registry.has(data.adapter_type):
             raise HTTPException(
                 status_code=422,
-                detail=f"Unknown adapter_type '{data.adapter_type}'. Must be one of {KNOWN_ADAPTER_TYPES}",
+                detail=f"Unknown adapter_type '{data.adapter_type}'. Known types: {self.adapter_registry.known_types()}",
             )
+
+        adapter = self.adapter_registry.get(data.adapter_type)
+        default_config = adapter.get_default_config().model_dump(exclude_none=True)
+        adapter_config = {**default_config, **data.adapter_config}
+        adapter.validate_config(adapter_config)
 
         slug = _slugify(data.name)
         created_at = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
@@ -77,7 +84,7 @@ class AgentService:
             slug=slug,
             dir_path=dir_path,
             adapter_type=data.adapter_type,
-            adapter_config=data.adapter_config,
+            adapter_config=adapter_config,
             skills=data.skills,
             status="active",
             heartbeat_interval_seconds=data.heartbeat_interval_seconds,

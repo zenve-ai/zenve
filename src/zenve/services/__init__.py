@@ -1,6 +1,7 @@
-from fastapi import Depends
+from fastapi import Depends, Request
 from sqlalchemy.orm import Session
 
+from zenve.agents.registry import AdapterRegistry
 from zenve.config.settings import Settings, get_settings
 from zenve.db.database import get_db
 from zenve.services.agent import AgentService
@@ -26,8 +27,13 @@ def get_filesystem_service(settings: Settings = Depends(get_settings)) -> Filesy
     return FilesystemService(settings)
 
 
+def get_adapter_registry(request: Request) -> AdapterRegistry:
+    return request.app.state.adapter_registry
+
+
 def get_agent_service(
     db: Session = Depends(get_db),
     filesystem: FilesystemService = Depends(get_filesystem_service),
+    adapter_registry: AdapterRegistry = Depends(get_adapter_registry),
 ) -> AgentService:
-    return AgentService(db, filesystem)
+    return AgentService(db, filesystem, adapter_registry)
