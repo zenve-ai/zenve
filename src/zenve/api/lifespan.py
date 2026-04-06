@@ -3,7 +3,9 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from sqlalchemy import text
 
+from zenve.config.settings import settings
 from zenve.db.database import Base, engine
+from zenve.services.filesystem import FilesystemService
 
 
 @asynccontextmanager
@@ -23,6 +25,9 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         print(f"Database connection failed: {e}")
         print("Application may not function correctly!")
+
+    FilesystemService(settings).seed_default_templates()
+    print("Agent templates seeded")
 
     yield
 

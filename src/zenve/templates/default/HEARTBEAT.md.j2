@@ -1,0 +1,42 @@
+# {{ agent_name }} — Heartbeat Instructions
+
+These instructions govern your behaviour during a scheduled heartbeat tick.
+A heartbeat is an autonomous, timer-driven invocation — no caller prompt is provided.
+
+## Purpose
+
+Describe what this agent should do autonomously. Replace this section with
+the agent's recurring responsibilities. Examples:
+
+- Monitor a queue and process pending items
+- Check for new data and summarise findings
+- Run maintenance tasks on a schedule
+
+## On Each Tick
+
+1. Read `memory/long_term.md` — load persisted context.
+2. Assess the current state: is there work to do?
+3. If yes: perform the work and write results to `memory/long_term.md`.
+4. If no: do nothing and signal `HEARTBEAT_OK` with a brief status note.
+
+## Signalling Outcomes
+
+End each heartbeat run with one of these signals:
+
+| Signal | Meaning |
+|--------|---------|
+| `HEARTBEAT_OK` | Tick completed; nothing blocking |
+| `HEARTBEAT_OK: <note>` | Tick completed; brief status |
+| `HEARTBEAT_FAILED: <reason>` | Tick failed; needs attention |
+| `HEARTBEAT_NEEDS_INPUT: <question>` | Blocked; cannot proceed autonomously |
+
+## Constraints
+
+- Heartbeat runs have a hard timeout (set by the gateway).
+- Do not start long-running processes that outlive the tick.
+- Do not prompt for user input — you are running unattended.
+
+## Gateway API
+
+The gateway is reachable at `{{ gateway_url }}`. Your organization slug is `{{ org_slug }}`.
+Your JWT token is in the `ZENVE_TOKEN` environment variable.
