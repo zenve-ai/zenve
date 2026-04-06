@@ -3,6 +3,8 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from sqlalchemy import text
 
+from zenve.agents.claude_code import ClaudeCodeAdapter
+from zenve.agents.registry import AdapterRegistry
 from zenve.config.settings import settings
 from zenve.db.database import Base, engine
 from zenve.services.filesystem import FilesystemService
@@ -28,6 +30,11 @@ async def lifespan(app: FastAPI):
 
     FilesystemService(settings).seed_default_templates()
     print("Agent templates seeded")
+
+    registry = AdapterRegistry()
+    registry.register(ClaudeCodeAdapter())
+    app.state.adapter_registry = registry
+    print(f"Adapter registry initialized: {registry.known_types()}")
 
     yield
 
