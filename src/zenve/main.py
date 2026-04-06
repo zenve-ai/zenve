@@ -5,7 +5,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from zenve.api.lifespan import lifespan
-from zenve.api.routes import api_key_router, auth_router, core_router, org_router
+from zenve.api.routes import agent_router, api_key_router, auth_router, core_router, org_router
 
 app = FastAPI(lifespan=lifespan)
 
@@ -26,6 +26,7 @@ app.include_router(core_router)
 app.include_router(auth_router)
 app.include_router(org_router)
 app.include_router(api_key_router)
+app.include_router(agent_router)
 
 
 def main():
