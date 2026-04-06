@@ -2,8 +2,6 @@ from datetime import datetime
 
 from pydantic import BaseModel
 
-KNOWN_ADAPTER_TYPES = ["claude_code", "codex", "anthropic_api"]
-
 
 class AgentCreate(BaseModel):
     name: str
