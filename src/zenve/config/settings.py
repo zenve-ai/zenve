@@ -18,6 +18,12 @@ class Settings(BaseSettings):
     # Base directory for org/agent data on disk
     data_dir: str = "/data"
 
+    # Directory containing Jinja2 template sets (e.g. default/)
+    templates_dir: str = "/data/templates"
+
+    # Base URL agents use to call back to the gateway
+    gateway_url: str = "http://localhost:8000/api/v1"
+
     # Optional token to protect the org bootstrap endpoint
     setup_token: str | None = None
 

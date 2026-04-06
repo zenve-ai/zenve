@@ -1,0 +1,28 @@
+# {{ agent_name }} — Tool Permissions
+
+This file defines the tools and capabilities available to this agent.
+The runtime enforces these constraints. Do not attempt to use tools not listed here.
+
+## Allowed Tools
+
+Edit this section to list the specific tools granted to this agent.
+Use MCP server names, CLI tool names, or capability categories as appropriate.
+
+    # Example — replace with actual tool grants:
+    # mcp__filesystem__read_file
+    # mcp__filesystem__write_file
+    # Bash (read-only, no network)
+
+## Disallowed Actions
+
+Unless explicitly listed above, the following are always prohibited:
+
+- Accessing filesystems outside `{{ agent_slug }}/` agent directory
+- Making outbound network requests not via the gateway API
+- Installing packages or modifying system configuration
+- Reading or writing other agents' directories
+- Storing credentials or secrets in any file
+
+## Runtime: {{ adapter_type }}
+
+Adapter-specific tool configuration may be set in `gateway.json`.
