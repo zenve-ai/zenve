@@ -220,12 +220,10 @@ The runtime enforces these constraints. Do not attempt to use tools not listed h
 Edit this section to list the specific tools granted to this agent.
 Use MCP server names, CLI tool names, or capability categories as appropriate.
 
-```
-# Example — replace with actual tool grants:
-# mcp__filesystem__read_file
-# mcp__filesystem__write_file
-# Bash (read-only, no network)
-```
+    # Example — replace with actual tool grants:
+    # mcp__filesystem__read_file
+    # mcp__filesystem__write_file
+    # Bash (read-only, no network)
 
 ## Disallowed Actions
 
@@ -287,6 +285,7 @@ Written programmatically at scaffold time (not a Jinja2 template). Updated whene
   "adapter_type": "claude_code",
   "skills": [],
   "status": "active",
+  "heartbeat_interval_seconds": 0,
   "gateway_url": "https://gateway.example.com/api/v1",
   "created_at": "2026-04-04T12:00:00Z"
 }
@@ -303,6 +302,7 @@ Fields:
 | `adapter_type` | Runtime adapter identifier |
 | `skills` | Optional tags / capability hints |
 | `status` | `active` \| `inactive` \| `archived` |
+| `heartbeat_interval_seconds` | Heartbeat tick interval in seconds; `0` means disabled |
 | `gateway_url` | Base URL agents use to call back home |
 | `created_at` | ISO-8601 creation timestamp |
 
@@ -391,3 +391,4 @@ GATEWAY_URL: str = "http://localhost:8000/api/v1"
 | Date | Change | Reason |
 |------|--------|--------|
 | 2026-04-06 | Created chunk with full template designs for SOUL.md.j2, AGENTS.md.j2, HEARTBEAT.md.j2, TOOLS.md.j2, memory stubs, gateway.json schema, FilesystemService signature, and config additions | Initial design of agent file templates |
+| 2026-04-06 | Added `heartbeat_interval_seconds` to gateway.json schema and field table; fixed nested code block in TOOLS.md.j2 section | Align gateway.json with ORM model (chunk 04); fix markdown rendering |
