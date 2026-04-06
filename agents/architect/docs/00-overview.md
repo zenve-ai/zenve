@@ -94,7 +94,7 @@ Filesystem mirrors the DB: `/data/orgs/{slug}/agents/{slug}/` holds SOUL.md, AGE
 | 01 | Organizations CRUD             | —          | ORM model, service, routes, Pydantic models         | implemented     | 2026-04-05 |
 | 02 | API Key Auth                   | 01         | API key model, hashing, auth dependency, scopes, key routes | not started     | —          |
 | 03 | Agent Filesystem & Templates   | 01         | SOUL.md.j2, AGENTS.md.j2, HEARTBEAT.md.j2, TOOLS.md.j2, memory stubs, gateway.json schema, FilesystemService, config | designed        | 2026-04-06 |
-| 04 | Agents CRUD                    | 01, 02, 03 | ORM model, service, routes, file read/write routes   | not started     | —          |
+| 04 | Agents CRUD                    | 01, 02, 03 | ORM model, service, routes, file read/write routes   | designed        | 2026-04-06 |
 | 05 | Adapter Interface              | 04         | BaseAdapter ABC, RunContext, RunResult, registry      | not started     | —          |
 | 06 | Claude Code Adapter            | 05         | ClaudeCodeAdapter implementation                     | not started     | —          |
 | 07 | Celery Setup & Run Execution   | 05, 06     | Celery app, Redis broker, execute_agent_run task     | not started     | —          |
