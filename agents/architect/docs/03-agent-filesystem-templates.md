@@ -367,12 +367,88 @@ GATEWAY_URL: str = "http://localhost:8000/api/v1"
 
 ---
 
+### 11. Bundled Templates & Bootstrap Seeding
+
+#### Problem
+
+On a fresh deployment `TEMPLATES_DIR` is empty — there are no templates to scaffold agents from. The templates must ship with the gateway release so the system is usable out of the box.
+
+#### Solution: package data + startup seeding
+
+**11a. Package layout**
+
+The default template set is stored inside the Python package so it is included in the wheel and available at any path via `importlib.resources`:
+
+```
+src/zenve/
+  templates/
+    default/
+      SOUL.md.j2
+      AGENTS.md.j2
+      HEARTBEAT.md.j2
+      TOOLS.md.j2
+```
+
+`pyproject.toml` must declare these as package data so they are included in the built distribution:
+
+```toml
+[tool.setuptools.package-data]
+"zenve" = ["templates/**/*.j2"]
+```
+
+**11b. Startup seeding in `api/lifespan.py`**
+
+On gateway startup, `FilesystemService.seed_default_templates()` is called. It copies the bundled `default/` set to `TEMPLATES_DIR/default/` only if that directory does not already exist — preserving any customisations the operator has made.
+
+```python
+# api/lifespan.py  (inside the startup block)
+filesystem_service.seed_default_templates()
+```
+
+```python
+# services/filesystem.py
+import importlib.resources
+import shutil
+
+class FilesystemService:
+    ...
+
+    def seed_default_templates(self) -> None:
+        """
+        Copy the bundled default template set to TEMPLATES_DIR/default/
+        if it does not already exist on disk.
+        Idempotent — safe to call on every startup.
+        """
+        dest = Path(self.settings.TEMPLATES_DIR) / "default"
+        if dest.exists():
+            return  # operator may have customised; never overwrite
+        with importlib.resources.files("zenve.templates") as pkg_templates:
+            shutil.copytree(str(pkg_templates / "default"), str(dest))
+```
+
+#### Behaviour summary
+
+| Scenario | Result |
+|----------|--------|
+| Fresh deployment, empty `TEMPLATES_DIR` | Bundled defaults are seeded on first startup |
+| Existing `TEMPLATES_DIR/default/` | Not touched — operator customisations preserved |
+| Custom template set (e.g. `minimal/`) | Not affected; only `default/` is managed |
+| Gateway upgrade (new template version) | Default set is **not** auto-updated; operator must delete `default/` to re-seed |
+
+#### Upgrade path
+
+If a gateway release ships updated default templates, operators who want the new defaults must delete `TEMPLATES_DIR/default/` before restarting. A future migration utility can handle this automatically, but is out of scope for this chunk.
+
+---
+
 ## Key Decisions
 
 | Decision | Choice | Rationale |
 |----------|--------|-----------|
 | Template format | Jinja2 | Standard Python templating; readable conditionals for optional fields |
 | Template discovery | Named directories under `TEMPLATES_DIR` | Deployers can add custom sets without code changes |
+| Bundled defaults | Package data in `src/zenve/templates/default/` | Ships with the wheel; no separate asset distribution needed |
+| Seeding strategy | Copy-once on startup (skip if exists) | Idempotent; preserves operator customisations across restarts |
 | Signal protocol | Plain text suffix (`RUN_OK`, `HEARTBEAT_OK`, etc.) | Simple to parse, works with any LLM output |
 | Memory split | `long_term.md` + `scratch.md` | Separates durable facts from ephemeral notes; keeps long_term.md clean |
 | `gateway.json` format | JSON (not template) | Programmatic writes are cleaner in JSON; no template needed |
@@ -385,6 +461,7 @@ GATEWAY_URL: str = "http://localhost:8000/api/v1"
 - `memory/scratch.md` clearing policy is advisory — the agent is responsible; the gateway does not truncate it.
 - The signal protocol (`RUN_OK`, `HEARTBEAT_OK`, etc.) must be documented in AGENTS.md and HEARTBEAT.md consistently. The adapter parser (Chunk 06) and heartbeat service (Chunk 10) depend on these exact strings.
 - Custom template sets inherit no defaults from `default/` — each set must provide all four template files.
+- `src/zenve/templates/` is never imported as Python — it is pure data. The `importlib.resources` API is used to locate it at runtime regardless of install method (editable, wheel, zip).
 
 ## Change Log
 
@@ -392,3 +469,4 @@ GATEWAY_URL: str = "http://localhost:8000/api/v1"
 |------|--------|--------|
 | 2026-04-06 | Created chunk with full template designs for SOUL.md.j2, AGENTS.md.j2, HEARTBEAT.md.j2, TOOLS.md.j2, memory stubs, gateway.json schema, FilesystemService signature, and config additions | Initial design of agent file templates |
 | 2026-04-06 | Added `heartbeat_interval_seconds` to gateway.json schema and field table; fixed nested code block in TOOLS.md.j2 section | Align gateway.json with ORM model (chunk 04); fix markdown rendering |
+| 2026-04-06 | Added section 11: bundled templates & bootstrap seeding — package data layout, `seed_default_templates()`, behaviour table, upgrade path | Fresh deployments have empty TEMPLATES_DIR; defaults must ship with the gateway |
