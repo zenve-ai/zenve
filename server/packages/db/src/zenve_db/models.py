@@ -18,6 +18,10 @@ class UserRecord(Base):
     password_hash: Mapped[str | None] = mapped_column(nullable=True)
     created_at: Mapped[datetime] = mapped_column(default=func.now())
 
+    memberships: Mapped[list["UserOrgMembership"]] = relationship(
+        back_populates="user", cascade="all, delete-orphan"
+    )
+
 
 class Organization(Base):
     __tablename__ = "organizations"
@@ -35,6 +39,23 @@ class Organization(Base):
     agents: Mapped[list["Agent"]] = relationship(
         back_populates="organization", cascade="all, delete-orphan"
     )
+    memberships: Mapped[list["UserOrgMembership"]] = relationship(
+        back_populates="organization", cascade="all, delete-orphan"
+    )
+
+
+class UserOrgMembership(Base):
+    __tablename__ = "user_org_memberships"
+    __table_args__ = (UniqueConstraint("user_id", "org_id"),)
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)
+    org_id: Mapped[str] = mapped_column(String(36), ForeignKey("organizations.id"), nullable=False)
+    role: Mapped[str] = mapped_column(String(20), nullable=False, default="member")
+    created_at: Mapped[datetime] = mapped_column(default=func.now())
+
+    user: Mapped["UserRecord"] = relationship(back_populates="memberships")
+    organization: Mapped["Organization"] = relationship(back_populates="memberships")
 
 
 class ApiKeyRecord(Base):
