@@ -19,7 +19,9 @@ export const authApi = createApi({
           setToken(data.access_token)
           setUserData(data.user)
           dispatch(setCurrentUser(data.user))
-        } catch {}
+        } catch {
+          // Request failed or was aborted; leave auth state unchanged
+        }
       },
     }),
     signup: builder.mutation<AuthResponse, SignupData>({
@@ -30,7 +32,9 @@ export const authApi = createApi({
           setToken(data.access_token)
           setUserData(data.user)
           dispatch(setCurrentUser(data.user))
-        } catch {}
+        } catch {
+          // Request failed or was aborted; leave auth state unchanged
+        }
       },
     }),
     logout: builder.mutation<void, void>({
@@ -38,7 +42,11 @@ export const authApi = createApi({
       async onQueryStarted(_, { dispatch, queryFulfilled }) {
         clearAuthData()
         dispatch(clearCurrentUser())
-        try { await queryFulfilled } catch {}
+        try {
+          await queryFulfilled
+        } catch {
+          // Logout request may fail after local session was cleared
+        }
       },
     }),
   }),

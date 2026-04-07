@@ -19,5 +19,10 @@ export default defineConfig([
       ecmaVersion: 2020,
       globals: globals.browser,
     },
+    rules: {
+      // shadcn/ui and similar patterns export hooks + `cva` helpers alongside components.
+      // Fast Refresh still works in practice; the rule is overly strict for that style.
+      'react-refresh/only-export-components': 'off',
+    },
   },
 ])
