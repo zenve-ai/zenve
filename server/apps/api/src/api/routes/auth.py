@@ -4,7 +4,7 @@ from zenve_models import LoginRequest, SignupRequest, TokenResponse
 from zenve_services import get_auth_service
 from zenve_services.auth import AuthService
 
-router = APIRouter(prefix="/auth", tags=["auth"])
+router = APIRouter(prefix="/api/v1/auth", tags=["auth"])
 
 
 @router.post("/signup", response_model=TokenResponse, status_code=status.HTTP_201_CREATED)
