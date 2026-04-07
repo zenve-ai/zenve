@@ -8,7 +8,7 @@ import time
 from pathlib import Path
 from typing import ClassVar
 
-from zenve_agents.base import BaseAdapter
+from zenve_adapters.base import BaseAdapter
 from zenve_models.adapter import ClaudeCodeConfig, RunContext, RunResult
 
 
