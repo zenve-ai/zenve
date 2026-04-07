@@ -7,7 +7,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from zenve_config.settings import settings
-from zenve_db.models import Organization
+from zenve_db.models import Organization, UserOrgMembership
 from zenve_models.org import OrgCreate, OrgUpdate
 
 
@@ -30,7 +30,7 @@ class OrgService:
     def __init__(self, db: Session):
         self.db = db
 
-    def create(self, data: OrgCreate) -> Organization:
+    def create(self, data: OrgCreate, owner_user_id: int) -> Organization:
         slug = data.slug or _slugify(data.name)
         base_path = str(Path(settings.data_dir) / "orgs" / slug)
 
@@ -41,6 +41,15 @@ class OrgService:
             base_path=base_path,
         )
         self.db.add(org)
+
+        membership = UserOrgMembership(
+            id=str(uuid.uuid4()),
+            user_id=owner_user_id,
+            org_id=org.id,
+            role="owner",
+        )
+        self.db.add(membership)
+
         try:
             self.db.commit()
         except IntegrityError as exc:
@@ -76,6 +85,14 @@ class OrgService:
 
     def list_all(self) -> list[Organization]:
         return self.db.query(Organization).all()
+
+    def list_for_user(self, user_id: int) -> list[tuple[Organization, str]]:
+        return (
+            self.db.query(Organization, UserOrgMembership.role)
+            .join(UserOrgMembership, UserOrgMembership.org_id == Organization.id)
+            .filter(UserOrgMembership.user_id == user_id)
+            .all()
+        )
 
     def update(self, org_id: str, data: OrgUpdate) -> Organization:
         org = self.get_by_id(org_id)

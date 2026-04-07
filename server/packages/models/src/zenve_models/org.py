@@ -26,5 +26,10 @@ class OrgResponse(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class OrgWithRoleResponse(OrgResponse):
+    role: str
+
+
 class OrgCreatedResponse(OrgResponse):
     api_key: ApiKeyCreated
+    role: str = "owner"

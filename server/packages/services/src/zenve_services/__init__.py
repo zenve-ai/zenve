@@ -8,6 +8,7 @@ from zenve_services.agent import AgentService
 from zenve_services.api_key import ApiKeyService
 from zenve_services.auth import AuthService
 from zenve_services.filesystem import FilesystemService
+from zenve_services.membership import MembershipService
 from zenve_services.org import OrgService
 
 
@@ -17,6 +18,10 @@ def get_auth_service(db: Session = Depends(get_db)) -> AuthService:
 
 def get_org_service(db: Session = Depends(get_db)) -> OrgService:
     return OrgService(db)
+
+
+def get_membership_service(db: Session = Depends(get_db)) -> MembershipService:
+    return MembershipService(db)
 
 
 def get_api_key_service(db: Session = Depends(get_db)) -> ApiKeyService:
