@@ -109,12 +109,12 @@ just docker-logs  # tail logs
 
 ## Adding a New Feature
 
-1. **Pydantic model** → `packages/models/src/zenve_models/{domain}.py`
-2. **ORM model** → `packages/db/src/zenve_db/models.py`
+1. **Pydantic Model** → `packages/models/src/zenve_models/{domain}.py`
+2. **ORM Model** → `packages/db/src/zenve_db/models.py`
 3. **Service** → `packages/services/src/zenve_services/{domain}.py`
 4. **Dependency function** → `packages/services/src/zenve_services/__init__.py`
 5. **Route** → `apps/api/src/api/routes/{domain}.py` (thin wrapper)
-6. **Register router** → `apps/api/src/api/routes/__init__.py` + `main.py`
+6. **Register Router** → `apps/api/src/api/routes/__init__.py` + `main.py`
 
 ## Adding a New Package
 

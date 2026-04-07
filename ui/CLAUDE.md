@@ -24,6 +24,41 @@ React 19 + Vite + TypeScript + Tailwind CSS v4 + shadcn/ui + Redux Toolkit + Rea
 - Path alias `@` → `src/`
 - **Forms:** always use `FieldGroup`, `FieldLabel`, `FieldDescription` from `@/components/ui/field` — never use `Label` directly in forms
 
+## Component body ordering
+Every component must follow this order — no interleaving:
+1. **Declarations** — all `const` together: hooks (`useParams`, `useState`, `useAppSelector`, RTK Query), then derived values computed from them
+2. **Effects** — `useEffect` and other side-effect hooks
+3. **Render helpers** — `const renderXxx = () => <JSX />` arrow functions for distinct sections
+4. **Compose** — `const renderMain = () => { ... }` handles loading/error/empty branching
+5. **Return** — `return renderMain()` or compose with render helpers; no early returns, no nested ternaries
+
+```tsx
+// ✅ Correct
+// 1. declarations
+const { id } = useParams()
+const { data, isLoading, error } = useGetItemQuery(id)
+const isEmpty = !data?.length
+
+// 2. effects
+useEffect(() => { ... }, [])
+
+// 3. render helpers
+const renderLoading = () => <LoadingSpinner />
+const renderError = () => <ErrorMessage error={error} />
+const renderContent = () => <MainContent data={data} />
+
+// 4. compose
+const renderMain = () => {
+  if (isLoading) return renderLoading()
+  if (error) return renderError()
+  if (isEmpty) return null
+  return renderContent()
+}
+
+// 5. return
+return <div>{renderMain()}</div>
+```
+
 ## Implementation Checklist
 - All imports use `@/` path aliases
 - Use `cn()` utility for className merging (from `@/lib/utils.ts`)
