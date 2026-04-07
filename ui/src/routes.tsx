@@ -1,7 +1,10 @@
 import { Route, Routes, Navigate } from 'react-router'
-import Home from './pages/home'
+import AgentDetail from './pages/agent-detail'
+import AgentsList from './pages/agents-list'
+import Dashboard from './pages/dashboard'
 import Login from './pages/login'
 import NoOrganizationPage from './pages/no-organization'
+import OrgLayout from './pages/org-layout'
 import { RootPathRedirect } from './pages/root-path-redirect'
 import { PrivateRoute, PublicRoute } from './components/auth'
 
@@ -14,7 +17,18 @@ export default function AppRoutes() {
       <Route path="/" element={<PrivateRoute><RootPathRedirect /></PrivateRoute>} />
 
       <Route path="/no-organization" element={<PrivateRoute><NoOrganizationPage /></PrivateRoute>} />
-      <Route path="/:orgSlug" element={<PrivateRoute><Home /></PrivateRoute>} />
+      <Route
+        path="/:orgSlug"
+        element={(
+          <PrivateRoute>
+            <OrgLayout />
+          </PrivateRoute>
+        )}
+      >
+        <Route index element={<Dashboard />} />
+        <Route path="agents" element={<AgentsList />} />
+        <Route path="agents/:agentSlug" element={<AgentDetail />} />
+      </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   )

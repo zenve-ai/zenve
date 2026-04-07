@@ -89,7 +89,7 @@ export function OrganizationSwitcher() {
               size="lg"
               className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
             >
-              <div className="flex aspect-square size-8 items-center justify-center rounded-lg border border-sidebar-border bg-sidebar text-sidebar-foreground">
+              <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-black text-white">
                 <CurrentIcon className="size-4" />
               </div>
               <div className="grid min-w-0 flex-1 text-left text-sm leading-tight">
