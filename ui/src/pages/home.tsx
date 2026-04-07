@@ -1,3 +1,5 @@
+import { useEffect } from 'react'
+import { Navigate, useNavigate, useParams } from 'react-router'
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -9,8 +11,40 @@ import {
 import { Separator } from '@/components/ui/separator'
 import { SidebarInset, SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar'
 import { AppSidebar } from '@/components/layout'
+import { useAppDispatch, useAppSelector } from '@/store/hooks'
+import {
+  useListOrganizationsQuery,
+  resolveOrgFromSlug,
+  selectCurrentOrgId,
+  selectOrganizations,
+  setCurrentOrganization,
+} from '@/store/organization'
+import { OrgLoading } from './org-loading'
 
 export default function Home() {
+  const { orgSlug } = useParams<{ orgSlug: string }>()
+  const navigate = useNavigate()
+  const dispatch = useAppDispatch()
+  const { isLoading, isFetching, isSuccess, isError, data } = useListOrganizationsQuery()
+  const organizations = useAppSelector(selectOrganizations)
+  const currentOrgId = useAppSelector(selectCurrentOrgId)
+
+  useEffect(() => {
+    if (!isSuccess || !organizations.length || !orgSlug) return
+    const match = resolveOrgFromSlug(organizations, orgSlug)
+    if (match) {
+      if (match.id !== currentOrgId) dispatch(setCurrentOrganization(match.id))
+    } else {
+      navigate(`/${organizations[0].slug}`, { replace: true })
+    }
+  }, [orgSlug, organizations, isSuccess, currentOrgId, dispatch, navigate])
+
+  const waiting = isLoading || isFetching
+  if (waiting) return <OrgLoading />
+
+  const empty = isError || (isSuccess && (!data || data.length === 0))
+  if (empty) return <Navigate to="/no-organization" replace />
+
   return (
     <SidebarProvider>
       <AppSidebar />
