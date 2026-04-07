@@ -16,6 +16,11 @@
       "sourceType": "github",
       "computedHash": "299513592c8a7221ad93d2b118090a2e3d3e35fe7069dcb90b9622af26ec4248"
     },
+    "frontend-design": {
+      "source": "anthropics/skills",
+      "sourceType": "github",
+      "computedHash": "063a0e6448123cd359ad0044cc46b0e490cc7964d45ef4bb9fd842bd2ffbca67"
+    },
     "react-architect": {
       "source": "ghalex/skills",
       "sourceType": "github",
@@ -25,6 +30,11 @@
       "source": "ghalex/skills",
       "sourceType": "github",
       "computedHash": "94da1e3488db5f8189529d1e39842ac8c93dd24c15d756570da7ed01ed062fa9"
+    },
+    "shadcn": {
+      "source": "shadcn/ui",
+      "sourceType": "github",
+      "computedHash": "873c67922d80775a9fdf596db7964b579f0408c30ec6e3d11989f6055bbec89f"
     }
   }
 }
