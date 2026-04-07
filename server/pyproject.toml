@@ -1,0 +1,54 @@
+[project]
+name = "zenve-workspace"
+version = "0.1.0"
+description = "zenve monorepo workspace"
+requires-python = ">=3.13"
+dependencies = []
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+only-include = ["README.md"]
+
+[tool.uv.workspace]
+members = [
+    "apps/api",
+    "packages/*",
+]
+
+[tool.uv.sources]
+zenve-config = { workspace = true }
+zenve-db = { workspace = true }
+zenve-models = { workspace = true }
+zenve-utils = { workspace = true }
+zenve-services = { workspace = true }
+zenve-agents = { workspace = true }
+
+[dependency-groups]
+dev = [
+    "pyright>=1.1.407",
+    "ruff>=0.11.0",
+]
+
+[tool.ruff]
+line-length = 100
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+
+[tool.ruff.lint]
+select = ["E", "W", "F", "I", "N", "UP", "B"]
+ignore = ["E501", "B008"]
+
+[tool.ruff.lint.isort]
+known-first-party = [
+    "zenve_agents",
+    "zenve_config",
+    "zenve_db",
+    "zenve_models",
+    "zenve_utils",
+    "zenve_services",
+]

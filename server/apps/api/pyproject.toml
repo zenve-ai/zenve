@@ -1,0 +1,36 @@
+[project]
+name = "zenve-api"
+version = "0.1.0"
+description = "zenve FastAPI application"
+requires-python = ">=3.13"
+dependencies = [
+    "fastapi>=0.115.0",
+    "uvicorn>=0.30.0",
+    "zenve-config",
+    "zenve-db",
+    "zenve-models",
+    "zenve-utils",
+    "zenve-services",
+    "zenve-agents",
+]
+
+[project.scripts]
+api-start = "api.main:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src"]
+
+[tool.hatch.build.targets.wheel.sources]
+"src" = ""
+
+[tool.uv.sources]
+zenve-config = { workspace = true }
+zenve-db = { workspace = true }
+zenve-models = { workspace = true }
+zenve-utils = { workspace = true }
+zenve-services = { workspace = true }
+zenve-agents = { workspace = true }

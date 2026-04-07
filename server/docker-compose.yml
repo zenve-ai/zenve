@@ -1,0 +1,14 @@
+services:
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    image: zenve-api:latest
+    container_name: zenve-api
+    ports:
+      - "8000:8000"
+    restart: unless-stopped
+    environment:
+      - SECRET_KEY=${SECRET_KEY}
+      - SQLITE_DATABASE_URL=${SQLITE_DATABASE_URL}
+      - PG_DATABASE_URL=${PG_DATABASE_URL}

@@ -1,0 +1,40 @@
+# {{ agent_name }} — Run Instructions
+
+These instructions govern how you behave when the gateway invokes a run.
+
+## On Start
+
+1. Read `SOUL.md` — internalize your identity and role.
+2. Read `memory/long_term.md` — load any persisted context.
+3. Read `memory/scratch.md` — load working notes from previous runs.
+4. Read the run prompt (provided by the caller in the run request).
+
+## Executing the Task
+
+- Complete the task described in the run prompt.
+- Stay within the tool permissions listed in `TOOLS.md`.
+- Use `memory/scratch.md` for notes you need within this run only.
+- Use `memory/long_term.md` for facts worth keeping across runs.
+
+## On Finish
+
+Before ending the session:
+
+1. Update `memory/long_term.md` with any durable observations.
+2. Clear `memory/scratch.md` or leave a brief summary for the next run.
+3. Produce a final response that the gateway will store as the run result.
+
+## Signalling Outcomes
+
+End your response with one of these signal lines so the gateway can parse the outcome:
+
+| Signal | Meaning |
+|--------|---------|
+| `RUN_OK` | Task completed successfully |
+| `RUN_FAILED: <reason>` | Task failed; include a short reason |
+| `RUN_NEEDS_INPUT: <question>` | Blocked; waiting for more information |
+
+## Gateway API
+
+The gateway is reachable at `{{ gateway_url }}`. Your organization slug is `{{ org_slug }}`.
+You may call the API using the JWT token injected in the `ZENVE_TOKEN` environment variable.
