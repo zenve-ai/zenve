@@ -3,7 +3,11 @@ import { useAppSelector } from '@/store/hooks'
 import { useListOrganizationsQuery, selectCurrentOrganization } from '@/store/organization'
 import { OrgLoading } from './org-loading'
 
-export function OrgRootRedirect() {
+/**
+ * `/` is not a destination — only redirects. Mounted under PrivateRoute so guests
+ * never see this; they are sent to /login first.
+ */
+export function RootPathRedirect() {
   const { isLoading, isFetching, isSuccess, isError, data } = useListOrganizationsQuery()
   const current = useAppSelector(selectCurrentOrganization)
 

@@ -126,7 +126,7 @@ export function OrganizationSwitcher() {
               })}
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
-            <DropdownMenuItem className="gap-2" onSelect={() => {}}>
+            <DropdownMenuItem className="gap-2" onSelect={() => navigate('/create-organization')}>
               <div className="flex size-8 shrink-0 items-center justify-center rounded-md border bg-muted/40">
                 <Plus className="size-4 text-muted-foreground" />
               </div>

@@ -12,4 +12,4 @@ export {
   selectOrgListLoaded,
 } from './slice'
 
-export { organizationApi, useListOrganizationsQuery } from './api'
+export { organizationApi, useListOrganizationsQuery, useCreateOrganizationMutation } from './api'
