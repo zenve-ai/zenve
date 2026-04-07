@@ -1,7 +1,7 @@
 from fastapi import Depends, Request
 from sqlalchemy.orm import Session
 
-from zenve_agents.registry import AdapterRegistry
+from zenve_adapters.registry import AdapterRegistry
 from zenve_config.settings import Settings, get_settings
 from zenve_db.database import get_db
 from zenve_services.agent import AgentService
