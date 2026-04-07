@@ -6,7 +6,7 @@ from fastapi import HTTPException
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from zenve_agents.registry import AdapterRegistry
+from zenve_adapters.registry import AdapterRegistry
 from zenve_config.settings import settings
 from zenve_db.models import Agent, Organization
 from zenve_models.agent import AgentCreate, AgentUpdate

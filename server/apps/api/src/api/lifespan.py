@@ -3,8 +3,8 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from sqlalchemy import text
 
-from zenve_agents.claude_code import ClaudeCodeAdapter
-from zenve_agents.registry import AdapterRegistry
+from zenve_adapters.claude_code import ClaudeCodeAdapter
+from zenve_adapters.registry import AdapterRegistry
 from zenve_config.settings import settings
 from zenve_db.database import Base, engine
 from zenve_services.filesystem import FilesystemService

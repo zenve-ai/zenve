@@ -11,7 +11,7 @@ dependencies = [
     "zenve-db",
     "zenve-models",
     "zenve-utils",
-    "zenve-agents",
+    "zenve-adapters",
 ]
 
 [build-system]
@@ -26,4 +26,4 @@ zenve-config = { workspace = true }
 zenve-db = { workspace = true }
 zenve-models = { workspace = true }
 zenve-utils = { workspace = true }
-zenve-agents = { workspace = true }
+zenve-adapters = { workspace = true }
