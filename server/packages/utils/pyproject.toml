@@ -1,0 +1,23 @@
+[project]
+name = "zenve-utils"
+version = "0.1.0"
+description = "zenve utility functions"
+requires-python = ">=3.13"
+dependencies = [
+    "fastapi>=0.115.0",
+    "bcrypt>=4.0",
+    "python-jose[cryptography]>=3.5.0",
+    "zenve-config",
+    "zenve-db",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/zenve_utils"]
+
+[tool.uv.sources]
+zenve-config = { workspace = true }
+zenve-db = { workspace = true }

@@ -1,0 +1,50 @@
+# Application
+
+dev:
+    API_RELOAD=true uv run api-start
+
+start:
+    uv run api-start
+
+# Package management
+
+install:
+    uv sync
+
+add-to-api package:
+    uv add --package zenve-api {{package}}
+
+add-to-pkg pkg package:
+    uv add --package {{pkg}} {{package}}
+
+update:
+    uv lock --upgrade
+    uv sync
+
+# Docker
+
+docker-build:
+    docker build -f apps/api/Dockerfile -t zenve-api:latest .
+
+docker-up:
+    docker compose up -d
+
+docker-down:
+    docker compose down
+
+docker-logs:
+    docker compose logs -f
+
+# Code quality
+
+format:
+    uv run ruff format .
+
+lint path=".":
+    uv run ruff check {{path}}
+
+lint-fix path=".":
+    uv run ruff check --fix {{path}}
+
+typecheck path=".":
+    uv run pyright {{path}}
