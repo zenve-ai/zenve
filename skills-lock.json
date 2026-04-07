@@ -1,6 +1,26 @@
 {
   "version": 1,
   "skills": {
+    "commit": {
+      "source": "ghalex/skills",
+      "sourceType": "github",
+      "computedHash": "8f006b38d44e09176c4f5ea5589efefa06a253a08ad171871f15b361dae7ab64"
+    },
+    "fastapi-architect": {
+      "source": "ghalex/skills",
+      "sourceType": "github",
+      "computedHash": "002c350c25fd1a1be1a5fc252a1fe4f57d547e8ff0fd3185c004a167b1e60f15"
+    },
+    "fastapi-monorepo-setup": {
+      "source": "ghalex/skills",
+      "sourceType": "github",
+      "computedHash": "299513592c8a7221ad93d2b118090a2e3d3e35fe7069dcb90b9622af26ec4248"
+    },
+    "react-architect": {
+      "source": "ghalex/skills",
+      "sourceType": "github",
+      "computedHash": "f2f96a9bcb01227177352d450b7aa2e43d101ce85ee8d24c8942fd904cc2ca6f"
+    },
     "react-setup": {
       "source": "ghalex/skills",
       "sourceType": "github",
