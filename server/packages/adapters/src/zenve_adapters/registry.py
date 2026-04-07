@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 
-from zenve_agents.base import BaseAdapter
+from zenve_adapters.base import BaseAdapter
 
 
 class AdapterRegistry:
