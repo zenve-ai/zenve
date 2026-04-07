@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "skills": {
+    "react-setup": {
+      "source": "ghalex/skills",
+      "sourceType": "github",
+      "computedHash": "94da1e3488db5f8189529d1e39842ac8c93dd24c15d756570da7ed01ed062fa9"
+    }
+  }
+}
