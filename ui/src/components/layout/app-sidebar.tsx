@@ -1,21 +1,13 @@
-import { BookOpen, Bot, Settings2, SquareTerminal } from 'lucide-react'
-import { NavMain } from './nav-main'
+import { useMemo } from 'react'
+import { useParams } from 'react-router'
+import { BookOpen, Bot, Settings2, Users } from 'lucide-react'
+import { useListAgentsQuery } from '@/store/agents'
+import { NavMain, type NavItem } from './nav-main'
 import { NavUser } from './nav-user'
 import { OrganizationSwitcher } from './organization-switcher'
 import { Sidebar, SidebarContent, SidebarFooter, SidebarHeader } from '@/components/ui/sidebar'
 
-const navItems = [
-  {
-    title: 'Playground',
-    url: '#',
-    icon: SquareTerminal,
-    isActive: true,
-    items: [
-      { title: 'History', url: '#' },
-      { title: 'Starred', url: '#' },
-      { title: 'Settings', url: '#' },
-    ],
-  },
+const demoNavTail: NavItem[] = [
   {
     title: 'Models',
     url: '#',
@@ -51,6 +43,27 @@ const navItems = [
 ]
 
 export function AppSidebar(props: React.ComponentProps<typeof Sidebar>) {
+  const { orgSlug } = useParams<{ orgSlug: string }>()
+  const { data: agents = [] } = useListAgentsQuery(
+    { orgSlug: orgSlug! },
+    { skip: !orgSlug },
+  )
+
+  const navItems = useMemo((): NavItem[] => {
+    const prefix = orgSlug ? `/${orgSlug}` : ''
+    const agentsBlock: NavItem = {
+      title: 'Agents',
+      url: `${prefix}/agents`,
+      icon: Users,
+      openWhenPathIncludes: '/agents',
+      items: agents.map((a) => ({
+        title: a.name,
+        url: `${prefix}/agents/${a.slug}`,
+      })),
+    }
+    return [agentsBlock, ...demoNavTail]
+  }, [orgSlug, agents])
+
   return (
     <Sidebar variant="inset" {...props}>
       <SidebarHeader>

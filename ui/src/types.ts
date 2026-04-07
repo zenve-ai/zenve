@@ -25,6 +25,24 @@ export type OrganizationIconKey =
   | 'building'
   | 'layers'
 
+/** Agent list / detail icon (same pattern as `OrganizationIconKey`). */
+export type AgentIconKey = 'crown' | 'compass' | 'code'
+
+export interface Agent {
+  id: string
+  orgId: string
+  name: string
+  slug: string
+  adapterType: string
+  adapterConfig: Record<string, unknown>
+  skills: string[]
+  status: string
+  heartbeatIntervalSeconds: number
+  lastHeartbeatAt: string | null
+  createdAt: string
+  updatedAt: string
+}
+
 export interface OrganizationSummary {
   id: string
   name: string
