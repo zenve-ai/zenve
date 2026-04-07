@@ -36,7 +36,7 @@ server/
 - Shared freely across routes, services, and utils
 
 ### Utils (`packages/utils/`)
-- Pure stateless helpers: hashing, JWT, `get_current_user` FastAPI dependency
+- Pure stateless helpers: hashing, JWT, `get_current_user` FastAPI dependency (JWT auth)
 - No business logic
 
 ### DB (`packages/db/`)
@@ -54,6 +54,35 @@ zenve-utils   → zenve-config, zenve-db
 zenve-services → zenve-db, zenve-models, zenve-utils
 apps/api          → all packages above
 ```
+
+## Authentication & Authorization
+
+Two auth systems coexist — use the right one for each context:
+
+### JWT Auth (User sessions)
+- Users log in via `/auth/login` or `/auth/signup`, receive a JWT token (24h TTL)
+- Dependency: `get_current_user()` from `zenve_utils.auth` → returns `UserRecord`
+- **Used for:** Organization CRUD (`/api/v1/orgs`) — any user-facing operation
+
+### API Key Auth (Programmatic access)
+- Orgs have API keys (`zv_live_*` prefix), stored as bcrypt hashes
+- Dependency: `get_current_org()` from `zenve_services.api_key_auth` → returns `(Organization, ApiKeyRecord)`
+- Scope-based access: `require_scope("agents:write")` for fine-grained control
+- **Used for:** Agent routes (`/api/v1/agents`), API key management (`/api/v1/api-keys`)
+
+### User–Org Membership
+- `UserOrgMembership` join table links users to orgs with roles: `owner`, `admin`, `member`
+- Org creation requires a logged-in user who becomes the `owner`
+- `MembershipService.require_membership()` — verifies user belongs to org (403 if not)
+- `MembershipService.require_role()` — verifies user has specific role(s) (403 if not)
+- Org update restricted to `owner` role
+
+### When to use which
+| Route context | Auth dependency | Notes |
+|---|---|---|
+| Org CRUD (`/api/v1/orgs`) | `get_current_user` (JWT) | Membership checked via `MembershipService` |
+| Agents (`/api/v1/agents`) | `get_current_org` + `require_scope` (API key) | For programmatic/agent access |
+| API keys (`/api/v1/api-keys`) | `get_current_org` (API key) | Manage keys within an org |
 
 ## Violations to Flag
 
