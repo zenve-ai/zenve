@@ -1,10 +1,10 @@
 # Application
 
 dev:
-    API_RELOAD=true uv run api-start
+    API_RELOAD=true uv run --package zenve-api api-start
 
 start:
-    uv run api-start
+    uv run --package zenve-api api-start
 
 # Package management
 
