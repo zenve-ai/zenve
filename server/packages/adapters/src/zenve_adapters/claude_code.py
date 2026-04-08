@@ -76,16 +76,18 @@ class ClaudeCodeAdapter(BaseAdapter):
             **ctx.env_vars,
         }
 
-        args = self._build_cli_args(config, message, soul)
+        args = self._build_cli_args(config, message, soul, ctx.tools)
+        print(f"Args: {args}")
 
         proc = await asyncio.create_subprocess_exec(
             *args,
             cwd=ctx.agent_dir,
             env=env,
+            stdin=asyncio.subprocess.PIPE,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
         )
-        stdout_bytes, stderr_bytes = await proc.communicate()
+        stdout_bytes, stderr_bytes = await proc.communicate(input=message.encode())
 
         duration = time.monotonic() - start
         stdout = stdout_bytes.decode(errors="replace")
@@ -107,20 +109,31 @@ class ClaudeCodeAdapter(BaseAdapter):
     # ------------------------------------------------------------------
 
     def _build_cli_args(
-        self, config: ClaudeCodeConfig, message: str, system_prompt: str
+        self,
+        config: ClaudeCodeConfig,
+        message: str,
+        system_prompt: str,
+        tools: list[str] | None = None,
     ) -> list[str]:
-        args = ["claude", "--print", "--output-format", config.output_format]
+        args = [
+            "claude",
+            "--print",
+            "--output-format",
+            config.output_format,
+        ]
         args.extend(["--system-prompt", system_prompt])
-        args.extend(["--prompt", message])
         if config.model:
             args.extend(["--model", config.model])
         if config.max_tokens is not None:
             args.extend(["--max-tokens", str(config.max_tokens)])
         if config.max_turns:
             args.extend(["--max-turns", str(config.max_turns)])
-        if config.allowed_tools:
-            for tool in config.allowed_tools:
-                args.extend(["--allowedTools", tool])
+        if tools is not None:
+            # Explicit tool list: auto-approve these, deny everything else
+            args.extend(["--allowedTools", ",".join(tools)])
+        else:
+            # No tool restrictions: skip all permission prompts
+            args.append("--dangerously-skip-permissions")
         return args
 
     def _parse_token_usage(self, stdout: str) -> dict | None:

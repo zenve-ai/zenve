@@ -29,7 +29,6 @@ class ClaudeCodeConfig(AdapterConfigBase):
 
     model: str = "claude-sonnet-4-6"
     max_tokens: int | None = None
-    allowed_tools: list[str] | None = None
     max_turns: int = 10
     output_format: str = "json"
 
@@ -77,6 +76,7 @@ class RunContext:
     heartbeat: bool
     gateway_url: str
     agent_token: str  # short-lived JWT (Chunk 09); empty string until then
+    tools: list[str] | None = None  # from gateway.json; None = all tools allowed
     env_vars: dict = field(default_factory=dict)
 
 
