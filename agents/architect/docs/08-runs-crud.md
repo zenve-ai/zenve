@@ -6,6 +6,9 @@ Implement the Run entity: ORM model, service, REST routes for triggering, listin
 ## Depends On
 - Chunk 07 (Celery — runs are dispatched as Celery tasks)
 
+## Referenced By
+- Chunk 15 — Run Event System (run_events FK to runs, events endpoint alongside run routes)
+
 ## Deliverables
 
 ### 1. ORM Model — `db/models.py`

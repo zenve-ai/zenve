@@ -105,6 +105,7 @@ Filesystem mirrors the DB: `/data/orgs/{slug}/agents/{slug}/` holds SOUL.md, AGE
 | 12 | Collaboration Execution Engine | 11, 05     | execute_group_run task, routing strategies, RESOLVE  | not started     | —          |
 | 13 | Collaboration API & Messages   | 12         | Full REST API, message thread, cancel                | not started     | —          |
 | 14 | Health & Observability         | 07, 10     | /health, /health/workers, status checks              | not started     | —          |
+| 15 | Run Event System               | 05, 07, 08 | RunEvent model, on_event callback, event timeline API | not started     | —          |
 
 ## Cross-Cutting Concerns
 

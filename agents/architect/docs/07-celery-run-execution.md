@@ -7,6 +7,10 @@ Set up Celery with Redis broker and implement the `execute_agent_run` task that 
 - Chunk 05 (Adapter Interface)
 - Chunk 06 (Claude Code Adapter — first adapter to test with)
 
+## Referenced By
+- Chunk 08 — Runs CRUD (runs are dispatched as Celery tasks)
+- Chunk 15 — Run Event System (task builds on_event closure and emits lifecycle events)
+
 ## Deliverables
 
 ### 1. Dependencies
