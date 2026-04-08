@@ -10,6 +10,7 @@ from zenve_services.auth import AuthService
 from zenve_services.filesystem import FilesystemService
 from zenve_services.membership import MembershipService
 from zenve_services.org import OrgService
+from zenve_services.run import RunService
 
 
 def get_auth_service(db: Session = Depends(get_db)) -> AuthService:
@@ -44,3 +45,7 @@ def get_agent_service(
     adapter_registry: AdapterRegistry = Depends(get_adapter_registry),
 ) -> AgentService:
     return AgentService(db, filesystem, adapter_registry)
+
+
+def get_run_service(db: Session = Depends(get_db)) -> RunService:
+    return RunService(db)
