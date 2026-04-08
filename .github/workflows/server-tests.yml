@@ -1,0 +1,32 @@
+name: Server Tests
+
+on:
+  pull_request:
+    paths:
+      - "server/**"
+
+jobs:
+  test:
+    name: Run server tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          version: "latest"
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install dependencies
+        working-directory: server
+        run: uv sync
+
+      - name: Run tests
+        working-directory: server
+        run: uv run pytest packages/adapters/tests -v
