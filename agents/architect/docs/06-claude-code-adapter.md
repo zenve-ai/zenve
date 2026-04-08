@@ -5,6 +5,10 @@ Implement the first concrete adapter: ClaudeCodeAdapter, which spawns the `claud
 
 ## Depends On
 - Chunk 05 (Adapter Interface)
+- Chunk 15 (Run Event System — emits execution events via `ctx.on_event`)
+
+## Referenced By
+- Chunk 07 — Celery Setup & Run Execution (first adapter to test with)
 
 ## Deliverables
 
@@ -63,8 +67,8 @@ class ClaudeCodeAdapter(BaseAdapter):
             **ctx.env_vars,
         }
 
-        # 4. Build CLI args from adapter_config
-        args = self._build_cli_args(ctx, message, soul)
+        # 4. Build CLI args from adapter_config + tools from RunContext
+        args = self._build_cli_args(ctx, message, soul, ctx.tools)
 
         # 5. Spawn claude CLI
         proc = await asyncio.create_subprocess_exec(
@@ -93,15 +97,18 @@ class ClaudeCodeAdapter(BaseAdapter):
 
 ### 2. CLI Args Builder
 
-`adapter_config` in `RunContext` is already merged (defaults + overrides) and validated as a `ClaudeCodeConfig` dict.
+`adapter_config` in `RunContext` is already merged (defaults + overrides) and validated as a `ClaudeCodeConfig` dict. Tool permissions come from `RunContext.tools` (populated from `gateway.json` by the context builder), not from adapter config.
 
 ```python
-def _build_cli_args(self, ctx: RunContext, message: str, system_prompt: str) -> list[str]:
+def _build_cli_args(
+    self, ctx: RunContext, message: str, system_prompt: str,
+    tools: list[str] | None = None,
+) -> list[str]:
     cfg = ClaudeCodeConfig.model_validate(ctx.adapter_config)
     args = ["claude"]
 
     # Non-interactive mode
-    args.extend(["--print"])   # or appropriate flag for non-interactive
+    args.extend(["--print"])
 
     # Message
     args.extend(["--prompt", message])
@@ -121,9 +128,14 @@ def _build_cli_args(self, ctx: RunContext, message: str, system_prompt: str) -> 
     if cfg.max_turns:
         args.extend(["--max-turns", str(cfg.max_turns)])
 
-    # Allowed tools
-    if cfg.allowed_tools:
-        args.extend(["--allowedTools", ",".join(cfg.allowed_tools)])
+    # Tool permissions from RunContext (sourced from gateway.json)
+    if tools is not None:
+        # Explicit tool list: auto-approve these, deny everything else
+        for tool in tools:
+            args.extend(["--allowedTools", tool])
+    else:
+        # No tool restrictions: skip all permission prompts
+        args.append("--dangerously-skip-permissions")
 
     # Output format
     args.extend(["--output-format", "json"])
@@ -158,24 +170,27 @@ Typed by `ClaudeCodeConfig` (defined in `models/adapter.py`). All fields are opt
 |-----------------|------------------|---------|--------------------------------------|
 | `model`         | `str \| None`    | `None`  | Model override (e.g. `claude-sonnet-4-6`) |
 | `max_tokens`    | `int \| None`    | `None`  | Max output tokens                    |
-| `allowed_tools` | `list[str] \| None` | `None` | Restrict tool access               |
 | `max_turns`     | `int \| None`    | `None`  | Max agentic turns                    |
+
+**Note:** Tool permissions are NOT part of adapter config. They live in `gateway.json.tools` and are agent-level, not adapter-level. This allows any adapter type to enforce the same tool list.
 
 Example stored `adapter_config` (only overrides, not full defaults):
 
 ```json
 {
   "model": "claude-sonnet-4-6",
-  "allowed_tools": ["Read", "Write"],
   "max_turns": 10
 }
 ```
 
 ## Notes
 - The adapter reads SOUL.md and AGENTS.md from disk — these are the agent's identity.
+- Tool permissions come from `RunContext.tools` (populated by the context builder from `gateway.json`). The adapter does not read gateway.json directly.
+- When `tools` is a list: `--allowedTools` auto-approves those tools and denies everything else. Unapproved tool use fails the turn.
+- When `tools` is `None` (no restrictions): `--dangerously-skip-permissions` is passed to allow all tools without prompts.
 - For heartbeat runs, HEARTBEAT.md is used as the prompt.
 - Gateway env vars are injected so the agent can discover the gateway at runtime.
-- `--print` flag (or equivalent) ensures non-interactive execution.
+- `--print` flag ensures non-interactive execution.
 - Token usage parsing depends on Claude CLI output format — may need adjustment.
 - `adapter_type = "claude_code"` class variable drives `name()` via `BaseAdapter`.
 - `validate_config()` raises `pydantic.ValidationError` on unknown or invalid fields; callers surface as HTTP 422.
@@ -190,3 +205,5 @@ Example stored `adapter_config` (only overrides, not full defaults):
 | 2026-04-06 | Added `validate_config()` classmethod returning `ClaudeCodeConfig.model_validate(raw_config)`  |
 | 2026-04-06 | Updated CLI args builder to use typed `ClaudeCodeConfig` (added `max_turns`, `allowed_tools`)  |
 | 2026-04-06 | Replaced JSON schema block with typed `ClaudeCodeConfig` field table referencing `models/adapter.py` |
+| 2026-04-08 | Tool permissions moved from `ClaudeCodeConfig.allowed_tools` to `gateway.json.tools`; adapter reads gateway.json at runtime |
+| 2026-04-08 | Added `--dangerously-skip-permissions` flag for headless execution; removed `allowed_tools` from adapter config |
