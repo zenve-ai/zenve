@@ -108,8 +108,12 @@ class Run(Base):
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     org_id: Mapped[str] = mapped_column(String(36), ForeignKey("organizations.id"), nullable=False)
     agent_id: Mapped[str] = mapped_column(String(36), ForeignKey("agents.id"), nullable=False)
-    trigger: Mapped[str] = mapped_column(nullable=False)  # manual, heartbeat, webhook, collaboration
-    status: Mapped[str] = mapped_column(nullable=False, default="queued")  # queued, running, completed, failed, cancelled
+    trigger: Mapped[str] = mapped_column(
+        nullable=False
+    )  # manual, heartbeat, webhook, collaboration
+    status: Mapped[str] = mapped_column(
+        nullable=False, default="queued"
+    )  # queued, running, completed, failed, cancelled
     adapter_type: Mapped[str] = mapped_column(nullable=False)
     message: Mapped[str | None] = mapped_column(nullable=True)
     started_at: Mapped[datetime | None] = mapped_column(nullable=True)

@@ -1,5 +1,5 @@
 from contextlib import asynccontextmanager
-
+import logging
 from fastapi import FastAPI
 from sqlalchemy import text
 
@@ -9,32 +9,41 @@ from zenve_config.settings import settings
 from zenve_db.database import Base, engine
 from zenve_services.filesystem import FilesystemService
 
+logger = logging.getLogger(__name__)
 
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    """Application lifespan handler for startup and shutdown events."""
-    print("\n" + "=" * 60)
-    print("Starting zenve API")
-    print("=" * 60)
-
+def setup_database(_: FastAPI):
     Base.metadata.create_all(bind=engine)
-    print("Database tables created/verified")
+    logger.info("Database tables created/verified.")
 
     try:
         with engine.connect() as conn:
             conn.execute(text("SELECT 1"))
-            print("Database connection successful")
+            logger.info("Database connection successful.")
     except Exception as e:
-        print(f"Database connection failed: {e}")
-        print("Application may not function correctly!")
+        logger.error(f"Database connection failed: {e}")
+        logger.error("Application may not function correctly!")
 
+def setup_filesystem(_: FastAPI):
     FilesystemService(settings).seed_default_templates()
-    print("Agent templates seeded")
+    logger.info("Agent templates seeded.")
 
+def setup_adapters(app: FastAPI):
     registry = AdapterRegistry()
     registry.register(ClaudeCodeAdapter())
     app.state.adapter_registry = registry
-    print(f"Adapter registry initialized: {registry.known_types()}")
+
+    logger.info(f"Adapters initialized: {registry.known_types()}")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Application lifespan handler for startup and shutdown events."""
+    logger.info("=" * 60)
+    logger.info("Starting Zenve API")
+    logger.info("=" * 60)
+
+    setup_database(app)
+    setup_filesystem(app)
+    setup_adapters(app)
 
     yield
 
