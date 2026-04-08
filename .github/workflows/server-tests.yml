@@ -25,7 +25,7 @@ jobs:
 
       - name: Install dependencies
         working-directory: server
-        run: uv sync
+        run: uv sync --all-packages
 
       - name: Run tests
         working-directory: server
