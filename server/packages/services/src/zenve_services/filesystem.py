@@ -77,7 +77,6 @@ class FilesystemService:
             "SOUL.md.j2",
             "AGENTS.md.j2",
             "HEARTBEAT.md.j2",
-            "TOOLS.md.j2",
         ):
             rendered = env.get_template(template_file).render(**template_vars)
             output_name = template_file.removesuffix(".j2")
