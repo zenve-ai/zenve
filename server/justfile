@@ -35,6 +35,11 @@ docker-down:
 docker-logs:
     docker compose logs -f
 
+# Testing
+
+test path="packages/adapters/tests":
+    uv run pytest {{path}} -v
+
 # Code quality
 
 format:
