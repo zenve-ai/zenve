@@ -42,6 +42,9 @@ class Organization(Base):
     memberships: Mapped[list["UserOrgMembership"]] = relationship(
         back_populates="organization", cascade="all, delete-orphan"
     )
+    runs: Mapped[list["Run"]] = relationship(
+        back_populates="organization", cascade="all, delete-orphan"
+    )
 
 
 class UserOrgMembership(Base):
@@ -96,3 +99,26 @@ class Agent(Base):
     updated_at: Mapped[datetime] = mapped_column(default=func.now(), onupdate=func.now())
 
     organization: Mapped["Organization"] = relationship(back_populates="agents")
+    runs: Mapped[list["Run"]] = relationship(back_populates="agent", cascade="all, delete-orphan")
+
+
+class Run(Base):
+    __tablename__ = "runs"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    org_id: Mapped[str] = mapped_column(String(36), ForeignKey("organizations.id"), nullable=False)
+    agent_id: Mapped[str] = mapped_column(String(36), ForeignKey("agents.id"), nullable=False)
+    trigger: Mapped[str] = mapped_column(nullable=False)  # manual, heartbeat, webhook, collaboration
+    status: Mapped[str] = mapped_column(nullable=False, default="queued")  # queued, running, completed, failed, cancelled
+    adapter_type: Mapped[str] = mapped_column(nullable=False)
+    message: Mapped[str | None] = mapped_column(nullable=True)
+    started_at: Mapped[datetime | None] = mapped_column(nullable=True)
+    finished_at: Mapped[datetime | None] = mapped_column(nullable=True)
+    exit_code: Mapped[int | None] = mapped_column(nullable=True)
+    error_summary: Mapped[str | None] = mapped_column(nullable=True)
+    token_usage: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    transcript_path: Mapped[str | None] = mapped_column(nullable=True)
+    created_at: Mapped[datetime] = mapped_column(default=func.now())
+
+    organization: Mapped["Organization"] = relationship(back_populates="runs")
+    agent: Mapped["Agent"] = relationship(back_populates="runs")

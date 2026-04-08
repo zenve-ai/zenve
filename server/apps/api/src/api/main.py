@@ -5,7 +5,14 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from api.lifespan import lifespan
-from api.routes import agent_router, api_key_router, auth_router, core_router, org_router
+from api.routes import (
+    agent_router,
+    api_key_router,
+    auth_router,
+    core_router,
+    org_router,
+    run_router,
+)
 
 app = FastAPI(lifespan=lifespan)
 
@@ -27,6 +34,7 @@ app.include_router(auth_router)
 app.include_router(org_router)
 app.include_router(api_key_router)
 app.include_router(agent_router)
+app.include_router(run_router)
 
 
 def main():
