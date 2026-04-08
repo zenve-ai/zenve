@@ -6,6 +6,11 @@ Define the BaseAdapter ABC, RunContext/RunResult dataclasses, and the AdapterReg
 ## Depends On
 - Chunk 04 (Agents — adapters execute agents)
 
+## Referenced By
+- Chunk 06 — Claude Code Adapter (first concrete adapter)
+- Chunk 07 — Celery Setup & Run Execution (uses RunContext, RunResult, AdapterRegistry)
+- Chunk 15 — Run Event System (adds `on_event` callback to RunContext)
+
 ## Deliverables
 
 ### 1. Data Models — `models/adapter.py`
@@ -22,8 +27,8 @@ class AdapterConfigBase(BaseModel):
 class ClaudeCodeConfig(AdapterConfigBase):
     model: str | None = None            # optional, default: CLI default
     max_tokens: int | None = None       # optional
-    allowed_tools: list[str] | None = None  # optional, restrict tools
     max_turns: int | None = None        # optional
+    # Note: tool permissions live in gateway.json, not adapter config
 
 class CodexConfig(AdapterConfigBase):
     model: str | None = None            # optional
@@ -55,6 +60,7 @@ class RunContext:
     adapter_config: dict        # adapter-specific config from DB (merged with defaults)
     gateway_url: str            # injected as env var
     agent_token: str            # short-lived JWT (Chunk 09, empty string for now)
+    tools: list[str] | None     # from gateway.json; None = all tools allowed
     env_vars: dict              # extra env vars to pass
 
 @dataclass
@@ -167,6 +173,11 @@ def build_run_context(
     adapter = adapter_registry.get(agent.adapter_type)
     default_cfg = adapter.get_default_config().model_dump()
     merged_cfg = {**default_cfg, **(agent.adapter_config or {})}
+
+    # Read tool permissions from gateway.json
+    gateway = filesystem.read_gateway_json(agent.dir_path)
+    tools = gateway.get("tools")  # list[str] | None
+
     return RunContext(
         agent_dir=agent.dir_path,
         agent_id=str(agent.id),
@@ -181,6 +192,7 @@ def build_run_context(
         adapter_config=merged_cfg,
         gateway_url=settings.GATEWAY_URL,
         agent_token="",  # Populated in Chunk 09
+        tools=tools,
         env_vars={},
     )
 ```
@@ -238,3 +250,5 @@ def get_agent_service(
 | 2026-04-06 | Added `adapter_type: str` field to `RunContext`                                            |
 | 2026-04-06 | Updated `RunContext` builder to accept `adapter_registry` and merge default config          |
 | 2026-04-06 | Added `AgentService` integration section: registry param, `has()`/`known_types()` validation, dependency function |
+| 2026-04-08 | Added `tools: list[str] | None` to `RunContext`; removed `allowed_tools` from `ClaudeCodeConfig` — tool permissions are agent-level (gateway.json), not adapter-level |
+| 2026-04-08 | Updated `build_run_context` to read `tools` from `gateway.json` via `FilesystemService` |
