@@ -66,7 +66,9 @@ def list_runs(
 ):
     org = org_service.get_by_id_or_slug(org_id)
     membership_service.require_membership(user.id, org.id)
-    return run_service.list_runs(org.id, agent_id=agent_id, status=run_status, trigger=trigger, limit=limit)
+    return run_service.list_runs(
+        org.id, agent_id=agent_id, status=run_status, trigger=trigger, limit=limit
+    )
 
 
 @router.get("/{run_id}", response_model=RunResponse)

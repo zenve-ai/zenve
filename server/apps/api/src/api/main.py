@@ -1,3 +1,4 @@
+import logging
 import os
 
 import uvicorn
@@ -15,6 +16,7 @@ from api.routes import (
 )
 
 app = FastAPI(lifespan=lifespan)
+
 
 origins = [
     "http://localhost:5173",
@@ -36,6 +38,12 @@ app.include_router(api_key_router)
 app.include_router(agent_router)
 app.include_router(run_router)
 
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(levelname)s:     %(message)s",
+)
+
+logger = logging.getLogger(__name__)
 
 def main():
     reload = os.getenv("API_RELOAD", "false").lower() == "true"
