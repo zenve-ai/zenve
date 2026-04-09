@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass, field
 
 from pydantic import BaseModel
@@ -30,7 +31,7 @@ class ClaudeCodeConfig(AdapterConfigBase):
     model: str = "claude-sonnet-4-6"
     max_tokens: int | None = None
     max_turns: int = 10
-    output_format: str = "json"
+    output_format: str = "stream-json"
 
 
 class CodexConfig(AdapterConfigBase):
@@ -78,6 +79,7 @@ class RunContext:
     agent_token: str  # short-lived JWT (Chunk 09); empty string until then
     tools: list[str] | None = None  # from gateway.json; None = all tools allowed
     env_vars: dict = field(default_factory=dict)
+    on_event: Callable[[str, str | None, dict | None], None] = field(default=lambda *a, **kw: None)
 
 
 @dataclass

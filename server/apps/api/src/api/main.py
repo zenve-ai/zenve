@@ -45,6 +45,7 @@ logging.basicConfig(
 
 logger = logging.getLogger(__name__)
 
+
 def main():
     reload = os.getenv("API_RELOAD", "false").lower() == "true"
     if reload:

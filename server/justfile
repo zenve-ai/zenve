@@ -40,6 +40,9 @@ docker-logs:
 test path="packages/adapters/tests":
     uv run pytest {{path}} -v
 
+test-file file:
+    uv run pytest {{file}} -v
+
 # Code quality
 
 format:

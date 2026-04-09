@@ -27,15 +27,15 @@ class FilesystemService:
             return
         dest.mkdir(parents=True, exist_ok=True)
         src: Traversable = importlib.resources.files("zenve_services.templates") / "default"
-        self._copy_traversable(src, dest)
+        self.copy_traversable(src, dest)
 
-    def _copy_traversable(self, src: Traversable, dest: Path) -> None:
+    def copy_traversable(self, src: Traversable, dest: Path) -> None:
         """Recursively copy a Traversable tree to a real filesystem path."""
         for item in src.iterdir():
             target = dest / item.name
             if item.is_dir():
                 target.mkdir(parents=True, exist_ok=True)
-                self._copy_traversable(item, target)
+                self.copy_traversable(item, target)
             else:
                 target.write_bytes(item.read_bytes())
 
@@ -82,13 +82,13 @@ class FilesystemService:
             output_name = template_file.removesuffix(".j2")
             (agent_dir / output_name).write_text(rendered, encoding="utf-8")
 
-        self._write_memory_stub(
+        self.write_memory_stub(
             agent_dir / "memory" / "long_term.md",
             f"# {template_vars.get('agent_name', agent_slug)} — Long-Term Memory\n\n"
             "This file persists facts, decisions, and context across runs.\n"
             "Update it at the end of each run with anything worth keeping.\n\n---\n\n_No entries yet._\n",
         )
-        self._write_memory_stub(
+        self.write_memory_stub(
             agent_dir / "memory" / "scratch.md",
             f"# {template_vars.get('agent_name', agent_slug)} — Scratch Memory\n\n"
             "This file holds ephemeral notes within a single run.\n"
@@ -97,7 +97,7 @@ class FilesystemService:
 
         return str(agent_dir)
 
-    def _write_memory_stub(self, path: Path, content: str) -> None:
+    def write_memory_stub(self, path: Path, content: str) -> None:
         path.write_text(content, encoding="utf-8")
 
     # ------------------------------------------------------------------
@@ -120,12 +120,12 @@ class FilesystemService:
 
     def read_agent_file(self, agent_dir: str, file_path: str) -> str:
         """Read a file relative to agent_dir. Raises ValueError on path traversal."""
-        full_path = self._validate_path(agent_dir, file_path)
+        full_path = self.validate_path(agent_dir, file_path)
         return Path(full_path).read_text(encoding="utf-8")
 
     def write_agent_file(self, agent_dir: str, file_path: str, content: str) -> None:
         """Write a file relative to agent_dir. Raises ValueError on path traversal."""
-        full_path = self._validate_path(agent_dir, file_path)
+        full_path = self.validate_path(agent_dir, file_path)
         path = Path(full_path)
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(content, encoding="utf-8")
@@ -139,7 +139,7 @@ class FilesystemService:
         """Create {base_path}/agents/ if it does not exist."""
         Path(base_path, "agents").mkdir(parents=True, exist_ok=True)
 
-    def _validate_path(self, agent_dir: str, file_path: str) -> str:
+    def validate_path(self, agent_dir: str, file_path: str) -> str:
         """Resolve file_path relative to agent_dir.
 
         Raises ValueError if the resolved path escapes agent_dir.

@@ -28,6 +28,9 @@ AGENTS_MD = """\
 Answer the user's question directly and briefly.
 """
 
+MESSAGE = """\
+Tell me your agent ID then check if hello.py exists, then if not create it and write a simple python function that prints 'Hello, World!'
+"""
 
 async def main() -> None:
     adapter = ClaudeCodeAdapter()
@@ -43,39 +46,39 @@ async def main() -> None:
 
         print(f"Agent directory: {agent_dir}")
 
+        def on_event(event_type: str, content: str | None = None, metadata: dict | None = None) -> None:
+            print(f"[{event_type}] {content or ''}")
+            print(f"{metadata or ''}")
+            print("=" * 60)
+
         ctx = RunContext(
             agent_dir=agent_dir,
-            agent_id="example-agent-id",
-            agent_slug="example-agent",
-            agent_name="Example Agent",
-            org_id="example-org-id",
-            org_slug="example-org",
-            run_id="example-run-001",
+            agent_id="dev-01",
+            agent_slug="dev",
+            agent_name="Devy",
+            org_id="1",
+            org_slug="logzai",
+            run_id="run-001",
             adapter_type="claude_code",
             adapter_config={
                 "model": "claude-haiku-4-5",
                 "max_turns": 5,
             },
-            message="Check if hello.py exists, then if not create it and write a simple python function that prints 'Hello, World!'",
+            message=MESSAGE,
             heartbeat=False,
             gateway_url="http://localhost:8000",
             agent_token="",
             tools=["Read", "Write", "Edit", "Bash"],
+            on_event=on_event,
         )
 
-        print(f"Running task: {ctx.message!r}")
+        print(f"Running task: {ctx.message!r}\n")
         result = await adapter.execute(ctx)
 
-    print(f"Exit code : {result.exit_code}")
+    print(f"\nExit code : {result.exit_code}")
     print(f"Duration  : {result.duration_seconds:.2f}s")
     if result.token_usage:
         print(f"Tokens    : {result.token_usage}")
-
-    print("Output:")
-    # data = json.loads(result.stdout.strip())
-    # print(json.dumps(data, indent=2))
-    print(result.stdout.strip())
-
     if result.error:
         print(f"Stderr    :\n{result.stderr.strip()}")
 
