@@ -5,6 +5,7 @@ from fastapi import FastAPI
 from sqlalchemy import text
 
 from zenve_adapters.claude_code import ClaudeCodeAdapter
+from zenve_adapters.open_code import OpenCodeAdapter
 from zenve_adapters.registry import AdapterRegistry
 from zenve_config.settings import get_settings
 from zenve_db.database import Base, engine
@@ -34,6 +35,7 @@ def setup_filesystem(_: FastAPI):
 def setup_adapters(app: FastAPI):
     registry = AdapterRegistry()
     registry.register(ClaudeCodeAdapter())
+    registry.register(OpenCodeAdapter())
     app.state.adapter_registry = registry
 
     logger.info(f"Adapters initialized: {registry.known_types()}")

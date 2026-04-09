@@ -29,7 +29,7 @@ Answer the user's question directly and briefly.
 """
 
 MESSAGE = """\
-Tell me your agent ID then check if hello.py exists, then if not create it and write a simple python function that prints 'Hello, World!'
+Check if hello.py exists, then if not create it and write a simple python function that prints 'Hello, World!'
 """
 
 
@@ -62,9 +62,8 @@ async def main() -> None:
             org_id="1",
             org_slug="logzai",
             run_id="run-001",
-            adapter_type="claude_code",
+            adapter_type="open_code",
             adapter_config={
-                "model": "claude-haiku-4-5",
                 "max_turns": 5,
             },
             message=MESSAGE,

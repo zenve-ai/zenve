@@ -3,6 +3,7 @@ from .adapter import (
     AnthropicAPIConfig,
     ClaudeCodeConfig,
     CodexConfig,
+    OpenCodeConfig,
     RunContext,
     RunResult,
 )
@@ -34,6 +35,7 @@ __all__ = [
     "ApiKeyResponse",
     "ClaudeCodeConfig",
     "CodexConfig",
+    "OpenCodeConfig",
     "LoginRequest",
     "MembershipResponse",
     "OrgCreate",

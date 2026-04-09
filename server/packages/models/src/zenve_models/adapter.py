@@ -42,6 +42,15 @@ class CodexConfig(AdapterConfigBase):
     approval_mode: str = "suggest"
 
 
+class OpenCodeConfig(AdapterConfigBase):
+    """Config for the open_code adapter (spawns `opencode` CLI)."""
+
+    model: str = ""
+    max_tokens: int | None = None
+    steps: int = 10
+    output_format: str = "json"
+
+
 class AnthropicAPIConfig(AdapterConfigBase):
     """Config for the anthropic_api adapter (calls Anthropic API directly)."""
 
