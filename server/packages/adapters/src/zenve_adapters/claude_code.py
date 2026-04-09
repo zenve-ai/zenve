@@ -143,7 +143,11 @@ class ClaudeCodeAdapter(BaseAdapter):
                             event = (
                                 "tool_call",
                                 f"Calling tool: {block.get('name')}",
-                                {"tool": block.get("name"), "tool_use_id": block.get("id"), "input": block.get("input", {})},
+                                {
+                                    "tool": block.get("name"),
+                                    "tool_use_id": block.get("id"),
+                                    "input": block.get("input", {}),
+                                },
                             )
                         if event:
                             ctx.on_event(*event)
@@ -156,11 +160,19 @@ class ClaudeCodeAdapter(BaseAdapter):
                     for block in content_blocks:
                         if block.get("type") == "tool_result":
                             result_content = str(block.get("content", ""))
-                            summary = result_content[:500] + "..." if len(result_content) > 500 else result_content
+                            summary = (
+                                result_content[:500] + "..."
+                                if len(result_content) > 500
+                                else result_content
+                            )
                             event = (
                                 "tool_result",
                                 summary,
-                                {"tool_use_id": block.get("tool_use_id"), "is_error": block.get("is_error", False), "full_result": result_content},
+                                {
+                                    "tool_use_id": block.get("tool_use_id"),
+                                    "is_error": block.get("is_error", False),
+                                    "full_result": result_content,
+                                },
                             )
                         if event:
                             ctx.on_event(*event)

@@ -9,15 +9,18 @@ class AgentCreate(BaseModel):
     adapter_type: str
     adapter_config: dict = {}
     skills: list[str] = []
-    tools: list[str] = []
+    tools: list[str] = ["Read", "Write", "Bash"]
     heartbeat_interval_seconds: int = 0
     template: str = "default"
-    """Template set name under `TEMPLATES_DIR` (e.g. `default`)."""
-    template_vars: dict[str, Any] | None = Field(
-        default=None,
-        description="Extra Jinja context for the chosen template set; keys depend on that template.",
+    template_vars: dict[str, Any] = Field(
+        default_factory=dict,
+        description="Jinja context for the chosen template set; keys depend on that template's manifest.",
     )
-    role: str | None = None
+
+
+class AgentCreateFromPreset(BaseModel):
+    preset: str
+    name: str | None = None
 
 
 class AgentUpdate(BaseModel):

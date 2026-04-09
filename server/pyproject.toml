@@ -25,6 +25,7 @@ zenve-models = { workspace = true }
 zenve-utils = { workspace = true }
 zenve-services = { workspace = true }
 zenve-adapters = { workspace = true }
+zenve-scaffolding = { workspace = true }
 
 [dependency-groups]
 dev = [
@@ -55,5 +56,6 @@ known-first-party = [
     "zenve_db",
     "zenve_models",
     "zenve_utils",
+    "zenve_scaffolding",
     "zenve_services",
 ]

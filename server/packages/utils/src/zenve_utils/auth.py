@@ -43,7 +43,9 @@ def get_current_user(
             detail="Missing or invalid authorization",
         )
     try:
-        payload = jwt.decode(credentials.credentials, get_settings().secret_key, algorithms=[ALGORITHM])
+        payload = jwt.decode(
+            credentials.credentials, get_settings().secret_key, algorithms=[ALGORITHM]
+        )
         user_id = payload.get("sub")
         if user_id is None:
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")

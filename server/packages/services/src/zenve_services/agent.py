@@ -1,16 +1,16 @@
 import re
 import uuid
-from datetime import UTC, datetime
 
 from fastapi import HTTPException
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from zenve_adapters.registry import AdapterRegistry
-from zenve_config.settings import get_settings
 from zenve_db.models import Agent, Organization
-from zenve_models.agent import AgentCreate, AgentUpdate
+from zenve_models.agent import AgentCreate, AgentCreateFromPreset, AgentUpdate
+from zenve_scaffolding import PresetService, ScaffoldingService
 from zenve_services.filesystem import FilesystemService
+from zenve_services.template import TemplateService
 
 
 def slugify(name: str) -> str:
@@ -25,10 +25,30 @@ class AgentService:
         db: Session,
         filesystem: FilesystemService,
         adapter_registry: AdapterRegistry,
+        template_service: TemplateService,
+        scaffolding: ScaffoldingService,
+        preset_service: PresetService,
     ):
         self.db = db
         self.filesystem = filesystem
         self.adapter_registry = adapter_registry
+        self.template_service = template_service
+        self.scaffolding = scaffolding
+        self.preset_service = preset_service
+
+    def create_from_preset(self, org: Organization, data: AgentCreateFromPreset) -> Agent:
+        preset = self.preset_service.load_preset(data.preset)
+        create_data = AgentCreate(
+            name=data.name or preset.name,
+            adapter_type=preset.adapter_type,
+            adapter_config=preset.adapter_config,
+            template=preset.template,
+            template_vars=preset.template_vars,
+            skills=preset.skills,
+            tools=preset.tools,
+            heartbeat_interval_seconds=preset.heartbeat_interval_seconds,
+        )
+        return self.create(org, create_data)
 
     def create(self, org: Organization, data: AgentCreate) -> Agent:
         if not self.adapter_registry.has(data.adapter_type):
@@ -43,23 +63,13 @@ class AgentService:
         adapter.validate_config(adapter_config)
 
         slug = slugify(data.name)
-        created_at = datetime.now(UTC).isoformat().replace("+00:00", "Z")
 
-        template_vars: dict[str, object] = {
-            "agent_name": data.name,
-            "agent_slug": slug,
-            "org_name": org.name,
-            "org_slug": org.slug,
-            "org_dir": org.base_path,
-            "role": data.role,
-            "adapter_type": data.adapter_type,
-            "gateway_url": get_settings().gateway_url,
-            "created_at": created_at,
-        }
-        if data.template_vars:
-            template_vars.update({k: v for k, v in data.template_vars.items() if v is not None})
+        template_name = self.template_service.resolve_template_name(data.template)
+        self.template_service.validate_vars(template_name, data.template_vars)
 
-        dir_path = self.filesystem.scaffold_agent_dir(
+        template_vars = {k: v for k, v in data.template_vars.items() if v is not None}
+
+        dir_path = self.scaffolding.scaffold_agent_dir(
             org_slug=org.slug,
             agent_slug=slug,
             base_path=org.base_path,

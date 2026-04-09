@@ -12,6 +12,7 @@ dependencies = [
     "zenve-utils",
     "zenve-services",
     "zenve-adapters",
+    "zenve-scaffolding",
 ]
 
 [project.scripts]
@@ -34,3 +35,4 @@ zenve-models = { workspace = true }
 zenve-utils = { workspace = true }
 zenve-services = { workspace = true }
 zenve-adapters = { workspace = true }
+zenve-scaffolding = { workspace = true }

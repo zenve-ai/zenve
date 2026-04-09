@@ -1,0 +1,36 @@
+{
+  "name": "default",
+  "description": "General-purpose agent with configurable identity, personality, and behavioral guardrails.",
+  "variables": [
+    {
+      "name": "instructions",
+      "type": "string",
+      "required": true,
+      "description": "Task-level instructions injected into AGENTS.md."
+    },
+    {
+      "name": "role",
+      "type": "string",
+      "required": true,
+      "description": "The agent's role definition. Falls back to a generic assistant description."
+    },
+    {
+      "name": "personality",
+      "type": "string",
+      "required": false,
+      "description": "Personality traits as a markdown list. Falls back to scoped/conservative/precise/grounded defaults."
+    },
+    {
+      "name": "cares_about",
+      "type": "string",
+      "required": false,
+      "description": "What the agent cares about as a markdown list. Falls back to org-aligned defaults."
+    },
+    {
+      "name": "does_not_do",
+      "type": "string",
+      "required": false,
+      "description": "Behavioral guardrails as a markdown list. Falls back to safe defaults."
+    }
+  ]
+}

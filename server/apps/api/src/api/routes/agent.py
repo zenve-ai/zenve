@@ -3,6 +3,7 @@ from fastapi import APIRouter, Depends, Query, status
 from zenve_db.models import UserRecord
 from zenve_models.agent import (
     AgentCreate,
+    AgentCreateFromPreset,
     AgentFileContent,
     AgentFileList,
     AgentResponse,
@@ -29,6 +30,20 @@ def create_agent(
     org = org_service.get_by_id_or_slug(org_id)
     membership_service.require_membership(user.id, org.id)
     return service.create(org, body)
+
+
+@router.post("/from-preset", response_model=AgentResponse, status_code=status.HTTP_201_CREATED)
+def create_agent_from_preset(
+    org_id: str,
+    body: AgentCreateFromPreset,
+    user: UserRecord = Depends(get_current_user),
+    org_service: OrgService = Depends(get_org_service),
+    membership_service: MembershipService = Depends(get_membership_service),
+    service: AgentService = Depends(get_agent_service),
+):
+    org = org_service.get_by_id_or_slug(org_id)
+    membership_service.require_membership(user.id, org.id)
+    return service.create_from_preset(org, body)
 
 
 @router.get("", response_model=list[AgentResponse])

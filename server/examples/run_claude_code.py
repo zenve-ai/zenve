@@ -32,6 +32,7 @@ MESSAGE = """\
 Tell me your agent ID then check if hello.py exists, then if not create it and write a simple python function that prints 'Hello, World!'
 """
 
+
 async def main() -> None:
     adapter = ClaudeCodeAdapter()
 
@@ -46,7 +47,9 @@ async def main() -> None:
 
         print(f"Agent directory: {agent_dir}")
 
-        def on_event(event_type: str, content: str | None = None, metadata: dict | None = None) -> None:
+        def on_event(
+            event_type: str, content: str | None = None, metadata: dict | None = None
+        ) -> None:
             print(f"[{event_type}] {content or ''}")
             print(f"{metadata or ''}")
             print("=" * 60)

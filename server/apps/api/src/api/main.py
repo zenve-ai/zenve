@@ -12,7 +12,9 @@ from api.routes import (
     auth_router,
     core_router,
     org_router,
+    preset_router,
     run_router,
+    template_router,
 )
 
 app = FastAPI(lifespan=lifespan)
@@ -37,6 +39,8 @@ app.include_router(org_router)
 app.include_router(api_key_router)
 app.include_router(agent_router)
 app.include_router(run_router)
+app.include_router(preset_router)
+app.include_router(template_router)
 
 logging.basicConfig(
     level=logging.INFO,

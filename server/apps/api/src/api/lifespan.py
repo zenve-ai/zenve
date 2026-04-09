@@ -8,7 +8,7 @@ from zenve_adapters.claude_code import ClaudeCodeAdapter
 from zenve_adapters.registry import AdapterRegistry
 from zenve_config.settings import get_settings
 from zenve_db.database import Base, engine
-from zenve_services.filesystem import FilesystemService
+from zenve_scaffolding import ScaffoldingService
 
 logger = logging.getLogger(__name__)
 
@@ -25,9 +25,11 @@ def setup_database(_: FastAPI):
         logger.error(f"Database connection failed: {e}")
         logger.error("Application may not function correctly!")
 
+
 def setup_filesystem(_: FastAPI):
-    FilesystemService(get_settings()).seed_default_templates()
+    ScaffoldingService(get_settings()).seed_default_templates()
     logger.info("Agent templates seeded.")
+
 
 def setup_adapters(app: FastAPI):
     registry = AdapterRegistry()
@@ -35,6 +37,7 @@ def setup_adapters(app: FastAPI):
     app.state.adapter_registry = registry
 
     logger.info(f"Adapters initialized: {registry.known_types()}")
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):

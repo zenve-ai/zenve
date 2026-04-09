@@ -1,14 +1,12 @@
 from __future__ import annotations
 
-import tempfile
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 
 from zenve_adapters.claude_code import ClaudeCodeAdapter
 from zenve_models.adapter import ClaudeCodeConfig, RunContext
 from zenve_utils.testing import json_line, make_proc
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -36,8 +34,6 @@ def make_ctx(on_event=None, **kwargs) -> RunContext:
     if on_event is not None:
         defaults["on_event"] = on_event
     return RunContext(**defaults)
-
-
 
 
 def test_parse_token_usage_usage_key():
@@ -87,9 +83,11 @@ async def test_on_event_system():
     events: list[tuple] = []
     ctx = make_ctx(on_event=lambda *a: events.append(a))
 
-    proc = make_proc([
-        json_line({"type": "system", "session_id": "sess-abc"}),
-    ])
+    proc = make_proc(
+        [
+            json_line({"type": "system", "session_id": "sess-abc"}),
+        ]
+    )
     with patch("asyncio.create_subprocess_exec", new=AsyncMock(return_value=proc)):
         await ClaudeCodeAdapter().execute(ctx)
 
@@ -101,9 +99,13 @@ async def test_on_event_assistant_text():
     events: list[tuple] = []
     ctx = make_ctx(on_event=lambda *a: events.append(a))
 
-    proc = make_proc([
-        json_line({"type": "assistant", "message": {"content": [{"type": "text", "text": "Hello!"}]}}),
-    ])
+    proc = make_proc(
+        [
+            json_line(
+                {"type": "assistant", "message": {"content": [{"type": "text", "text": "Hello!"}]}}
+            ),
+        ]
+    )
     with patch("asyncio.create_subprocess_exec", new=AsyncMock(return_value=proc)):
         await ClaudeCodeAdapter().execute(ctx)
 
@@ -115,11 +117,25 @@ async def test_on_event_assistant_tool_use():
     events: list[tuple] = []
     ctx = make_ctx(on_event=lambda *a: events.append(a))
 
-    proc = make_proc([
-        json_line({"type": "assistant", "message": {"content": [
-            {"type": "tool_use", "name": "Glob", "id": "tu_1", "input": {"pattern": "*.py"}},
-        ]}}),
-    ])
+    proc = make_proc(
+        [
+            json_line(
+                {
+                    "type": "assistant",
+                    "message": {
+                        "content": [
+                            {
+                                "type": "tool_use",
+                                "name": "Glob",
+                                "id": "tu_1",
+                                "input": {"pattern": "*.py"},
+                            },
+                        ]
+                    },
+                }
+            ),
+        ]
+    )
     with patch("asyncio.create_subprocess_exec", new=AsyncMock(return_value=proc)):
         await ClaudeCodeAdapter().execute(ctx)
 
@@ -136,12 +152,26 @@ async def test_on_event_assistant_mixed_blocks():
     events: list[tuple] = []
     ctx = make_ctx(on_event=lambda *a: events.append(a))
 
-    proc = make_proc([
-        json_line({"type": "assistant", "message": {"content": [
-            {"type": "text", "text": "Let me check."},
-            {"type": "tool_use", "name": "Read", "id": "tu_2", "input": {"path": "foo.py"}},
-        ]}}),
-    ])
+    proc = make_proc(
+        [
+            json_line(
+                {
+                    "type": "assistant",
+                    "message": {
+                        "content": [
+                            {"type": "text", "text": "Let me check."},
+                            {
+                                "type": "tool_use",
+                                "name": "Read",
+                                "id": "tu_2",
+                                "input": {"path": "foo.py"},
+                            },
+                        ]
+                    },
+                }
+            ),
+        ]
+    )
     with patch("asyncio.create_subprocess_exec", new=AsyncMock(return_value=proc)):
         await ClaudeCodeAdapter().execute(ctx)
 
@@ -155,11 +185,25 @@ async def test_on_event_user_tool_result():
     events: list[tuple] = []
     ctx = make_ctx(on_event=lambda *a: events.append(a))
 
-    proc = make_proc([
-        json_line({"type": "user", "message": {"content": [
-            {"type": "tool_result", "tool_use_id": "tu_1", "content": "file contents", "is_error": False},
-        ]}}),
-    ])
+    proc = make_proc(
+        [
+            json_line(
+                {
+                    "type": "user",
+                    "message": {
+                        "content": [
+                            {
+                                "type": "tool_result",
+                                "tool_use_id": "tu_1",
+                                "content": "file contents",
+                                "is_error": False,
+                            },
+                        ]
+                    },
+                }
+            ),
+        ]
+    )
     with patch("asyncio.create_subprocess_exec", new=AsyncMock(return_value=proc)):
         await ClaudeCodeAdapter().execute(ctx)
 
@@ -179,11 +223,25 @@ async def test_on_event_tool_result_truncated():
     ctx = make_ctx(on_event=lambda *a: events.append(a))
 
     long_content = "x" * 600
-    proc = make_proc([
-        json_line({"type": "user", "message": {"content": [
-            {"type": "tool_result", "tool_use_id": "tu_2", "content": long_content, "is_error": False},
-        ]}}),
-    ])
+    proc = make_proc(
+        [
+            json_line(
+                {
+                    "type": "user",
+                    "message": {
+                        "content": [
+                            {
+                                "type": "tool_result",
+                                "tool_use_id": "tu_2",
+                                "content": long_content,
+                                "is_error": False,
+                            },
+                        ]
+                    },
+                }
+            ),
+        ]
+    )
     with patch("asyncio.create_subprocess_exec", new=AsyncMock(return_value=proc)):
         await ClaudeCodeAdapter().execute(ctx)
 
@@ -197,18 +255,22 @@ async def test_on_event_result_usage():
     events: list[tuple] = []
     ctx = make_ctx(on_event=lambda *a: events.append(a))
 
-    proc = make_proc([
-        json_line({
-            "type": "result",
-            "total_cost_usd": 0.05,
-            "usage": {
-                "input_tokens": 100,
-                "output_tokens": 50,
-                "cache_read_input_tokens": 10,
-                "cache_creation_input_tokens": 5,
-            },
-        }),
-    ])
+    proc = make_proc(
+        [
+            json_line(
+                {
+                    "type": "result",
+                    "total_cost_usd": 0.05,
+                    "usage": {
+                        "input_tokens": 100,
+                        "output_tokens": 50,
+                        "cache_read_input_tokens": 10,
+                        "cache_creation_input_tokens": 5,
+                    },
+                }
+            ),
+        ]
+    )
     with patch("asyncio.create_subprocess_exec", new=AsyncMock(return_value=proc)):
         await ClaudeCodeAdapter().execute(ctx)
 
@@ -230,9 +292,11 @@ async def test_on_event_error():
     events: list[tuple] = []
     ctx = make_ctx(on_event=lambda *a: events.append(a))
 
-    proc = make_proc([
-        json_line({"type": "error", "message": "rate limit exceeded"}),
-    ])
+    proc = make_proc(
+        [
+            json_line({"type": "error", "message": "rate limit exceeded"}),
+        ]
+    )
     with patch("asyncio.create_subprocess_exec", new=AsyncMock(return_value=proc)):
         await ClaudeCodeAdapter().execute(ctx)
 
@@ -245,20 +309,51 @@ async def test_on_event_full_sequence():
     events: list[tuple] = []
     ctx = make_ctx(on_event=lambda *a: events.append(a))
 
-    proc = make_proc([
-        json_line({"type": "system", "session_id": "s1"}),
-        json_line({"type": "assistant", "message": {"content": [
-            {"type": "tool_use", "name": "Glob", "id": "t1", "input": {}},
-        ]}}),
-        json_line({"type": "user", "message": {"content": [
-            {"type": "tool_result", "tool_use_id": "t1", "content": "found.py", "is_error": False},
-        ]}}),
-        json_line({"type": "assistant", "message": {"content": [{"type": "text", "text": "Done."}]}}),
-        json_line({"type": "result", "total_cost_usd": 0.01, "usage": {
-            "input_tokens": 10, "output_tokens": 5,
-            "cache_read_input_tokens": 0, "cache_creation_input_tokens": 0,
-        }}),
-    ])
+    proc = make_proc(
+        [
+            json_line({"type": "system", "session_id": "s1"}),
+            json_line(
+                {
+                    "type": "assistant",
+                    "message": {
+                        "content": [
+                            {"type": "tool_use", "name": "Glob", "id": "t1", "input": {}},
+                        ]
+                    },
+                }
+            ),
+            json_line(
+                {
+                    "type": "user",
+                    "message": {
+                        "content": [
+                            {
+                                "type": "tool_result",
+                                "tool_use_id": "t1",
+                                "content": "found.py",
+                                "is_error": False,
+                            },
+                        ]
+                    },
+                }
+            ),
+            json_line(
+                {"type": "assistant", "message": {"content": [{"type": "text", "text": "Done."}]}}
+            ),
+            json_line(
+                {
+                    "type": "result",
+                    "total_cost_usd": 0.01,
+                    "usage": {
+                        "input_tokens": 10,
+                        "output_tokens": 5,
+                        "cache_read_input_tokens": 0,
+                        "cache_creation_input_tokens": 0,
+                    },
+                }
+            ),
+        ]
+    )
     with patch("asyncio.create_subprocess_exec", new=AsyncMock(return_value=proc)):
         await ClaudeCodeAdapter().execute(ctx)
 
