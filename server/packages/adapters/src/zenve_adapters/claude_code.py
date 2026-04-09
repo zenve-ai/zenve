@@ -67,15 +67,13 @@ class ClaudeCodeAdapter(BaseAdapter):
             f"- run_id: {ctx.run_id}\n"
             f"- gateway_url: {ctx.gateway_url}\n"
         )
-        system_prompt = f"{identity}\n\n{soul}"
+        system_prompt = f"{identity}\n\n{soul}\n\n{agents_md}"
 
         if ctx.heartbeat:
             heartbeat_md = self.read_file(Path(ctx.agent_dir) / "HEARTBEAT.md")
-            message = (
-                f"{agents_md}\n\n---\n\nHeartbeat tick. Review your checklist:\n\n{heartbeat_md}"
-            )
+            message = f"Heartbeat tick. Review your checklist:\n\n{heartbeat_md}"
         else:
-            message = f"{agents_md}\n\n---\n\n{ctx.message or '(no message provided)'}"
+            message = ctx.message or "(no message provided)"
 
         env = {
             **os.environ,
