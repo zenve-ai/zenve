@@ -10,6 +10,7 @@ Set up Celery with Redis broker and implement the `execute_agent_run` task that 
 ## Referenced By
 - Chunk 08 — Runs CRUD (runs are dispatched as Celery tasks)
 - Chunk 15 — Run Event System (task builds on_event closure and emits lifecycle events)
+- Chunk 16 — Org-Level Git Versioning (commit step added to this task after adapter returns)
 
 ## Deliverables
 
@@ -60,6 +61,7 @@ def execute_agent_run(self, run_id: str):
     # 1. Get run + agent from DB
     run = run_service.get(run_id)
     agent = agent_service.get(run.agent_id)
+    org = org_service.get(run.org_id)
 
     # 2. Get adapter
     adapter = adapter_registry.get(agent.adapter_type)
@@ -67,17 +69,29 @@ def execute_agent_run(self, run_id: str):
     # 3. Mark as running
     run_service.update(run_id, status="running", started_at=utcnow())
 
+    # 4. Capture pre-run SHA (see Chunk 16)
+    org_repo = OrgRepo(org)
+    pre_sha = org_repo.head_sha()
+
     try:
-        # 4. Build context
+        # 5. Build context
         ctx = build_run_context(agent, run)
 
-        # 5. Execute via adapter
+        # 6. Execute via adapter
         result = adapter.execute(ctx)
 
-        # 6. Write transcript to disk
+        # 7. Write transcript to disk
         transcript_path = write_transcript(agent, run, result)
 
-        # 7. Update run record
+        # 8. Commit all changes made by the adapter (see Chunk 16)
+        post_sha = org_repo.commit_run(
+            agent_slug=agent.slug,
+            run_id=str(run.id),
+            trigger=run.trigger,
+            summary=result.summary or "",
+        )
+
+        # 9. Update run record
         run_service.update(run_id,
             status="completed" if result.exit_code == 0 else "failed",
             finished_at=utcnow(),
@@ -85,16 +99,43 @@ def execute_agent_run(self, run_id: str):
             token_usage=result.token_usage,
             transcript_path=transcript_path,
             error_summary=result.error,
+            pre_commit_sha=pre_sha,
+            post_commit_sha=post_sha,
         )
 
     except Exception as e:
+        # Rollback agent's own directory to pre-run state; shared project/ is kept
+        org_repo.rollback_agent(agent.slug, pre_sha, run_id=str(run.id))
+
         run_service.update(run_id,
             status="failed",
             finished_at=utcnow(),
             error_summary=str(e),
+            pre_commit_sha=pre_sha,
         )
         raise self.retry(exc=e)
 ```
+
+**Commit step detail** — `org_repo.commit_run()` must:
+1. Acquire the per-org lock (Redis lock in production, `asyncio.Lock` in dev).
+2. Run `git add -A`.
+3. Commit with author `{agent_slug} <{agent_slug}@{org_slug}.zenve.ai>` and message:
+   ```
+   run {run_id} ({trigger}): {short summary}
+
+   Run: {run_id}
+   Agent: {agent_slug}
+   Trigger: {heartbeat|manual|collaboration}
+   ```
+4. Return the new HEAD SHA.
+5. Release the lock.
+
+**Rollback detail** — `org_repo.rollback_agent()` runs:
+```
+git checkout <pre_sha> -- agents/<slug>/
+git commit -m "rollback run <run_id>"
+```
+Shared `project/` state is **not** rolled back.
 
 ### 5. Transcript Writer — `services/transcript.py`
 
