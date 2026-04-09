@@ -1,4 +1,4 @@
-from zenve_config.settings import settings
+from zenve_config.settings import get_settings
 from zenve_db.models import Agent
 from zenve_models.adapter import RunContext
 
@@ -36,7 +36,7 @@ def build_run_context(
         adapter_config=agent.adapter_config or {},
         message=message,
         heartbeat=heartbeat,
-        gateway_url=settings.gateway_url,
+        gateway_url=get_settings().gateway_url,
         agent_token=agent_token,
         env_vars=extra_env or {},
     )
