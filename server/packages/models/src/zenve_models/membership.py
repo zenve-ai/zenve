@@ -5,7 +5,7 @@ from pydantic import BaseModel
 
 class MembershipResponse(BaseModel):
     id: str
-    user_id: int
+    user_id: str
     org_id: str
     role: str
     created_at: datetime

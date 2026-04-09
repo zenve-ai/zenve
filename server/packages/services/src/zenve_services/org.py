@@ -30,7 +30,7 @@ class OrgService:
     def __init__(self, db: Session):
         self.db = db
 
-    def create(self, data: OrgCreate, owner_user_id: int) -> Organization:
+    def create(self, data: OrgCreate, owner_user_id: str) -> Organization:
         slug = data.slug or slugify(data.name)
         base_path = str(Path(get_settings().data_dir) / "orgs" / slug)
 
@@ -86,7 +86,7 @@ class OrgService:
     def list_all(self) -> list[Organization]:
         return self.db.query(Organization).all()
 
-    def list_for_user(self, user_id: int) -> list[tuple[Organization, str]]:
+    def list_for_user(self, user_id: str) -> list[tuple[Organization, str]]:
         return (
             self.db.query(Organization, UserOrgMembership.role)
             .join(UserOrgMembership, UserOrgMembership.org_id == Organization.id)

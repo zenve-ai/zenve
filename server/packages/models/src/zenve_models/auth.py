@@ -15,7 +15,7 @@ class SignupRequest(BaseModel):
 
 
 class UserResponse(BaseModel):
-    id: int
+    id: str
     email: str
     name: str | None
     created_at: datetime
