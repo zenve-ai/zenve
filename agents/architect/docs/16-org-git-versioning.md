@@ -20,7 +20,6 @@ Give each organization a single git repository at its filesystem root. The gatew
   project/              ← shared org-level state (specs, docs, context)
   agents/
     {agent_slug}/
-      gateway.json
       SOUL.md
       AGENTS.md
       memory/

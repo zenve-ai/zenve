@@ -39,7 +39,7 @@ Constraints: `UniqueConstraint("org_id", "name")`, `UniqueConstraint("org_id", "
 Relationship: `Organization.agents` ↔ `Agent.organization`.
 
 **Status values (canonical):** `active`, `inactive`, `archived`.
-- `inactive` replaces the earlier "paused" — aligns with gateway.json schema from chunk 03.
+- `inactive` replaces the earlier "paused".
 - `error` is not stored as a status; it is surfaced in the Run record (chunk 08), not on the agent.
 
 **`KNOWN_ADAPTER_TYPES`** (module-level constant in `services/agent.py`):
@@ -117,18 +117,7 @@ class AgentService:
         #            "created_at": utcnow().isoformat(),
         #        },
         #    ) → returns agent_dir (absolute path)
-        # 4. Call filesystem.write_gateway_json(agent_dir, {
-        #        "id": str(new_uuid),
-        #        "name": data.name,
-        #        "slug": slug,
-        #        "org_slug": org.slug,
-        #        "adapter_type": data.adapter_type,
-        #        "skills": data.skills,
-        #        "status": "active",
-        #        "heartbeat_interval_seconds": data.heartbeat_interval_seconds,
-        #        "gateway_url": settings.gateway_url,
-        #    })
-        # 5. Insert Agent row with dir_path=agent_dir, status="active"
+        # 4. Insert Agent row with dir_path=agent_dir, status="active"
         # Return agent
 
     def get_by_id(self, org_id: UUID, agent_id: UUID) -> Agent: ...
@@ -144,22 +133,16 @@ class AgentService:
 
     def update(self, org_id: UUID, agent_id: UUID, data: AgentUpdate) -> Agent:
         # Update DB columns for any non-None field in data
-        # If any of {adapter_config, skills, status, heartbeat_interval_seconds}
-        #   changed → rewrite gateway.json via filesystem.write_gateway_json
         # Return updated agent
 
     def archive(self, org_id: UUID, agent_id: UUID) -> Agent:
         # Soft delete: set status = "archived"
-        # Rewrites gateway.json (status field)
         # Files on disk are kept
 
     def get_agent_files(self, agent: Agent) -> list[str]: ...
     def read_agent_file(self, agent: Agent, path: str) -> str: ...
     def write_agent_file(self, agent: Agent, path: str, content: str) -> None: ...
 ```
-
-**gateway.json rewrite trigger fields:** `adapter_config`, `skills`, `status`, `heartbeat_interval_seconds`.
-Name/slug changes do NOT rewrite gateway.json (slug is immutable after creation).
 
 ### 4. Dependency Function — `services/__init__.py`
 
@@ -227,7 +210,7 @@ Add `agent_router` to `api/routes/__init__.py` and include in `main.py`.
 
 No new environment variables. This chunk consumes:
 - `DATA_DIR` — agent filesystem root (from chunk 03)
-- `GATEWAY_URL` — injected into gateway.json and template vars (from chunk 03)
+- `GATEWAY_URL` — injected into template vars (from chunk 03)
 
 ## Notes
 - Slug is derived from `name` at creation time and is immutable thereafter.
@@ -235,11 +218,12 @@ No new environment variables. This chunk consumes:
 - File endpoints use `{path:path}` to capture nested paths like `memory/long_term.md`.
 - All file operations are scoped to the agent's `dir_path` — path traversal is blocked by `FilesystemService`.
 - `adapter_type` is validated against `KNOWN_ADAPTER_TYPES`; unknown values → 422.
-- `DELETE` is a soft delete — sets status to `"archived"`, keeps files on disk, rewrites gateway.json.
+- `DELETE` is a soft delete — sets status to `"archived"`, keeps files on disk.
 
 ## Change Log
 
 | Date       | Change                                                                                          |
 |------------|-------------------------------------------------------------------------------------------------|
 | 2026-04-06 | Initial draft                                                                                   |
-| 2026-04-06 | Reconciled against chunks 02 and 03: status values corrected (`inactive` replaces `paused`, `error` removed from agent status); added `Referenced By`; added per-route scope annotations; documented `get_current_org` tuple pattern; expanded `create` with full `template_vars` dict and `gateway.json` payload; specified gateway.json rewrite trigger fields in `update`; added `KNOWN_ADAPTER_TYPES` constant; added Config section |
+| 2026-04-06 | Reconciled against chunks 02 and 03: status values corrected (`inactive` replaces `paused`, `error` removed from agent status); added `Referenced By`; added per-route scope annotations; documented `get_current_org` tuple pattern; expanded `create` with full `template_vars` dict; added `KNOWN_ADAPTER_TYPES` constant; added Config section |
+| 2026-04-09 | Removed all `gateway.json` references — DB is the single source of truth; no filesystem config file needed |

@@ -94,7 +94,7 @@ Filesystem mirrors the DB: `/data/orgs/{slug}/` holds a single git repo (`.git/`
 |----|--------------------------------|------------|-----------------------------------------------------|-----------------|------------|
 | 01 | Organizations CRUD             | —          | ORM model, service, routes, Pydantic models         | implemented     | 2026-04-05 |
 | 02 | API Key Auth                   | 01         | API key model, hashing, auth dependency, scopes, key routes | not started     | —          |
-| 03 | Agent Filesystem & Templates   | 01         | SOUL.md.j2, AGENTS.md.j2, HEARTBEAT.md.j2, TOOLS.md.j2, memory stubs, gateway.json schema, FilesystemService, config | designed        | 2026-04-06 |
+| 03 | Agent Filesystem & Templates   | 01         | SOUL.md.j2, AGENTS.md.j2, HEARTBEAT.md.j2, memory stubs, FilesystemService, config | designed        | 2026-04-06 |
 | 04 | Agents CRUD                    | 01, 02, 03 | ORM model, service, routes, file read/write routes   | designed        | 2026-04-06 |
 | 05 | Adapter Interface              | 04         | BaseAdapter ABC, RunContext, RunResult, registry      | not started     | —          |
 | 06 | Claude Code Adapter            | 05         | ClaudeCodeAdapter implementation                     | not started     | —          |
@@ -113,7 +113,7 @@ Filesystem mirrors the DB: `/data/orgs/{slug}/` holds a single git repo (`.git/`
 
 - **Auth model** — Two tiers: API keys for external callers (chunks 02, 04), short-lived JWT for agent runtimes (chunk 09). Org resolved from key, never from request body.
 - **Dual identification** — All entities support UUID and slug lookup. UUID-first resolution, slug fallback.
-- **Hybrid storage** — DB for queryable metadata, filesystem for agent identity and full transcripts. `gateway.json` bridges the two worlds.
+- **Hybrid storage** — DB for queryable metadata, filesystem for agent identity and full transcripts.
 - **Path safety** — All filesystem operations validate against path traversal. Agent dirs are sandboxed under org base_path.
 - **Org-level git versioning** — Each org has one git repo at its filesystem root. The gateway commits once per run after the adapter returns, recording `pre_commit_sha` and `post_commit_sha` on the run record. Concurrent commits serialize via a per-org lock (chunk 16).
 
@@ -131,7 +131,7 @@ Filesystem mirrors the DB: `/data/orgs/{slug}/` holds a single git repo (`.git/`
 | Multi-tenancy | Organization-scoped | All entities belong to an org. One deployment, many teams. |
 | Adapters | Pluggable ABC | Runtime-agnostic. New runtimes don't touch core. |
 | Templates | Jinja2 on disk | Agent scaffolding from templates at creation time. |
-| Identity bridging | gateway.json + slug/UUID dual lookup | Filesystem stays human-readable, API stays programmatic. |
+| Identity bridging | slug/UUID dual lookup | Filesystem stays human-readable, API stays programmatic. |
 | Agent auth at runtime | Short-lived JWT via env vars | Agents can discover peers without exposing org API keys. |
 | Multi-agent collaboration | Group chat + Celery-driven round-robin | Gateway orchestrates turns, agents only see shared messages. |
 | Org git versioning | One repo per org, commit per run | Single remote per org, coherent history, soft-delete audit trail. |
@@ -146,8 +146,7 @@ Filesystem mirrors the DB: `/data/orgs/{slug}/` holds a single git repo (`.git/`
 4. **File watching** — Should the gateway watch agent dirs for external edits or is the API the only write path? *(affects chunks 03, 04)*
 5. **Run timeouts** — Default timeout for a run? Configurable per-agent? *(affects chunks 05, 07)*
 6. **Adapter config secrets** — Should API keys for LLM providers live in adapter_config (encrypted), env vars, or a secrets store? *(affects chunks 05, 06)*
-7. **gateway.json mutation policy** — Can agents modify their own gateway.json? May need guardrails to prevent capability escalation. *(affects chunks 03, 04)*
-8. **Collaboration context management** — Should there be compaction/summarization after N messages? *(affects chunk 12)*
-9. **Human-in-the-loop for collaborations** — Can a human post into an active collaboration mid-discussion? *(affects chunk 13)*
-10. **Shared-state write conflicts** — If two agents in a collaboration edit `project/specs.md` in the same round, merge conflicts are possible. Current collaboration model serializes turns, so this is a future concern. *(affects chunks 12, 16)*
-11. **History rewriting on hard delete** — Soft delete is the default. Hard-deleting an agent's history would require `git filter-repo` and is not exposed through the API. *(affects chunks 04, 16)*
+7. **Collaboration context management** — Should there be compaction/summarization after N messages? *(affects chunk 12)*
+8. **Human-in-the-loop for collaborations** — Can a human post into an active collaboration mid-discussion? *(affects chunk 13)*
+9. **Shared-state write conflicts** — If two agents in a collaboration edit `project/specs.md` in the same round, merge conflicts are possible. Current collaboration model serializes turns, so this is a future concern. *(affects chunks 12, 16)*
+10. **History rewriting on hard delete** — Soft delete is the default. Hard-deleting an agent's history would require `git filter-repo` and is not exposed through the API. *(affects chunks 04, 16)*

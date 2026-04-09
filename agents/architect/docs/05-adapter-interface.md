@@ -28,7 +28,7 @@ class ClaudeCodeConfig(AdapterConfigBase):
     model: str | None = None            # optional, default: CLI default
     max_tokens: int | None = None       # optional
     max_turns: int | None = None        # optional
-    # Note: tool permissions live in gateway.json, not adapter config
+    # Note: tool permissions live on the Agent DB model, not adapter config
 
 class CodexConfig(AdapterConfigBase):
     model: str | None = None            # optional
@@ -60,7 +60,7 @@ class RunContext:
     adapter_config: dict        # adapter-specific config from DB (merged with defaults)
     gateway_url: str            # injected as env var
     agent_token: str            # short-lived JWT (Chunk 09, empty string for now)
-    tools: list[str] | None     # from gateway.json; None = all tools allowed
+    tools: list[str] | None     # from Agent DB model; None = all tools allowed
     env_vars: dict              # extra env vars to pass
 
 @dataclass
@@ -174,9 +174,8 @@ def build_run_context(
     default_cfg = adapter.get_default_config().model_dump()
     merged_cfg = {**default_cfg, **(agent.adapter_config or {})}
 
-    # Read tool permissions from gateway.json
-    gateway = filesystem.read_gateway_json(agent.dir_path)
-    tools = gateway.get("tools")  # list[str] | None
+    # Tool permissions from Agent DB model
+    tools = agent.tools or None  # empty list → None (all tools allowed)
 
     return RunContext(
         agent_dir=agent.dir_path,
@@ -250,5 +249,5 @@ def get_agent_service(
 | 2026-04-06 | Added `adapter_type: str` field to `RunContext`                                            |
 | 2026-04-06 | Updated `RunContext` builder to accept `adapter_registry` and merge default config          |
 | 2026-04-06 | Added `AgentService` integration section: registry param, `has()`/`known_types()` validation, dependency function |
-| 2026-04-08 | Added `tools: list[str] | None` to `RunContext`; removed `allowed_tools` from `ClaudeCodeConfig` — tool permissions are agent-level (gateway.json), not adapter-level |
-| 2026-04-08 | Updated `build_run_context` to read `tools` from `gateway.json` via `FilesystemService` |
+| 2026-04-08 | Added `tools: list[str] | None` to `RunContext`; removed `allowed_tools` from `ClaudeCodeConfig` — tool permissions are agent-level, not adapter-level |
+| 2026-04-09 | Updated `build_run_context` to read `tools` from Agent DB model instead of `gateway.json` |

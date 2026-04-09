@@ -1,7 +1,7 @@
 # Chunk 03 — Agent Filesystem & Templates
 
 ## Goal
-Define the agent directory structure and Jinja2 template scaffolding system. When an agent is created, the gateway renders these templates and writes the resulting files to disk. The templates establish an agent's identity, operational instructions, and heartbeat behaviour — all as human-readable markdown that the agent runtime reads at startup. Tool permissions are defined in `gateway.json` and enforced at runtime by the adapter.
+Define the agent directory structure and Jinja2 template scaffolding system. When an agent is created, the gateway renders these templates and writes the resulting files to disk. The templates establish an agent's identity, operational instructions, and heartbeat behaviour — all as human-readable markdown that the agent runtime reads at startup. Tool permissions are stored on the Agent DB model and enforced at runtime by the adapter.
 
 ## Depends On
 - Chunk 01 — Organizations (for `base_path`, `org_slug`, `org_name`)
@@ -31,7 +31,6 @@ Agent directory created at scaffold time:
 
 ```
 {org.base_path}/agents/{agent_slug}/
-  gateway.json          ← written from code, not a template (includes tools array)
   SOUL.md               ← rendered from SOUL.md.j2
   AGENTS.md             ← rendered from AGENTS.md.j2
   HEARTBEAT.md          ← rendered from HEARTBEAT.md.j2
@@ -89,7 +88,7 @@ You are **{{ agent_name }}**, an AI agent operating inside the **{{ org_name }}*
 1. You act on behalf of the **{{ org_name }}** organization.
 2. You follow the instructions in `AGENTS.md` for how to behave during a run.
 3. You follow the instructions in `HEARTBEAT.md` for autonomous scheduled behaviour.
-4. Tool permissions are enforced by the runtime via `gateway.json`. Only use tools that have been granted.
+4. Tool permissions are enforced by the runtime. Only use tools that have been granted.
 5. You do not take actions outside the scope of your role.
 6. When in doubt, do less and report back rather than acting unilaterally.
 
@@ -233,47 +232,7 @@ _Empty._
 
 ---
 
-### 7. `gateway.json` Schema
-
-Written programmatically at scaffold time (not a Jinja2 template). Updated whenever the agent's config changes via the API. This is the **single source of truth** for agent tool permissions — adapters read `tools` at runtime and enforce them via their native allow-list mechanisms (e.g. `--allowedTools` for Claude Code).
-
-```json
-{
-  "id": "uuid",
-  "slug": "dev-agent",
-  "org_id": "uuid",
-  "org_slug": "acme",
-  "adapter_type": "claude_code",
-  "tools": ["Read", "Write", "Edit", "Bash", "WebFetch"],
-  "skills": [],
-  "status": "active",
-  "heartbeat_interval_seconds": 0,
-  "gateway_url": "https://gateway.example.com/api/v1",
-  "created_at": "2026-04-04T12:00:00Z"
-}
-```
-
-Fields:
-
-| Field | Description |
-|-------|-------------|
-| `id` | Agent UUID (from DB) |
-| `slug` | Agent slug (URL-safe) |
-| `org_id` | Owning organization UUID |
-| `org_slug` | Owning organization slug |
-| `adapter_type` | Runtime adapter identifier |
-| `tools` | Tool allow-list. Adapter reads this and enforces at runtime. Empty array `[]` = no tool access (print-only). `null` or absent = all tools allowed. |
-| `skills` | Optional tags / capability hints |
-| `status` | `active` \| `inactive` \| `archived` |
-| `heartbeat_interval_seconds` | Heartbeat tick interval in seconds; `0` means disabled |
-| `gateway_url` | Base URL agents use to call back home |
-| `created_at` | ISO-8601 creation timestamp |
-
-No secrets or credentials are stored here.
-
----
-
-### 8. Filesystem Service — `services/filesystem.py`
+### 7. Filesystem Service — `services/filesystem.py`
 
 ```python
 class FilesystemService:
@@ -292,12 +251,6 @@ class FilesystemService:
         Returns the absolute path to the created agent directory.
         Raises FileExistsError if the directory already exists.
         """
-
-    def write_gateway_json(self, agent_dir: str, data: dict) -> None:
-        """Write or overwrite gateway.json in the agent directory."""
-
-    def read_gateway_json(self, agent_dir: str) -> dict:
-        """Read and parse gateway.json from the agent directory."""
 
     def read_agent_file(self, agent_dir: str, file_path: str) -> str:
         """Read a file relative to agent_dir. Validates no path traversal."""
@@ -320,7 +273,7 @@ class FilesystemService:
 
 ---
 
-### 9. Config Additions — `config/settings.py`
+### 8. Config Additions — `config/settings.py`
 
 ```python
 DATA_DIR: str = "/data"                        # root for all org/agent data
@@ -330,7 +283,7 @@ GATEWAY_URL: str = "http://localhost:8000/api/v1"
 
 ---
 
-### 10. Bundled Templates & Bootstrap Seeding
+### 9. Bundled Templates & Bootstrap Seeding
 
 #### Problem
 
@@ -413,9 +366,8 @@ If a gateway release ships updated default templates, operators who want the new
 | Seeding strategy | Copy-once on startup (skip if exists) | Idempotent; preserves operator customisations across restarts |
 | Signal protocol | Plain text suffix (`RUN_OK`, `HEARTBEAT_OK`, etc.) | Simple to parse, works with any LLM output |
 | Memory split | `long_term.md` + `scratch.md` | Separates durable facts from ephemeral notes; keeps long_term.md clean |
-| `gateway.json` format | JSON (not template) | Programmatic writes are cleaner in JSON; no template needed |
 | No credentials on disk | Enforced by policy | Secrets go in env vars (ZENVE_TOKEN), never in agent files |
-| Tool permissions in gateway.json | `tools` array in JSON | Machine-readable, adapter-enforced at runtime; no separate markdown file needed |
+| Tool permissions in DB | `tools` column on Agent model | Machine-readable, adapter-enforced at runtime; DB is the single source of truth |
 
 ## Notes
 
@@ -430,7 +382,7 @@ If a gateway release ships updated default templates, operators who want the new
 
 | Date | Change | Reason |
 |------|--------|--------|
-| 2026-04-06 | Created chunk with full template designs for SOUL.md.j2, AGENTS.md.j2, HEARTBEAT.md.j2, TOOLS.md.j2, memory stubs, gateway.json schema, FilesystemService signature, and config additions | Initial design of agent file templates |
-| 2026-04-06 | Added `heartbeat_interval_seconds` to gateway.json schema and field table; fixed nested code block in TOOLS.md.j2 section | Align gateway.json with ORM model (chunk 04); fix markdown rendering |
-| 2026-04-06 | Added section 11: bundled templates & bootstrap seeding — package data layout, `seed_default_templates()`, behaviour table, upgrade path | Fresh deployments have empty TEMPLATES_DIR; defaults must ship with the gateway |
-| 2026-04-08 | Removed TOOLS.md.j2 template; added `tools` array to gateway.json schema | Tool permissions are machine-readable in gateway.json, enforced by adapters at runtime. TOOLS.md was redundant — SOUL.md/AGENTS.md handle instructional context, gateway.json handles enforcement. |
+| 2026-04-06 | Created chunk with full template designs for SOUL.md.j2, AGENTS.md.j2, HEARTBEAT.md.j2, memory stubs, FilesystemService signature, and config additions | Initial design of agent file templates |
+| 2026-04-06 | Added section for bundled templates & bootstrap seeding — package data layout, `seed_default_templates()`, behaviour table, upgrade path | Fresh deployments have empty TEMPLATES_DIR; defaults must ship with the gateway |
+| 2026-04-08 | Removed TOOLS.md.j2 template; tool permissions stored on Agent DB model | Tool permissions are machine-readable, enforced by adapters at runtime. TOOLS.md was redundant — SOUL.md/AGENTS.md handle instructional context. |
+| 2026-04-09 | Removed `gateway.json` — all agent metadata lives in the DB; identity is injected at runtime via system prompt and env vars | gateway.json was redundant with DB as source of truth and adapter-injected context |

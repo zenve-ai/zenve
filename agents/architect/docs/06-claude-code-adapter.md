@@ -120,7 +120,7 @@ class ClaudeCodeAdapter(BaseAdapter):
 
 ### 2. CLI Args Builder
 
-`adapter_config` in `RunContext` is already merged (defaults + overrides) and validated as a `ClaudeCodeConfig` dict. Tool permissions come from `RunContext.tools` (populated from `gateway.json` by the context builder), not from adapter config.
+`adapter_config` in `RunContext` is already merged (defaults + overrides) and validated as a `ClaudeCodeConfig` dict. Tool permissions come from `RunContext.tools` (populated from the Agent DB model by the context builder), not from adapter config.
 
 ```python
 def _build_cli_args(
@@ -152,7 +152,7 @@ def _build_cli_args(
     if config.max_turns:
         args.extend(["--max-turns", str(config.max_turns)])
 
-    # Tool permissions from RunContext (sourced from gateway.json)
+    # Tool permissions from RunContext (sourced from Agent DB model)
     if tools is not None:
         # Explicit tool list: auto-approve these, deny everything else
         args.extend(["--allowedTools", ",".join(tools)])
@@ -193,7 +193,7 @@ Typed by `ClaudeCodeConfig` (defined in `models/adapter.py`). All fields are opt
 | `max_tokens`    | `int \| None`    | `None`  | Max output tokens                    |
 | `max_turns`     | `int \| None`    | `None`  | Max agentic turns                    |
 
-**Note:** Tool permissions are NOT part of adapter config. They live in `gateway.json.tools` and are agent-level, not adapter-level. This allows any adapter type to enforce the same tool list.
+**Note:** Tool permissions are NOT part of adapter config. They live on the Agent DB model (`tools` column) and are agent-level, not adapter-level. This allows any adapter type to enforce the same tool list.
 
 Example stored `adapter_config` (only overrides, not full defaults):
 
@@ -207,9 +207,9 @@ Example stored `adapter_config` (only overrides, not full defaults):
 ## Notes
 - **System prompt composition** — `--system-prompt` is built from three layers in order: runtime identity block → SOUL.md (persona) → AGENTS.md (behavioral instructions). This keeps the agent's operational context fixed and separate from the task.
 - **Message is task-only** — stdin carries only the user's task (or heartbeat content). No AGENTS.md prefix. This gives the model a clean human-turn with no instruction noise mixed in.
-- **Identity block** — injected at the top of the system prompt so the agent always knows its own `agent_id`, `agent_slug`, `agent_name`, `org_id`, `org_slug`, `run_id`, and `gateway_url`, even without reading `gateway.json`.
+- **Identity block** — injected at the top of the system prompt so the agent always knows its own `agent_id`, `agent_slug`, `agent_name`, `org_id`, `org_slug`, `run_id`, and `gateway_url`.
 - **AGENTS.md placement rationale** — behavioral instructions (On Start, Executing the Task, On Finish) are part of the agent's permanent operating context, not a task. Placing them in the system prompt (not the message) correctly models this distinction.
-- Tool permissions come from `RunContext.tools` (populated by the context builder from `gateway.json`). The adapter does not read `gateway.json` directly.
+- Tool permissions come from `RunContext.tools` (populated by the context builder from the Agent DB model).
 - When `tools` is a list: `--allowedTools` auto-approves those tools and denies everything else. Unapproved tool use fails the turn.
 - When `tools` is `None` (no restrictions): `--dangerously-skip-permissions` is passed to allow all tools without prompts.
 - For heartbeat runs, HEARTBEAT.md is used as the message (user turn), not the system prompt.
@@ -229,7 +229,7 @@ Example stored `adapter_config` (only overrides, not full defaults):
 | 2026-04-06 | Added `validate_config()` classmethod returning `ClaudeCodeConfig.model_validate(raw_config)`  |
 | 2026-04-06 | Updated CLI args builder to use typed `ClaudeCodeConfig` (added `max_turns`, `allowed_tools`)  |
 | 2026-04-06 | Replaced JSON schema block with typed `ClaudeCodeConfig` field table referencing `models/adapter.py` |
-| 2026-04-08 | Tool permissions moved from `ClaudeCodeConfig.allowed_tools` to `gateway.json.tools`; adapter reads gateway.json at runtime |
+| 2026-04-08 | Tool permissions moved from `ClaudeCodeConfig.allowed_tools` to Agent DB model `tools` column |
 | 2026-04-08 | Added `--dangerously-skip-permissions` flag for headless execution; removed `allowed_tools` from adapter config |
 | 2026-04-09 | Injected runtime identity block (`agent_id`, `agent_slug`, `agent_name`, `org_id`, `org_slug`, `run_id`, `gateway_url`) as first section of `--system-prompt` |
 | 2026-04-09 | Moved AGENTS.md from user message prefix into `--system-prompt` (after SOUL.md); message now carries task only |
