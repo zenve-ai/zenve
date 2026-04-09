@@ -57,13 +57,23 @@ class ClaudeCodeAdapter(BaseAdapter):
         soul = self.read_file(Path(ctx.agent_dir) / "SOUL.md")
         agents_md = self.read_file(Path(ctx.agent_dir) / "AGENTS.md")
 
+        identity = (
+            f"# Your Identity\n"
+            f"- agent_id: {ctx.agent_id}\n"
+            f"- agent_slug: {ctx.agent_slug}\n"
+            f"- agent_name: {ctx.agent_name}\n"
+            f"- org_id: {ctx.org_id}\n"
+            f"- org_slug: {ctx.org_slug}\n"
+            f"- run_id: {ctx.run_id}\n"
+            f"- gateway_url: {ctx.gateway_url}\n"
+        )
+        system_prompt = f"{identity}\n\n{soul}\n\n{agents_md}"
+
         if ctx.heartbeat:
             heartbeat_md = self.read_file(Path(ctx.agent_dir) / "HEARTBEAT.md")
-            message = (
-                f"{agents_md}\n\n---\n\nHeartbeat tick. Review your checklist:\n\n{heartbeat_md}"
-            )
+            message = f"Heartbeat tick. Review your checklist:\n\n{heartbeat_md}"
         else:
-            message = f"{agents_md}\n\n---\n\n{ctx.message or '(no message provided)'}"
+            message = ctx.message or "(no message provided)"
 
         env = {
             **os.environ,
@@ -76,7 +86,7 @@ class ClaudeCodeAdapter(BaseAdapter):
             **ctx.env_vars,
         }
 
-        args = self.build_cli_args(config, message, soul, ctx.tools)
+        args = self.build_cli_args(config, message, system_prompt, ctx.tools)
         # print(f"Args: {args}")
 
         proc = await asyncio.create_subprocess_exec(

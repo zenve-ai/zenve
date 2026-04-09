@@ -6,7 +6,7 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jose import JWTError, jwt
 from sqlalchemy.orm import Session
 
-from zenve_config.settings import settings
+from zenve_config.settings import get_settings
 from zenve_db.database import get_db
 from zenve_db.models import UserRecord
 
@@ -28,7 +28,7 @@ def create_token(user_id: int) -> str:
     expire = datetime.now(UTC) + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     return jwt.encode(
         {"sub": str(user_id), "exp": expire},
-        settings.secret_key,
+        get_settings().secret_key,
         algorithm=ALGORITHM,
     )
 
@@ -43,7 +43,7 @@ def get_current_user(
             detail="Missing or invalid authorization",
         )
     try:
-        payload = jwt.decode(credentials.credentials, settings.secret_key, algorithms=[ALGORITHM])
+        payload = jwt.decode(credentials.credentials, get_settings().secret_key, algorithms=[ALGORITHM])
         user_id = payload.get("sub")
         if user_id is None:
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
