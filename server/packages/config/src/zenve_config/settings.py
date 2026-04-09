@@ -7,7 +7,7 @@ class Settings(BaseSettings):
     """Application settings loaded from environment variables."""
 
     # Secret key for signing JWT tokens
-    secret_key: str
+    secret_key: str = "dev-secret-key-change-in-production"
 
     # SQLite database file path (fallback)
     sqlite_database_url: str = "zenve.db"
