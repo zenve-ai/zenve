@@ -33,12 +33,13 @@ A self-hosted FastAPI REST gateway that manages organizations of AI agents, exec
 │  ┌─────▼──────────┐   ┌──────────────────────────┐  │
 │  │  SQLAlchemy     │   │  Agent Filesystem        │  │
 │  │  (Registry DB)  │   │  /data/orgs/{org}/       │  │
-│  │                 │   │    agents/{name}/         │  │
-│  │  - organizations│   │      SOUL.md             │  │
-│  │  - agents       │   │      AGENTS.md           │  │
-│  │  - runs         │   │      HEARTBEAT.md        │  │
-│  │  - api_keys     │   │      memory/             │  │
-│  └─────────────────┘   │      runs/ (transcripts) │  │
+│  │                 │   │    .git/  ← org git repo │  │
+│  │  - organizations│   │    agents/{name}/         │  │
+│  │  - agents       │   │      SOUL.md             │  │
+│  │  - runs         │   │      AGENTS.md           │  │
+│  │  - api_keys     │   │      HEARTBEAT.md        │  │
+│  └─────────────────┘   │      memory/             │  │
+│                         │      runs/ (gitignored)  │  │
 │                         └──────────────────────────┘  │
 └───────────────────────────┬───────────────────────────┘
                             │ Celery task dispatch
@@ -70,10 +71,10 @@ Four core database entities, plus a filesystem layer:
 - **Organizations** — top-level tenant. All entities are org-scoped.
 - **API Keys** — org-scoped, bcrypt-hashed, with granular scopes. Used by external callers.
 - **Agents** — registered in DB with metadata (adapter type, status, heartbeat config). Identity files live on disk.
-- **Runs** — execution records (queued → running → completed/failed/timeout). Transcripts stored on disk.
+- **Runs** — execution records (queued → running → completed/failed/timeout). Transcripts stored on disk. Each run records `pre_commit_sha` and `post_commit_sha` for diffing.
 - **Collaborations** — multi-agent group chat sessions with members, messages, and round-robin orchestration. Each turn creates a sub-run.
 
-Filesystem mirrors the DB: `/data/orgs/{slug}/agents/{slug}/` holds SOUL.md, AGENTS.md, HEARTBEAT.md, gateway.json, memory/, and run transcripts.
+Filesystem mirrors the DB: `/data/orgs/{slug}/` holds a single git repo (`.git/`) with all agent directories under `agents/{slug}/`, a shared `project/` directory, and run transcripts are gitignored.
 
 ## Tech Stack
 
@@ -106,6 +107,7 @@ Filesystem mirrors the DB: `/data/orgs/{slug}/agents/{slug}/` holds SOUL.md, AGE
 | 13 | Collaboration API & Messages   | 12         | Full REST API, message thread, cancel                | not started     | —          |
 | 14 | Health & Observability         | 07, 10     | /health, /health/workers, status checks              | not started     | —          |
 | 15 | Run Event System               | 05, 07, 08 | RunEvent model, on_event callback, event timeline API | not started     | —          |
+| 16 | Org-Level Git Versioning       | 07, 08     | OrgRepo helper, commit-per-run lifecycle, rollback, diff endpoint, remote push, org git config | not started     | —          |
 
 ## Cross-Cutting Concerns
 
@@ -113,6 +115,7 @@ Filesystem mirrors the DB: `/data/orgs/{slug}/agents/{slug}/` holds SOUL.md, AGE
 - **Dual identification** — All entities support UUID and slug lookup. UUID-first resolution, slug fallback.
 - **Hybrid storage** — DB for queryable metadata, filesystem for agent identity and full transcripts. `gateway.json` bridges the two worlds.
 - **Path safety** — All filesystem operations validate against path traversal. Agent dirs are sandboxed under org base_path.
+- **Org-level git versioning** — Each org has one git repo at its filesystem root. The gateway commits once per run after the adapter returns, recording `pre_commit_sha` and `post_commit_sha` on the run record. Concurrent commits serialize via a per-org lock (chunk 16).
 
 ## Key Decisions
 
@@ -131,6 +134,9 @@ Filesystem mirrors the DB: `/data/orgs/{slug}/agents/{slug}/` holds SOUL.md, AGE
 | Identity bridging | gateway.json + slug/UUID dual lookup | Filesystem stays human-readable, API stays programmatic. |
 | Agent auth at runtime | Short-lived JWT via env vars | Agents can discover peers without exposing org API keys. |
 | Multi-agent collaboration | Group chat + Celery-driven round-robin | Gateway orchestrates turns, agents only see shared messages. |
+| Org git versioning | One repo per org, commit per run | Single remote per org, coherent history, soft-delete audit trail. |
+| Git commit concurrency | Per-org Redis lock around commit step only | Adapters run in parallel; commits serialize for ~100ms each. |
+| Git remote push | `on_schedule` (5-min APScheduler) + manual | Default policy avoids noisy push-per-run; manual override via API. |
 
 ## Open Questions
 
@@ -143,3 +149,5 @@ Filesystem mirrors the DB: `/data/orgs/{slug}/agents/{slug}/` holds SOUL.md, AGE
 7. **gateway.json mutation policy** — Can agents modify their own gateway.json? May need guardrails to prevent capability escalation. *(affects chunks 03, 04)*
 8. **Collaboration context management** — Should there be compaction/summarization after N messages? *(affects chunk 12)*
 9. **Human-in-the-loop for collaborations** — Can a human post into an active collaboration mid-discussion? *(affects chunk 13)*
+10. **Shared-state write conflicts** — If two agents in a collaboration edit `project/specs.md` in the same round, merge conflicts are possible. Current collaboration model serializes turns, so this is a future concern. *(affects chunks 12, 16)*
+11. **History rewriting on hard delete** — Soft delete is the default. Hard-deleting an agent's history would require `git filter-repo` and is not exposed through the API. *(affects chunks 04, 16)*
