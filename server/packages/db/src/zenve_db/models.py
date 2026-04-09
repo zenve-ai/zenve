@@ -92,6 +92,7 @@ class Agent(Base):
     adapter_type: Mapped[str] = mapped_column(nullable=False)
     adapter_config: Mapped[dict] = mapped_column(JSON, default=dict)
     skills: Mapped[list] = mapped_column(JSON, default=list)
+    tools: Mapped[list] = mapped_column(JSON, default=list)
     status: Mapped[str] = mapped_column(default="active")
     heartbeat_interval_seconds: Mapped[int] = mapped_column(default=0)
     last_heartbeat_at: Mapped[datetime | None] = mapped_column(nullable=True)

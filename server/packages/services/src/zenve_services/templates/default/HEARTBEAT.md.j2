@@ -1,23 +1,21 @@
-# {{ agent_name }} — Heartbeat Instructions
+# {{ agent_name }} — Heartbeat
 
-These instructions govern your behaviour during a scheduled heartbeat tick.
 A heartbeat is an autonomous, timer-driven invocation — no caller prompt is provided.
 
-## Purpose
+## Tasks
 
-Describe what this agent should do autonomously. Replace this section with
-the agent's recurring responsibilities. Examples:
+On each tick, execute the following tasks in order:
 
-- Monitor a queue and process pending items
-- Check for new data and summarise findings
-- Run maintenance tasks on a schedule
+<!-- No tasks defined yet. Add tasks here — each will run on every tick. -->
 
 ## On Each Tick
 
 1. Read `memory/long_term.md` — load persisted context.
-2. Assess the current state: is there work to do?
-3. If yes: perform the work and write results to `memory/long_term.md`.
-4. If no: do nothing and signal `HEARTBEAT_OK` with a brief status note.
+2. Check the Tasks list above.
+3. If no tasks are defined, stop and signal `HEARTBEAT_OK: nothing to do`.
+4. Otherwise, execute each task in order.
+5. Update `memory/long_term.md` with results and observations.
+6. Signal `HEARTBEAT_OK: <note>` summarising what was done.
 
 ## Signalling Outcomes
 
@@ -25,8 +23,8 @@ End each heartbeat run with one of these signals:
 
 | Signal | Meaning |
 |--------|---------|
-| `HEARTBEAT_OK` | Tick completed; nothing blocking |
-| `HEARTBEAT_OK: <note>` | Tick completed; brief status |
+| `HEARTBEAT_OK: nothing to do` | No tasks defined; tick skipped |
+| `HEARTBEAT_OK: <note>` | Tasks completed; brief summary of what was done |
 | `HEARTBEAT_FAILED: <reason>` | Tick failed; needs attention |
 | `HEARTBEAT_NEEDS_INPUT: <question>` | Blocked; cannot proceed autonomously |
 

@@ -50,6 +50,7 @@ class AgentService:
             "agent_slug": slug,
             "org_name": org.name,
             "org_slug": org.slug,
+            "org_dir": org.base_path,
             "role": data.role,
             "adapter_type": data.adapter_type,
             "gateway_url": get_settings().gateway_url,
@@ -68,22 +69,6 @@ class AgentService:
 
         agent_id = str(uuid.uuid4())
 
-        self.filesystem.write_gateway_json(
-            dir_path,
-            {
-                "id": agent_id,
-                "slug": slug,
-                "org_id": org.id,
-                "org_slug": org.slug,
-                "adapter_type": data.adapter_type,
-                "skills": data.skills,
-                "status": "active",
-                "heartbeat_interval_seconds": data.heartbeat_interval_seconds,
-                "gateway_url": get_settings().gateway_url,
-                "created_at": created_at,
-            },
-        )
-
         agent = Agent(
             id=agent_id,
             org_id=org.id,
@@ -93,6 +78,7 @@ class AgentService:
             adapter_type=data.adapter_type,
             adapter_config=adapter_config,
             skills=data.skills,
+            tools=data.tools,
             status="active",
             heartbeat_interval_seconds=data.heartbeat_interval_seconds,
         )
@@ -143,36 +129,21 @@ class AgentService:
     def update(self, org_id: str, agent_id: str, data: AgentUpdate) -> Agent:
         agent = self.get_by_id(org_id, agent_id)
 
-        gateway_dirty = False
-
         if data.name is not None:
             agent.name = data.name
         if data.adapter_config is not None:
             agent.adapter_config = data.adapter_config
-            gateway_dirty = True
         if data.skills is not None:
             agent.skills = data.skills
-            gateway_dirty = True
+        if data.tools is not None:
+            agent.tools = data.tools
         if data.status is not None:
             agent.status = data.status
-            gateway_dirty = True
         if data.heartbeat_interval_seconds is not None:
             agent.heartbeat_interval_seconds = data.heartbeat_interval_seconds
-            gateway_dirty = True
 
         self.db.commit()
         self.db.refresh(agent)
-
-        if gateway_dirty:
-            gw = self.filesystem.read_gateway_json(agent.dir_path)
-            if data.skills is not None:
-                gw["skills"] = agent.skills
-            if data.status is not None:
-                gw["status"] = agent.status
-            if data.heartbeat_interval_seconds is not None:
-                gw["heartbeat_interval_seconds"] = agent.heartbeat_interval_seconds
-            self.filesystem.write_gateway_json(agent.dir_path, gw)
-
         return agent
 
     def archive(self, org_id: str, agent_id: str) -> Agent:
@@ -180,11 +151,6 @@ class AgentService:
         agent.status = "archived"
         self.db.commit()
         self.db.refresh(agent)
-
-        gw = self.filesystem.read_gateway_json(agent.dir_path)
-        gw["status"] = "archived"
-        self.filesystem.write_gateway_json(agent.dir_path, gw)
-
         return agent
 
     def get_agent_files(self, agent: Agent) -> list[str]:

@@ -1,5 +1,4 @@
 import importlib.resources
-import json
 from importlib.resources.abc import Traversable
 from pathlib import Path
 
@@ -76,6 +75,7 @@ class FilesystemService:
         for template_file in (
             "SOUL.md.j2",
             "AGENTS.md.j2",
+            "RUN.md.j2",
             "HEARTBEAT.md.j2",
         ):
             rendered = env.get_template(template_file).render(**template_vars)
@@ -99,20 +99,6 @@ class FilesystemService:
 
     def write_memory_stub(self, path: Path, content: str) -> None:
         path.write_text(content, encoding="utf-8")
-
-    # ------------------------------------------------------------------
-    # gateway.json
-    # ------------------------------------------------------------------
-
-    def write_gateway_json(self, agent_dir: str, data: dict) -> None:
-        """Write or overwrite gateway.json in the agent directory."""
-        path = Path(agent_dir) / "gateway.json"
-        path.write_text(json.dumps(data, indent=2), encoding="utf-8")
-
-    def read_gateway_json(self, agent_dir: str) -> dict:
-        """Read and parse gateway.json from the agent directory."""
-        path = Path(agent_dir) / "gateway.json"
-        return json.loads(path.read_text(encoding="utf-8"))
 
     # ------------------------------------------------------------------
     # Generic file operations

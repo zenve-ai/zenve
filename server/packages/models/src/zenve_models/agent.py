@@ -9,6 +9,7 @@ class AgentCreate(BaseModel):
     adapter_type: str
     adapter_config: dict = {}
     skills: list[str] = []
+    tools: list[str] = []
     heartbeat_interval_seconds: int = 0
     template: str = "default"
     """Template set name under `TEMPLATES_DIR` (e.g. `default`)."""
@@ -23,6 +24,7 @@ class AgentUpdate(BaseModel):
     name: str | None = None
     adapter_config: dict | None = None
     skills: list[str] | None = None
+    tools: list[str] | None = None
     status: str | None = None
     heartbeat_interval_seconds: int | None = None
 
@@ -36,6 +38,7 @@ class AgentResponse(BaseModel):
     adapter_type: str
     adapter_config: dict
     skills: list[str]
+    tools: list[str]
     status: str
     heartbeat_interval_seconds: int
     last_heartbeat_at: datetime | None

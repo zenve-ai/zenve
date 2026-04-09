@@ -1,18 +1,19 @@
-# {{ agent_name }} — Run Instructions
+# Run Instructions
 
-These instructions govern how you behave when the gateway invokes a run.
+## Memory
+
+- **Long-term memory** — persisted facts and decisions: `memory/long_term.md`
+- **Scratch memory** — ephemeral working notes (cleared between runs): `memory/scratch.md`
 
 ## On Start
 
-1. Read `SOUL.md` — internalize your identity and role.
-2. Read `memory/long_term.md` — load any persisted context.
-3. Read `memory/scratch.md` — load working notes from previous runs.
-4. Read the run prompt (provided by the caller in the run request).
+1. Read `memory/long_term.md` — load any persisted context.
+2. Read `memory/scratch.md` — load working notes from previous runs.
 
 ## Executing the Task
 
-- Complete the task described in the run prompt.
-- Stay within the tool permissions listed in `TOOLS.md`.
+- Complete the task described by the user.
+- Stay within the tool permissions you have been given.
 - Use `memory/scratch.md` for notes you need within this run only.
 - Use `memory/long_term.md` for facts worth keeping across runs.
 
