@@ -1,5 +1,6 @@
-from contextlib import asynccontextmanager
 import logging
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from sqlalchemy import text
 
@@ -10,6 +11,7 @@ from zenve_db.database import Base, engine
 from zenve_services.filesystem import FilesystemService
 
 logger = logging.getLogger(__name__)
+
 
 def setup_database(_: FastAPI):
     Base.metadata.create_all(bind=engine)

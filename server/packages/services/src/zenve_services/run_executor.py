@@ -12,7 +12,7 @@ from zenve_models.adapter import RunContext, RunResult
 logger = logging.getLogger(__name__)
 
 
-def _write_transcript(ctx: RunContext, result: RunResult) -> Path | None:
+def write_transcript(ctx: RunContext, result: RunResult) -> Path | None:
     """Write run output to {agent_dir}/runs/{timestamp}_{run_id[:8]}.md"""
     try:
         runs_dir = Path(ctx.agent_dir) / "runs"
@@ -63,7 +63,7 @@ async def execute_run(
         adapter = adapter_registry.get(ctx.adapter_type)
         result: RunResult = await adapter.execute(ctx)
 
-        transcript_path = _write_transcript(ctx, result)
+        transcript_path = write_transcript(ctx, result)
 
         # Re-fetch in case cancelled while running
         db.refresh(run)

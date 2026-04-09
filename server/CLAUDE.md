@@ -38,6 +38,7 @@ server/
 ### Utils (`packages/utils/`)
 - Pure stateless helpers: hashing, JWT, `get_current_user` FastAPI dependency (JWT auth)
 - No business logic
+- **Test helpers** — shared test utilities (mock factories, fake data builders) go in `packages/utils/src/zenve_utils/testing.py`, not in individual test files or conftest.py
 
 ### DB (`packages/db/`)
 - `database.py` — engine, session, `get_db`
@@ -83,6 +84,10 @@ Two auth systems coexist — use the right one for each context:
 | Org CRUD (`/api/v1/orgs`) | `get_current_user` (JWT) | Membership checked via `MembershipService` |
 | Agents (`/api/v1/agents`) | `get_current_org` + `require_scope` (API key) | For programmatic/agent access |
 | API keys (`/api/v1/api-keys`) | `get_current_org` (API key) | Manage keys within an org |
+
+## Naming Rules
+
+- **No underscore prefix on functions** — never write `def _my_func`. Use plain names (`def my_func`) even for module-private or helper functions.
 
 ## Violations to Flag
 

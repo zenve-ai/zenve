@@ -13,7 +13,7 @@ from zenve_models.agent import AgentCreate, AgentUpdate
 from zenve_services.filesystem import FilesystemService
 
 
-def _slugify(name: str) -> str:
+def slugify(name: str) -> str:
     slug = name.lower().strip()
     slug = re.sub(r"[^a-z0-9]+", "-", slug)
     return slug.strip("-")
@@ -42,7 +42,7 @@ class AgentService:
         adapter_config = {**default_config, **data.adapter_config}
         adapter.validate_config(adapter_config)
 
-        slug = _slugify(data.name)
+        slug = slugify(data.name)
         created_at = datetime.now(UTC).isoformat().replace("+00:00", "Z")
 
         template_vars: dict[str, object] = {

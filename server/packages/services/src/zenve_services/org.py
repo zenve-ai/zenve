@@ -11,13 +11,13 @@ from zenve_db.models import Organization, UserOrgMembership
 from zenve_models.org import OrgCreate, OrgUpdate
 
 
-def _slugify(name: str) -> str:
+def slugify(name: str) -> str:
     slug = name.lower().strip()
     slug = re.sub(r"[^a-z0-9]+", "-", slug)
     return slug.strip("-")
 
 
-def _conflict_detail(exc: IntegrityError) -> str:
+def conflict_detail(exc: IntegrityError) -> str:
     msg = str(exc.orig) if exc.orig is not None else str(exc)
     if "organizations.slug" in msg:
         return "An organization with this slug already exists"
@@ -31,7 +31,7 @@ class OrgService:
         self.db = db
 
     def create(self, data: OrgCreate, owner_user_id: int) -> Organization:
-        slug = data.slug or _slugify(data.name)
+        slug = data.slug or slugify(data.name)
         base_path = str(Path(settings.data_dir) / "orgs" / slug)
 
         org = Organization(
@@ -56,7 +56,7 @@ class OrgService:
             self.db.rollback()
             raise HTTPException(
                 status_code=409,
-                detail=_conflict_detail(exc),
+                detail=conflict_detail(exc),
             ) from exc
         self.db.refresh(org)
 
@@ -106,7 +106,7 @@ class OrgService:
             self.db.rollback()
             raise HTTPException(
                 status_code=409,
-                detail=_conflict_detail(exc),
+                detail=conflict_detail(exc),
             ) from exc
         self.db.refresh(org)
         return org

@@ -7,7 +7,7 @@ from zenve_adapters.registry import AdapterRegistry
 from zenve_models.adapter import AdapterConfigBase, RunContext, RunResult
 
 
-class _StubAdapter(BaseAdapter):
+class StubAdapter(BaseAdapter):
     adapter_type = "stub"
 
     @classmethod
@@ -27,7 +27,7 @@ class _StubAdapter(BaseAdapter):
 
 def test_register_and_get():
     registry = AdapterRegistry()
-    adapter = _StubAdapter()
+    adapter = StubAdapter()
 
     registry.register(adapter)
 
@@ -38,10 +38,10 @@ def test_register_and_get():
 
 def test_register_duplicate_raises():
     registry = AdapterRegistry()
-    registry.register(_StubAdapter())
+    registry.register(StubAdapter())
 
     with pytest.raises(ValueError, match="already registered"):
-        registry.register(_StubAdapter())
+        registry.register(StubAdapter())
 
 
 def test_get_unknown_raises():

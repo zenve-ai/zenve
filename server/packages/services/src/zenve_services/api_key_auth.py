@@ -34,7 +34,7 @@ async def get_current_org(
     return org, record
 
 
-def _match_scope(granted: str, required: str) -> bool:
+def match_scope(granted: str, required: str) -> bool:
     """Check if a single granted scope covers the required scope."""
     if granted == "*":
         return True
@@ -56,7 +56,7 @@ def require_scope(scope: str) -> Callable:
     ) -> tuple[Organization, ApiKeyRecord]:
         _, key_record = auth
         granted_scopes = [s.strip() for s in key_record.scopes.split(",")]
-        if not any(_match_scope(g, scope) for g in granted_scopes):
+        if not any(match_scope(g, scope) for g in granted_scopes):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail=f"API key missing required scope: {scope}",

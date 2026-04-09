@@ -54,11 +54,11 @@ class ClaudeCodeAdapter(BaseAdapter):
         start = time.monotonic()
         config = self.validate_config(ctx.adapter_config)
 
-        soul = self._read_file(Path(ctx.agent_dir) / "SOUL.md")
-        agents_md = self._read_file(Path(ctx.agent_dir) / "AGENTS.md")
+        soul = self.read_file(Path(ctx.agent_dir) / "SOUL.md")
+        agents_md = self.read_file(Path(ctx.agent_dir) / "AGENTS.md")
 
         if ctx.heartbeat:
-            heartbeat_md = self._read_file(Path(ctx.agent_dir) / "HEARTBEAT.md")
+            heartbeat_md = self.read_file(Path(ctx.agent_dir) / "HEARTBEAT.md")
             message = (
                 f"{agents_md}\n\n---\n\nHeartbeat tick. Review your checklist:\n\n{heartbeat_md}"
             )
@@ -76,8 +76,8 @@ class ClaudeCodeAdapter(BaseAdapter):
             **ctx.env_vars,
         }
 
-        args = self._build_cli_args(config, message, soul, ctx.tools)
-        print(f"Args: {args}")
+        args = self.build_cli_args(config, message, soul, ctx.tools)
+        # print(f"Args: {args}")
 
         proc = await asyncio.create_subprocess_exec(
             *args,
@@ -87,17 +87,102 @@ class ClaudeCodeAdapter(BaseAdapter):
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
         )
-        stdout_bytes, stderr_bytes = await proc.communicate(input=message.encode())
+
+        if proc.stdin:
+            proc.stdin.write(message.encode())
+            await proc.stdin.drain()
+            proc.stdin.close()
+
+        full_stdout_lines: list[str] = []
+        token_usage: dict | None = None
+
+        async for raw_line in proc.stdout:
+            line = raw_line.decode(errors="replace").strip()
+            if not line:
+                continue
+            full_stdout_lines.append(line)
+
+            try:
+                parsed = json.loads(line)
+            except json.JSONDecodeError:
+                print(f"[run:{ctx.run_id}] output: {line}")
+                continue
+
+            event_type = parsed.get("type")
+
+            event: tuple | None = None
+
+            if event_type == "system":
+                session_id = parsed.get("session_id", "unknown")
+                event = ("output", f"Session started: {session_id}", {"session_id": session_id})
+
+            elif event_type == "assistant":
+                blocks = parsed.get("message", {}).get("content", "")
+                if isinstance(blocks, str):
+                    if blocks:
+                        event = ("output", blocks, None)
+                elif isinstance(blocks, list):
+                    for block in blocks:
+                        if block.get("type") == "text":
+                            text = block.get("text", "")
+                            if text:
+                                event = ("output", text, None)
+                        elif block.get("type") == "tool_use":
+                            event = (
+                                "tool_call",
+                                f"Calling tool: {block.get('name')}",
+                                {"tool": block.get("name"), "tool_use_id": block.get("id"), "input": block.get("input", {})},
+                            )
+                        if event:
+                            ctx.on_event(*event)
+                            event = None
+                    continue
+
+            elif event_type == "user":
+                content_blocks = parsed.get("message", {}).get("content", [])
+                if isinstance(content_blocks, list):
+                    for block in content_blocks:
+                        if block.get("type") == "tool_result":
+                            result_content = str(block.get("content", ""))
+                            summary = result_content[:500] + "..." if len(result_content) > 500 else result_content
+                            event = (
+                                "tool_result",
+                                summary,
+                                {"tool_use_id": block.get("tool_use_id"), "is_error": block.get("is_error", False), "full_result": result_content},
+                            )
+                        if event:
+                            ctx.on_event(*event)
+                            event = None
+                    continue
+
+            elif event_type == "result":
+                usage = parsed.get("usage", {})
+                if usage:
+                    token_usage = {
+                        "input_tokens": usage.get("input_tokens", 0),
+                        "output_tokens": usage.get("output_tokens", 0),
+                        "cache_read_input_tokens": usage.get("cache_read_input_tokens", 0),
+                        "cache_creation_input_tokens": usage.get("cache_creation_input_tokens", 0),
+                        "cost_usd": parsed.get("total_cost_usd"),
+                    }
+                    event = ("usage", None, token_usage)
+
+            elif event_type == "error":
+                msg = parsed.get("message", "unknown error")
+                event = ("error", msg, {"type": "error"})
+
+            if event:
+                ctx.on_event(*event)
+
+        stderr_bytes = await proc.stderr.read() if proc.stderr else b""
+        await proc.wait()
 
         duration = time.monotonic() - start
-        stdout = stdout_bytes.decode(errors="replace")
         stderr = stderr_bytes.decode(errors="replace")
-
-        token_usage = self._parse_token_usage(stdout)
 
         return RunResult(
             exit_code=proc.returncode or 0,
-            stdout=stdout,
+            stdout="\n".join(full_stdout_lines),
             stderr=stderr,
             duration_seconds=duration,
             token_usage=token_usage,
@@ -108,7 +193,7 @@ class ClaudeCodeAdapter(BaseAdapter):
     # Private helpers
     # ------------------------------------------------------------------
 
-    def _build_cli_args(
+    def build_cli_args(
         self,
         config: ClaudeCodeConfig,
         message: str,
@@ -118,6 +203,7 @@ class ClaudeCodeAdapter(BaseAdapter):
         args = [
             "claude",
             "--print",
+            "--verbose",
             "--output-format",
             config.output_format,
         ]
@@ -136,7 +222,7 @@ class ClaudeCodeAdapter(BaseAdapter):
             args.append("--dangerously-skip-permissions")
         return args
 
-    def _parse_token_usage(self, stdout: str) -> dict | None:
+    def parse_token_usage(self, stdout: str) -> dict | None:
         """Parse token usage from Claude CLI JSON output."""
         try:
             data = json.loads(stdout)
@@ -152,7 +238,7 @@ class ClaudeCodeAdapter(BaseAdapter):
         return None
 
     @staticmethod
-    def _read_file(path: Path) -> str:
+    def read_file(path: Path) -> str:
         if path.exists():
             return path.read_text(encoding="utf-8")
         return f"(file not found: {path.name})"
