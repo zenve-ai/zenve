@@ -6,7 +6,7 @@ from sqlalchemy import text
 
 from zenve_adapters.claude_code import ClaudeCodeAdapter
 from zenve_adapters.registry import AdapterRegistry
-from zenve_config.settings import settings
+from zenve_config.settings import get_settings
 from zenve_db.database import Base, engine
 from zenve_services.filesystem import FilesystemService
 
@@ -26,7 +26,7 @@ def setup_database(_: FastAPI):
         logger.error("Application may not function correctly!")
 
 def setup_filesystem(_: FastAPI):
-    FilesystemService(settings).seed_default_templates()
+    FilesystemService(get_settings()).seed_default_templates()
     logger.info("Agent templates seeded.")
 
 def setup_adapters(app: FastAPI):

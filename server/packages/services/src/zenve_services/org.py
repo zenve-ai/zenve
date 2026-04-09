@@ -6,7 +6,7 @@ from fastapi import HTTPException
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from zenve_config.settings import settings
+from zenve_config.settings import get_settings
 from zenve_db.models import Organization, UserOrgMembership
 from zenve_models.org import OrgCreate, OrgUpdate
 
@@ -32,7 +32,7 @@ class OrgService:
 
     def create(self, data: OrgCreate, owner_user_id: int) -> Organization:
         slug = data.slug or slugify(data.name)
-        base_path = str(Path(settings.data_dir) / "orgs" / slug)
+        base_path = str(Path(get_settings().data_dir) / "orgs" / slug)
 
         org = Organization(
             id=str(uuid.uuid4()),

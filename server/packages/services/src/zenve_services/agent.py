@@ -7,7 +7,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from zenve_adapters.registry import AdapterRegistry
-from zenve_config.settings import settings
+from zenve_config.settings import get_settings
 from zenve_db.models import Agent, Organization
 from zenve_models.agent import AgentCreate, AgentUpdate
 from zenve_services.filesystem import FilesystemService
@@ -52,7 +52,7 @@ class AgentService:
             "org_slug": org.slug,
             "role": data.role,
             "adapter_type": data.adapter_type,
-            "gateway_url": settings.gateway_url,
+            "gateway_url": get_settings().gateway_url,
             "created_at": created_at,
         }
         if data.template_vars:
@@ -79,7 +79,7 @@ class AgentService:
                 "skills": data.skills,
                 "status": "active",
                 "heartbeat_interval_seconds": data.heartbeat_interval_seconds,
-                "gateway_url": settings.gateway_url,
+                "gateway_url": get_settings().gateway_url,
                 "created_at": created_at,
             },
         )
