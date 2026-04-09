@@ -8,6 +8,7 @@ Implement the Run entity: ORM model, service, REST routes for triggering, listin
 
 ## Referenced By
 - Chunk 15 — Run Event System (run_events FK to runs, events endpoint alongside run routes)
+- Chunk 16 — Org-Level Git Versioning (pre/post SHA fields on Run; diff endpoint reads from org repo)
 
 ## Deliverables
 
@@ -32,6 +33,8 @@ runs
   transcript_path VARCHAR NULL          -- path to full transcript on disk
   celery_task_id  VARCHAR NULL          -- for task tracking/revocation
   collaboration_id UUID FK NULL         -- set for collaboration sub-runs (Chunk 11)
+  pre_commit_sha  VARCHAR(40) NULL      -- org repo HEAD before adapter ran (Chunk 16)
+  post_commit_sha VARCHAR(40) NULL      -- org repo HEAD after adapter committed (Chunk 16)
   created_at      TIMESTAMP
 ```
 
@@ -60,6 +63,8 @@ class RunResponse(BaseModel):
     token_usage: dict | None
     celery_task_id: str | None
     collaboration_id: UUID | None
+    pre_commit_sha: str | None
+    post_commit_sha: str | None
     created_at: datetime
 
 class RunTranscript(BaseModel):
@@ -136,6 +141,12 @@ GET    /api/v1/runs/{run_id}/transcript → get full transcript
 DELETE /api/v1/runs/{run_id}/cancel    → cancel a running task
   - Revokes Celery task
   - Marks run as failed
+
+GET    /api/v1/runs/{run_id}/diff      → git diff for this run (Chunk 16)
+  Query: ?include_shared=false
+  - Diffs pre_commit_sha..post_commit_sha scoped to agents/{agent_slug}/
+  - With include_shared=true also includes project/
+  - Returns 404 if pre_commit_sha or post_commit_sha is null
 ```
 
 ### 6. Register Router
@@ -149,3 +160,5 @@ Add run_router to `api/routes/__init__.py`.
 - The `cancel` endpoint uses Celery's `revoke()` with `terminate=True`.
 - `has_active_run()` is used by the heartbeat scheduler to avoid double-scheduling.
 - Transcript is read from disk, not stored in the database (keeps DB lean).
+- `pre_commit_sha` and `post_commit_sha` are set by the Celery task (Chunk 07) after the adapter runs. Both are null until the run completes.
+- The diff endpoint path-scopes the diff to the agent's own directory, so unrelated concurrent commits don't pollute the output.
