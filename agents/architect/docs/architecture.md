@@ -308,36 +308,58 @@ class ClaudeCodeAdapter(BaseAdapter):
         return "claude_code"
 
     async def execute(self, ctx: RunContext) -> RunResult:
-        # 1. Build prompt from agent files
+        # 1. Read agent identity files
         soul = read_file(ctx.agent_dir / "SOUL.md")
         agents_md = read_file(ctx.agent_dir / "AGENTS.md")
 
+        # 2. Build system prompt: runtime identity + persona + behavioral instructions
+        identity = (
+            f"# Your Identity\n"
+            f"- agent_id: {ctx.agent_id}\n"
+            f"- agent_slug: {ctx.agent_slug}\n"
+            f"- agent_name: {ctx.agent_name}\n"
+            f"- org_id: {ctx.org_id}\n"
+            f"- org_slug: {ctx.org_slug}\n"
+            f"- run_id: {ctx.run_id}\n"
+            f"- gateway_url: {ctx.gateway_url}\n"
+        )
+        system_prompt = f"{identity}\n\n{soul}\n\n{agents_md}"
+
+        # 3. Build message (task only — instructions live in system prompt)
         if ctx.heartbeat:
             heartbeat_md = read_file(ctx.agent_dir / "HEARTBEAT.md")
-            message = f"Heartbeat check. Review your checklist:\n{heartbeat_md}"
+            message = f"Heartbeat tick. Review your checklist:\n\n{heartbeat_md}"
         else:
-            message = ctx.message
+            message = ctx.message or "(no message provided)"
 
-        # 2. Spawn claude CLI in non-interactive mode
+        # 4. Spawn claude CLI in non-interactive mode
         proc = await asyncio.create_subprocess_exec(
-            "claude", "--query", message,
-            "--system-prompt", soul,
-            "--cwd", ctx.agent_dir,
+            "claude", "--print", "--verbose",
+            "--output-format", "stream-json",
+            "--system-prompt", system_prompt,
+            cwd=ctx.agent_dir,
             env={**os.environ, **ctx.env_vars},
-            stdout=PIPE, stderr=PIPE
+            stdin=PIPE, stdout=PIPE, stderr=PIPE,
         )
-        stdout, stderr = await proc.communicate()
 
-        # 3. Parse output for token usage
-        usage = parse_usage(stderr)
+        # 5. Write task to stdin; stream JSON events from stdout
+        proc.stdin.write(message.encode())
+        await proc.stdin.drain()
+        proc.stdin.close()
+
+        async for line in proc.stdout:
+            # parse and emit ctx.on_event(type, text, metadata)
+            ...
+
+        await proc.wait()
 
         return RunResult(
             exit_code=proc.returncode,
-            stdout=stdout.decode(),
-            stderr=stderr.decode(),
-            token_usage=usage,
+            stdout=...,
+            stderr=...,
+            token_usage=...,
             duration_seconds=...,
-            error=stderr.decode() if proc.returncode != 0 else None,
+            error=... if proc.returncode != 0 else None,
         )
 ```
 
