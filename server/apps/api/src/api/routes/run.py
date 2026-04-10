@@ -22,7 +22,7 @@ router = APIRouter(prefix="/api/v1/orgs/{org_id}/runs", tags=["runs"])
 
 
 @router.post("", response_model=RunResponse, status_code=status.HTTP_202_ACCEPTED)
-def trigger_run(
+async def trigger_run(
     org_id: str,
     body: RunCreate,
     user: UserRecord = Depends(get_current_user),
@@ -34,7 +34,7 @@ def trigger_run(
     org = org_service.get_by_id_or_slug(org_id)
     membership_service.require_membership(user.id, org.id)
 
-    agent = run_service.get_agent_for_run(org.id, body.agent_id)
+    agent = run_service.get_agent_for_run(org.id, body.agent)
     run = run_service.create_run(
         org_id=org.id,
         agent_id=agent.id,

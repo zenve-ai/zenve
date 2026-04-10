@@ -109,6 +109,7 @@ class OpenCodeAdapter(BaseAdapter):
             proc.stdin.close()
 
         full_stdout_lines: list[str] = []
+
         token_usage: dict | None = None
         session_id: str | None = None
 

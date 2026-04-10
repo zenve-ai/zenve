@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import logging
 from datetime import UTC, datetime
 from pathlib import Path
@@ -40,6 +41,55 @@ def write_transcript(ctx: RunContext, result: RunResult) -> Path | None:
         return None
 
 
+def parse_json_line_by_line(text: str) -> str | list[dict] | dict:
+    lines = [line.strip() for line in text.split('\n') if line.strip()]
+
+    if len(lines) > 1:
+        try:
+            return [json.loads(line) for line in lines]
+        except json.JSONDecodeError:
+            pass
+
+    try:
+        parsed = json.loads(text)
+        if isinstance(parsed, (dict, list)):
+            return parsed
+    except (json.JSONDecodeError, ValueError):
+        pass
+
+    return text
+
+
+def parse_json_safe(text: str) -> str | list[dict] | dict:
+    return parse_json_line_by_line(text)
+
+
+def write_transcript_json(ctx: RunContext, result: RunResult) -> Path | None:
+    """Write run output to {agent_dir}/runs/{YYYY-MM-DD}/{run-id}.json"""
+    try:
+        runs_dir = Path(ctx.agent_dir) / "runs"
+        runs_dir.mkdir(parents=True, exist_ok=True)
+
+        date_dir = runs_dir / datetime.now(UTC).strftime("%Y-%m-%d")
+        date_dir.mkdir(parents=True, exist_ok=True)
+
+        filename = f"{ctx.run_id}.json"
+        path = date_dir / filename
+        transcript = {
+            "run_id": ctx.run_id,
+            "agent_slug": ctx.agent_slug,
+            "exit_code": result.exit_code,
+            "duration_seconds": result.duration_seconds,
+            "stdout": parse_json_safe(result.stdout),
+            "stderr": parse_json_safe(result.stderr) if result.stderr else None,
+        }
+        path.write_text(json.dumps(transcript, indent=2), encoding="utf-8")
+        return path
+    except Exception:
+        logger.exception("Failed to write transcript for run %s", ctx.run_id)
+        return None
+
+
 async def execute_run(
     run_id: str,
     ctx: RunContext,
@@ -63,7 +113,7 @@ async def execute_run(
         adapter = adapter_registry.get(ctx.adapter_type)
         result: RunResult = await adapter.execute(ctx)
 
-        transcript_path = write_transcript(ctx, result)
+        transcript_path = write_transcript_json(ctx, result)
 
         # Re-fetch in case cancelled while running
         db.refresh(run)

@@ -51,8 +51,8 @@ async def main() -> None:
             event_type: str, content: str | None = None, metadata: dict | None = None
         ) -> None:
             print(f"[{event_type}] {content or ''}")
-            print(f"{metadata or ''}")
-            print("=" * 60)
+            #print(f"{metadata or ''}")
+            #print("=" * 60)
 
         ctx = RunContext(
             agent_dir=agent_dir,

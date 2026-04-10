@@ -1,0 +1,32 @@
+import sys
+
+from sqlalchemy import text
+from zenve_db.database import Session
+
+
+def clean_table(table_name: str) -> None:
+    """Delete all rows from a table by name.
+
+    Args:
+        table_name: Name of the table to truncate (e.g., "runs", "agents")
+    """
+    db = Session()
+    try:
+        query = text(f"DELETE FROM {table_name}")
+        result = db.execute(query)
+        db.commit()
+
+        print(f"Deleted {result.rowcount} rows from {table_name}")
+    except Exception as e:
+        db.rollback()
+        raise RuntimeError(f"Failed to clean table {table_name}: {e}")
+    finally:
+        db.close()
+
+if __name__ == "__main__":
+    if len(sys.argv) < 2:
+        print("Usage: python examples/clean_table.py <table_name>")
+        sys.exit(1)
+
+    table = sys.argv[1]
+    clean_table(table)

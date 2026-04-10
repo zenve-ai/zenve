@@ -6,7 +6,7 @@ from pydantic import BaseModel, ConfigDict
 
 
 class RunCreate(BaseModel):
-    agent_id: str
+    agent: str
     message: str | None = None
 
 

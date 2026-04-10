@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import uuid
 from pathlib import Path
 
 from fastapi import HTTPException
@@ -94,10 +95,15 @@ class RunService:
         self.db.refresh(run)
         return run
 
-    def get_agent_for_run(self, org_id: str, agent_id: str) -> Agent:
+    def get_agent_for_run(self, org_id: str, identifier: str) -> Agent:
+        try:
+            uuid.UUID(identifier)
+            filter_col = Agent.id
+        except ValueError:
+            filter_col = Agent.slug
         agent = (
             self.db.query(Agent)
-            .filter(Agent.id == agent_id, Agent.org_id == org_id, Agent.status != "archived")
+            .filter(filter_col == identifier, Agent.org_id == org_id, Agent.status != "archived")
             .first()
         )
         if not agent:
