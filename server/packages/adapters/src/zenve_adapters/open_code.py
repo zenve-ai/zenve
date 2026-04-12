@@ -112,6 +112,8 @@ class OpenCodeAdapter(BaseAdapter):
 
         token_usage: dict | None = None
         session_id: str | None = None
+        last_text: str | None = None
+        outcome: str | None = None
 
         if proc.stdout:
             async for raw_line in proc.stdout:
@@ -144,6 +146,7 @@ class OpenCodeAdapter(BaseAdapter):
                     part = parsed.get("part", {})
                     text = part.get("text", "")
                     if text:
+                        last_text = text
                         event = ("output", text, None)
 
                 elif event_type == "tool_use":
@@ -166,6 +169,8 @@ class OpenCodeAdapter(BaseAdapter):
 
                 elif event_type == "step_finish":
                     part = parsed.get("part", {})
+                    if part.get("reason") == "stop" and last_text:
+                        outcome = last_text
                     tokens = part.get("tokens", {})
                     cache = tokens.get("cache", {})
                     token_usage = {
@@ -201,6 +206,7 @@ class OpenCodeAdapter(BaseAdapter):
             duration_seconds=duration,
             token_usage=token_usage,
             error=stderr if proc.returncode != 0 else None,
+            outcome=outcome,
         )
 
     # ------------------------------------------------------------------

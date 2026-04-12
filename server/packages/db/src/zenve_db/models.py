@@ -114,7 +114,7 @@ class Run(Base):
     )  # manual, heartbeat, webhook, collaboration
     status: Mapped[str] = mapped_column(
         nullable=False, default="queued"
-    )  # queued, running, completed, failed, cancelled
+    )  # queued, running, completed, failed, cancelled, needs_input
     adapter_type: Mapped[str] = mapped_column(nullable=False)
     message: Mapped[str | None] = mapped_column(nullable=True)
     started_at: Mapped[datetime | None] = mapped_column(nullable=True)
@@ -123,6 +123,7 @@ class Run(Base):
     error_summary: Mapped[str | None] = mapped_column(nullable=True)
     token_usage: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     transcript_path: Mapped[str | None] = mapped_column(nullable=True)
+    outcome: Mapped[str | None] = mapped_column(nullable=True)
     created_at: Mapped[datetime] = mapped_column(default=func.now())
 
     organization: Mapped["Organization"] = relationship(back_populates="runs")

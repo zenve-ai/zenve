@@ -105,3 +105,4 @@ class RunResult:
     duration_seconds: float
     token_usage: dict | None = None  # {input_tokens, output_tokens, cost_usd}
     error: str | None = None
+    outcome: str | None = None  # final response text from the model

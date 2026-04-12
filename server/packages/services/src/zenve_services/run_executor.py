@@ -82,6 +82,7 @@ def write_transcript_json(ctx: RunContext, result: RunResult) -> Path | None:
             "duration_seconds": result.duration_seconds,
             "stdout": parse_json_safe(result.stdout),
             "stderr": parse_json_safe(result.stderr) if result.stderr else None,
+            "outcome": result.outcome,
         }
         path.write_text(json.dumps(transcript, indent=2), encoding="utf-8")
         return path
@@ -118,11 +119,15 @@ async def execute_run(
         # Re-fetch in case cancelled while running
         db.refresh(run)
         if run.status != "cancelled":
-            run.status = "completed" if result.exit_code == 0 else "failed"
+            if result.outcome:
+                run.status = adapter.parse_run_status(result.outcome)
+            else:
+                run.status = "completed" if result.exit_code == 0 else "failed"
             run.exit_code = result.exit_code
             run.token_usage = result.token_usage
             run.transcript_path = str(transcript_path) if transcript_path else None
             run.error_summary = result.error
+            run.outcome = result.outcome
         run.finished_at = datetime.now(UTC)
         db.commit()
 

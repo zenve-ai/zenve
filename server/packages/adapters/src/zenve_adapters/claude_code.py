@@ -107,6 +107,7 @@ class ClaudeCodeAdapter(BaseAdapter):
 
         full_stdout_lines: list[str] = []
         token_usage: dict | None = None
+        outcome: str | None = None
 
         async for raw_line in proc.stdout:
             line = raw_line.decode(errors="replace").strip()
@@ -180,6 +181,7 @@ class ClaudeCodeAdapter(BaseAdapter):
                     continue
 
             elif event_type == "result":
+                outcome = parsed.get("result") or None
                 usage = parsed.get("usage", {})
                 if usage:
                     token_usage = {
@@ -211,6 +213,7 @@ class ClaudeCodeAdapter(BaseAdapter):
             duration_seconds=duration,
             token_usage=token_usage,
             error=stderr if proc.returncode != 0 else None,
+            outcome=outcome,
         )
 
     # ------------------------------------------------------------------

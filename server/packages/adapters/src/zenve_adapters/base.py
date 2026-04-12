@@ -63,6 +63,24 @@ class BaseAdapter(ABC):
         ...
 
     # ------------------------------------------------------------------
+    # Signal parsing
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def parse_run_status(outcome: str) -> str:
+        """Scan last lines for RUN_* or HEARTBEAT_* signal. Returns run status string."""
+        lines = outcome.strip().splitlines()
+        for line in reversed(lines[-10:]):
+            line = line.strip()
+            if line in ("RUN_OK", "HEARTBEAT_OK"):
+                return "completed"
+            if line.startswith("RUN_FAILED") or line.startswith("HEARTBEAT_FAILED"):
+                return "failed"
+            if line.startswith("RUN_NEEDS_INPUT") or line.startswith("HEARTBEAT_NEEDS_INPUT"):
+                return "needs_input"
+        return "completed"
+
+    # ------------------------------------------------------------------
     # Health
     # ------------------------------------------------------------------
 

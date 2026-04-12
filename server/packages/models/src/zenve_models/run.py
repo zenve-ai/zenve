@@ -26,6 +26,7 @@ class RunResponse(BaseModel):
     error_summary: str | None
     token_usage: dict | None
     transcript_path: str | None
+    outcome: str | None
     created_at: datetime
 
 
