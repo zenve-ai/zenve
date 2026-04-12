@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import asyncio.subprocess
 import json
+import logging
 import os
 import time
 from pathlib import Path
@@ -10,6 +11,8 @@ from typing import ClassVar
 
 from zenve_adapters.base import BaseAdapter
 from zenve_models.adapter import ClaudeCodeConfig, RunContext, RunResult
+
+logger = logging.getLogger(__name__)
 
 
 class ClaudeCodeAdapter(BaseAdapter):
@@ -89,7 +92,6 @@ class ClaudeCodeAdapter(BaseAdapter):
         }
 
         args = self.build_cli_args(config, message, system_prompt, ctx.tools)
-        # print(f"Args: {args}")
 
         proc = await asyncio.create_subprocess_exec(
             *args,
@@ -118,11 +120,13 @@ class ClaudeCodeAdapter(BaseAdapter):
             try:
                 parsed = json.loads(line)
             except json.JSONDecodeError:
-                print(f"[run:{ctx.run_id}] output: {line}")
+                logger.warning("[run:%s] non-JSON output: %s", ctx.run_id, line[:200])
+                continue
+
+            if not isinstance(parsed, dict):
                 continue
 
             event_type = parsed.get("type")
-
             event: tuple | None = None
 
             if event_type == "system":
@@ -161,11 +165,7 @@ class ClaudeCodeAdapter(BaseAdapter):
                     for block in content_blocks:
                         if block.get("type") == "tool_result":
                             result_content = str(block.get("content", ""))
-                            summary = (
-                                result_content[:500] + "..."
-                                if len(result_content) > 500
-                                else result_content
-                            )
+                            summary = result_content[:500] + "..." if len(result_content) > 500 else result_content
                             event = (
                                 "tool_result",
                                 summary,
@@ -191,7 +191,7 @@ class ClaudeCodeAdapter(BaseAdapter):
                         "cache_creation_input_tokens": usage.get("cache_creation_input_tokens", 0),
                         "cost_usd": parsed.get("total_cost_usd"),
                     }
-                    event = ("usage", None, token_usage)
+                    event = ("usage", f"Cost: {parsed.get('total_cost_usd')}", token_usage)
 
             elif event_type == "error":
                 msg = parsed.get("message", "unknown error")
@@ -232,7 +232,7 @@ class ClaudeCodeAdapter(BaseAdapter):
             "--print",
             "--verbose",
             "--output-format",
-            config.output_format,
+            "stream-json",
         ]
         args.extend(["--system-prompt", system_prompt])
         if config.model:

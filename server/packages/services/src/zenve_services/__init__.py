@@ -12,6 +12,8 @@ from zenve_services.filesystem import FilesystemService
 from zenve_services.membership import MembershipService
 from zenve_services.org import OrgService
 from zenve_services.run import RunService
+from zenve_services.run_event import RunEventService
+from zenve_services.run_executor import RunExecutor
 from zenve_services.template import TemplateService
 
 
@@ -72,3 +74,13 @@ def get_agent_service(
 
 def get_run_service(db: Session = Depends(get_db)) -> RunService:
     return RunService(db)
+
+
+def get_run_event_service(db: Session = Depends(get_db)) -> RunEventService:
+    return RunEventService(db)
+
+
+def get_run_executor(
+    adapter_registry: AdapterRegistry = Depends(get_adapter_registry),
+) -> RunExecutor:
+    return RunExecutor(adapter_registry)

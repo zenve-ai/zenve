@@ -5,6 +5,11 @@ import uvicorn
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(levelname)s:     %(message)s",
+)
+
 from api.lifespan import lifespan
 from api.routes import (
     agent_router,
@@ -41,11 +46,6 @@ app.include_router(agent_router)
 app.include_router(run_router)
 app.include_router(preset_router)
 app.include_router(template_router)
-
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(levelname)s:     %(message)s",
-)
 
 logger = logging.getLogger(__name__)
 

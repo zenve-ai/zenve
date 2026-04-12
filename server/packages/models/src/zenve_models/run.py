@@ -8,6 +8,8 @@ from pydantic import BaseModel, ConfigDict
 class RunCreate(BaseModel):
     agent: str
     message: str | None = None
+    adapter_type: str | None = None
+    adapter_config: dict | None = None
 
 
 class RunResponse(BaseModel):

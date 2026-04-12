@@ -31,7 +31,6 @@ class ClaudeCodeConfig(AdapterConfigBase):
     model: str = "claude-sonnet-4-6"
     max_tokens: int | None = None
     max_turns: int = 10
-    output_format: str = "stream-json"
 
 
 class CodexConfig(AdapterConfigBase):

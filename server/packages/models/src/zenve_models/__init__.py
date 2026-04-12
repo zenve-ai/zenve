@@ -20,6 +20,7 @@ from .auth import LoginRequest, SignupRequest, TokenResponse, UserResponse
 from .membership import MembershipResponse
 from .org import OrgCreate, OrgCreatedResponse, OrgResponse, OrgUpdate, OrgWithRoleResponse
 from .preset import Preset, PresetSummary
+from .run_event import RunEventResponse, RunEventType
 
 __all__ = [
     "AdapterConfigBase",
@@ -46,6 +47,8 @@ __all__ = [
     "Preset",
     "PresetSummary",
     "RunContext",
+    "RunEventResponse",
+    "RunEventType",
     "RunResult",
     "SignupRequest",
     "TokenResponse",
