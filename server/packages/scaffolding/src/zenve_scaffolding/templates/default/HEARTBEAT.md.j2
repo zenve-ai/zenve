@@ -17,6 +17,21 @@ On each tick, execute the following tasks in order:
 5. Update `memory/long_term.md` with results and observations.
 6. Signal `HEARTBEAT_OK: <note>` summarising what was done.
 
+## Before ending the session:
+
+1. Update `memory/long_term.md` with any durable observations.
+2. Clear `memory/scratch.md` or leave a brief summary for the next run.
+3. Produce a final response that the gateway will store as the run result.
+
+Here is an example of a final response:
+
+```markdown
+I have sent an email to nane@acme.com with all 
+the sales leads in the last month.
+
+HEARTBEAT_OK: Sales email send successfully to nane@acme.com.
+```
+
 ## Signalling Outcomes
 
 End each heartbeat run with one of these signals:
@@ -24,7 +39,7 @@ End each heartbeat run with one of these signals:
 | Signal | Meaning |
 |--------|---------|
 | `HEARTBEAT_OK: nothing to do` | No tasks defined; tick skipped |
-| `HEARTBEAT_OK: <note>` | Tasks completed; brief summary of what was done |
+| `HEARTBEAT_OK: <note>` | Tasks completed; brief note of what was done |
 | `HEARTBEAT_FAILED: <reason>` | Tick failed; needs attention |
 | `HEARTBEAT_NEEDS_INPUT: <question>` | Blocked; cannot proceed autonomously |
 
