@@ -62,9 +62,10 @@ async def main() -> None:
             org_id="1",
             org_slug="logzai",
             run_id="run-001",
-            adapter_type="open_code",
+            adapter_type="claude_code",
             adapter_config={
-                "max_turns": 5,
+                "model": "claude-haiku-4-5",
+                "max_turns": 10,
             },
             message=MESSAGE,
             heartbeat=False,
