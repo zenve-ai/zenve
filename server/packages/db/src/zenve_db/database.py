@@ -22,7 +22,7 @@ def create_postgres_engine(connection_string: str | None = None):
 
 Base = declarative_base()
 
-engine = create_sqlite_engine()
+engine = create_postgres_engine()
 Session = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 
