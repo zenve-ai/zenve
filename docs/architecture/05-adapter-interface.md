@@ -1,253 +1,240 @@
 # Chunk 05 — Adapter Interface
 
 ## Goal
-Define the BaseAdapter ABC, RunContext/RunResult dataclasses, and the AdapterRegistry. This is the pluggable execution layer.
+Define the `BaseAdapter` ABC, `RunContext`/`RunResult` dataclasses, and the `AdapterRegistry`. This is the pluggable execution layer — adapters live in the `zenve-adapters` package and are stateless singletons registered at startup.
 
 ## Depends On
-- Chunk 04 (Agents — adapters execute agents)
+- Chunk 04 — Agents CRUD (adapters execute agents; `AgentService` validates adapter type against registry)
 
 ## Referenced By
-- Chunk 06 — Claude Code Adapter (first concrete adapter)
-- Chunk 07 — Celery Setup & Run Execution (uses RunContext, RunResult, AdapterRegistry)
-- Chunk 15 — Run Event System (adds `on_event` callback to RunContext)
+- Chunk 06 — Concrete Adapters (first implementations)
+- Chunk 07 — Celery Setup & Run Execution (uses `RunContext`, `RunResult`, `AdapterRegistry`)
+- Chunk 15 — Run Event System (`on_event` callback on `RunContext`)
+
+---
 
 ## Deliverables
 
-### 1. Data Models — `models/adapter.py`
+### 1. Package — `packages/adapters/`
 
-#### Typed Adapter Config Models
-
-```python
-from pydantic import BaseModel
-
-class AdapterConfigBase(BaseModel):
-    """Base class for all adapter config models."""
-    model_config = {"extra": "allow"}
-
-class ClaudeCodeConfig(AdapterConfigBase):
-    model: str | None = None            # optional, default: CLI default
-    max_tokens: int | None = None       # optional
-    max_turns: int | None = None        # optional
-    # Note: tool permissions live on the Agent DB model, not adapter config
-
-class CodexConfig(AdapterConfigBase):
-    model: str | None = None            # optional
-    max_tokens: int | None = None       # optional
-
-class AnthropicAPIConfig(AdapterConfigBase):
-    model: str = "claude-sonnet-4-6"   # required, defaulted
-    max_tokens: int = 4096             # required, defaulted
-    api_key_env_var: str = "ANTHROPIC_API_KEY"  # env var name for API key
+```
+packages/adapters/
+  src/zenve_adapters/
+    __init__.py      # exports BaseAdapter, AdapterRegistry
+    base.py
+    registry.py
+    claude_code.py   # Chunk 06
+    open_code.py     # Chunk 06
 ```
 
-#### RunContext and RunResult
+**Dependency chain:** `zenve-adapters` → `zenve-models` only.
+
+---
+
+### 2. Config Models — `models/adapter.py`
 
 ```python
-from dataclasses import dataclass
+class AdapterConfigBase(BaseModel):
+    model_config = {"extra": "ignore"}   # unknown keys silently dropped
 
+class ClaudeCodeConfig(AdapterConfigBase):
+    model: str = "claude-sonnet-4-6"
+    max_tokens: int | None = None
+    max_turns: int = 10
+    output_format: str = "stream-json"
+
+class CodexConfig(AdapterConfigBase):
+    model: str = "o4-mini"
+    max_tokens: int | None = None
+    approval_mode: str = "suggest"
+
+class OpenCodeConfig(AdapterConfigBase):
+    model: str = ""
+    max_tokens: int | None = None
+    steps: int = 10
+    output_format: str = "json"
+
+class AnthropicAPIConfig(AdapterConfigBase):
+    model: str = "claude-opus-4-5"
+    max_tokens: int = 4096
+    temperature: float = 1.0
+    system_prompt_override: str | None = None
+```
+
+---
+
+### 3. RunContext and RunResult — `models/adapter.py`
+
+```python
 @dataclass
 class RunContext:
-    agent_dir: str              # absolute path to agent dir
-    agent_id: str               # UUID from DB
+    agent_dir: str
+    agent_id: str
     agent_slug: str
     agent_name: str
     org_id: str
     org_slug: str
     run_id: str
-    adapter_type: str           # e.g. "claude_code", "codex"
-    message: str | None         # user message for manual runs
-    heartbeat: bool             # True if triggered by heartbeat
-    adapter_config: dict        # adapter-specific config from DB (merged with defaults)
-    gateway_url: str            # injected as env var
-    agent_token: str            # short-lived JWT (Chunk 09, empty string for now)
-    tools: list[str] | None     # from Agent DB model; None = all tools allowed
-    env_vars: dict              # extra env vars to pass
+    adapter_type: str
+    adapter_config: dict
+    message: str | None
+    heartbeat: bool
+    gateway_url: str
+    agent_token: str                    # short-lived JWT (Chunk 09); empty string until then
+    tools: list[str] | None = None      # None = all tools allowed
+    env_vars: dict = field(default_factory=dict)
+    on_event: Callable[[str, str | None, dict | None], None] = field(
+        default=lambda *a, **kw: None   # no-op until Chunk 15 wires a real handler
+    )
 
 @dataclass
 class RunResult:
     exit_code: int
     stdout: str
     stderr: str
-    token_usage: dict | None    # {input_tokens, output_tokens, cost_usd}
     duration_seconds: float
-    error: str | None
+    token_usage: dict | None = None     # {input_tokens, output_tokens, cost_usd, ...}
+    error: str | None = None
 ```
 
-### 2. Base Adapter — `agents/base.py`
+---
+
+### 4. BaseAdapter — `packages/adapters/base.py`
 
 ```python
-from abc import ABC, abstractmethod
-from typing import ClassVar
-
 class BaseAdapter(ABC):
+    """Stateless — one instance per adapter_type, created at startup, reused for all runs."""
 
-    adapter_type: ClassVar[str]  # concrete subclasses declare this (e.g. "claude_code")
+    adapter_type: ClassVar[str]
 
     def name(self) -> str:
-        """Adapter identifier — reads adapter_type class variable."""
-        return self.adapter_type
+        return self.__class__.adapter_type
 
     @classmethod
     @abstractmethod
     def get_default_config(cls) -> AdapterConfigBase:
-        """Return a default config instance for this adapter type."""
+        """Return default config instance. Called by AgentService.create() to merge with user overrides."""
         ...
 
     @classmethod
     @abstractmethod
     def validate_config(cls, raw_config: dict) -> AdapterConfigBase:
-        """Validate and coerce raw adapter_config dict into the typed config model."""
+        """Validate raw adapter_config dict. Raises pydantic.ValidationError on invalid input."""
         ...
 
     @abstractmethod
     async def execute(self, ctx: RunContext) -> RunResult:
-        """Execute the agent. Called inside a Celery worker."""
+        """Execute one agent run. Must NOT raise on non-zero subprocess exit — capture in RunResult.exit_code.
+        Only raise for infrastructure failures that should trigger a Celery retry."""
         ...
 
     @abstractmethod
     async def health_check(self) -> bool:
-        """Check if the runtime is available (e.g., CLI installed)."""
+        """Return True if runtime dependency is available. Must never raise."""
         ...
 ```
 
-### 3. Adapter Registry — `agents/registry.py`
+---
+
+### 5. AdapterRegistry — `packages/adapters/registry.py`
 
 ```python
 class AdapterRegistry:
-    _adapters: dict[str, BaseAdapter]
-
-    def __init__(self):
-        self._adapters = {}
+    def __init__(self) -> None:
+        self._adapters: dict[str, BaseAdapter] = {}
 
     def register(self, adapter: BaseAdapter) -> None:
-        self._adapters[adapter.name()] = adapter
+        """Raises ValueError if adapter_type already registered."""
+        key = adapter.name()
+        if key in self._adapters:
+            raise ValueError(f"Adapter already registered: {key!r}")
+        self._adapters[key] = adapter
 
     def get(self, adapter_type: str) -> BaseAdapter:
+        """Raises KeyError if not registered. AgentService converts this to HTTP 422."""
         if adapter_type not in self._adapters:
-            raise ValueError(f"Unknown adapter: {adapter_type}")
+            raise KeyError(f"Unknown adapter_type: {adapter_type!r}")
         return self._adapters[adapter_type]
 
-    def has(self, adapter_type: str) -> bool:
-        """Return True if adapter_type is registered."""
-        return adapter_type in self._adapters
-
-    def known_types(self) -> list[str]:
-        """Return sorted list of all registered adapter type strings."""
-        return sorted(self._adapters.keys())
-
-    def list_adapters(self) -> list[str]:
-        return list(self._adapters.keys())
+    def has(self, adapter_type: str) -> bool: ...
+    def known_types(self) -> list[str]: ...  # sorted
 
     async def health_check_all(self) -> dict[str, bool]:
-        return {
-            name: await adapter.health_check()
-            for name, adapter in self._adapters.items()
-        }
-```
-
-### 4. Registry Initialization — `api/lifespan.py`
-
-During app startup, create the registry and register available adapters:
-
-```python
-adapter_registry = AdapterRegistry()
-# adapter_registry.register(ClaudeCodeAdapter())  # Chunk 06
-# adapter_registry.register(CodexAdapter())        # future
-```
-
-Store on `app.state.adapter_registry` for access in routes/services.
-
-### 5. RunContext Builder — `services/run_context.py`
-
-`adapter_type` is passed in from the caller (resolved from `agent.adapter_type` in the DB). `adapter_config` is expected to be the already-merged config (defaults + stored overrides) by the time this builder is called.
-
-```python
-def build_run_context(
-    agent: Agent,
-    run: Run,
-    adapter_registry: AdapterRegistry,
-    message: str | None = None,
-) -> RunContext:
-    """Build a RunContext from DB models. Used by Celery tasks."""
-    org = agent.organization
-    adapter = adapter_registry.get(agent.adapter_type)
-    default_cfg = adapter.get_default_config().model_dump()
-    merged_cfg = {**default_cfg, **(agent.adapter_config or {})}
-
-    # Tool permissions from Agent DB model
-    tools = agent.tools or None  # empty list → None (all tools allowed)
-
-    return RunContext(
-        agent_dir=agent.dir_path,
-        agent_id=str(agent.id),
-        agent_slug=agent.slug,
-        agent_name=agent.name,
-        org_id=str(org.id),
-        org_slug=org.slug,
-        run_id=str(run.id),
-        adapter_type=agent.adapter_type,
-        message=message or run.message,
-        heartbeat=(run.trigger == "heartbeat"),
-        adapter_config=merged_cfg,
-        gateway_url=settings.GATEWAY_URL,
-        agent_token="",  # Populated in Chunk 09
-        tools=tools,
-        env_vars={},
-    )
-```
-
-### 6. AgentService Integration — `services/agent.py`
-
-`AgentService.__init__` accepts a third parameter `adapter_registry: AdapterRegistry`. The previous hard-coded `KNOWN_ADAPTER_TYPES` list check is replaced with registry-based validation. Default config is merged at agent-create time so stored `adapter_config` only contains user overrides.
-
-```python
-class AgentService:
-    def __init__(self, db: Session, filesystem: FilesystemService, adapter_registry: AdapterRegistry):
-        self.db = db
-        self.filesystem = filesystem
-        self.registry = adapter_registry
-
-    def create_agent(self, org: Organization, data: AgentCreate) -> Agent:
-        if not self.registry.has(data.adapter_type):
-            raise ValueError(
-                f"Unknown adapter type '{data.adapter_type}'. "
-                f"Known types: {self.registry.known_types()}"
-            )
-        # Merge defaults with user-supplied config; store only what was supplied
-        adapter = self.registry.get(data.adapter_type)
-        adapter.validate_config(data.adapter_config or {})  # raises on invalid fields
+        """Run health_check() on all adapters concurrently via asyncio.gather(return_exceptions=True)."""
         ...
 ```
 
-The dependency function in `services/__init__.py` injects the registry from `app.state`:
+---
+
+### 6. Registry Initialization — `api/lifespan.py`
+
+```python
+adapter_registry = AdapterRegistry()
+adapter_registry.register(ClaudeCodeAdapter())
+adapter_registry.register(OpenCodeAdapter())
+app.state.adapter_registry = adapter_registry
+```
+
+---
+
+### 7. AgentService Integration — `services/agent.py`
+
+`AgentService.__init__` receives the registry alongside other dependencies. The registry drives adapter validation at agent-create time.
+
+```python
+class AgentService:
+    def __init__(
+        self,
+        db: Session,
+        filesystem: FilesystemService,
+        adapter_registry: AdapterRegistry,
+        template_service: TemplateService,
+        scaffolding: ScaffoldingService,
+        preset_service: PresetService,
+    ): ...
+
+    def create(self, org: Organization, data: AgentCreate) -> Agent:
+        if not self.adapter_registry.has(data.adapter_type):
+            raise HTTPException(422, f"Unknown adapter_type '{data.adapter_type}'. Known: {self.adapter_registry.known_types()}")
+        adapter = self.adapter_registry.get(data.adapter_type)
+        default_config = adapter.get_default_config().model_dump(exclude_none=True)
+        adapter_config = {**default_config, **data.adapter_config}
+        ...
+```
+
+Dependency function in `services/__init__.py`:
 
 ```python
 def get_agent_service(
-    request: Request,
     db: Session = Depends(get_db),
     filesystem: FilesystemService = Depends(get_filesystem_service),
+    adapter_registry: AdapterRegistry = Depends(get_adapter_registry),
+    template_service: TemplateService = Depends(get_template_service),
+    scaffolding: ScaffoldingService = Depends(get_scaffolding_service),
+    preset_service: PresetService = Depends(get_preset_service),
 ) -> AgentService:
-    return AgentService(db, filesystem, request.app.state.adapter_registry)
+    return AgentService(db, filesystem, adapter_registry, template_service, scaffolding, preset_service)
+
+def get_adapter_registry(request: Request) -> AdapterRegistry:
+    return request.app.state.adapter_registry
 ```
 
+---
+
 ## Notes
-- The adapter interface is async (`async def execute`) to support both subprocess-based (Claude Code, Codex) and API-based (Anthropic API) adapters.
-- `agents/` directory is used for adapters, not for agent CRUD logic (that's in `services/`).
-- The registry is a singleton created at startup and passed via app state or dependency injection.
-- `agent_token` is an empty string placeholder until Chunk 09 (Agent Runtime Tokens).
-- `adapter_type` on `RunContext` is redundant with `adapter_config` contents but kept for clarity — Celery tasks resolve the adapter by type before building context.
-- `validate_config()` raises a `ValidationError` (Pydantic) on invalid input; callers should catch and surface as HTTP 422.
+
+- `AdapterConfigBase` uses `extra = "ignore"` — unknown fields are silently dropped. This prevents stale keys in stored configs from causing failures on upgrade.
+- `on_event` defaults to a no-op lambda so adapters can call `ctx.on_event(...)` unconditionally even before Chunk 15 wires a real handler.
+- `validate_config()` raises `pydantic.ValidationError`; callers surface as HTTP 422.
+- `agent_token` is an empty string until Chunk 09. Adapters should inject it as `GATEWAY_AGENT_TOKEN` env var regardless.
+- `health_check_all()` uses `return_exceptions=True` so one failing health check doesn't prevent others from running. Exceptions are treated as `False`.
 
 ## Change Log
 
-| Date       | Change                                                                                     |
-|------------|--------------------------------------------------------------------------------------------|
-| 2026-04-06 | Added `adapter_type: ClassVar[str]` to `BaseAdapter`; `name()` made concrete               |
-| 2026-04-06 | Added `get_default_config()` and `validate_config()` abstract classmethods to `BaseAdapter` |
-| 2026-04-06 | Added `has()` and `known_types()` to `AdapterRegistry`                                     |
-| 2026-04-06 | Added typed config models: `AdapterConfigBase`, `ClaudeCodeConfig`, `CodexConfig`, `AnthropicAPIConfig` |
-| 2026-04-06 | Added `adapter_type: str` field to `RunContext`                                            |
-| 2026-04-06 | Updated `RunContext` builder to accept `adapter_registry` and merge default config          |
-| 2026-04-06 | Added `AgentService` integration section: registry param, `has()`/`known_types()` validation, dependency function |
-| 2026-04-08 | Added `tools: list[str] | None` to `RunContext`; removed `allowed_tools` from `ClaudeCodeConfig` — tool permissions are agent-level, not adapter-level |
-| 2026-04-09 | Updated `build_run_context` to read `tools` from Agent DB model instead of `gateway.json` |
+| Date | Change | Reason |
+|------|--------|--------|
+| 2026-04-06 | Created chunk: BaseAdapter, RunContext/RunResult, AdapterRegistry, config models | Initial design |
+| 2026-04-06 | Added `get_default_config()`, `validate_config()`, `has()`, `known_types()` | Registry-based validation |
+| 2026-04-08 | Added `tools: list[str] | None` to RunContext; removed `allowed_tools` from ClaudeCodeConfig | Tool permissions are agent-level |
+| 2026-04-09 | Updated `build_run_context` to read `tools` from Agent DB model | Removed gateway.json |
+| 2026-04-10 | Package renamed to `zenve-adapters` in `packages/adapters/`; `on_event` now a dataclass field with no-op default; `extra = "ignore"` on AdapterConfigBase; config models updated with real defaults (`output_format`, `approval_mode`, `temperature`, etc.); `OpenCodeConfig` added; `AdapterRegistry.register()` raises on duplicate; `get()` raises KeyError; `health_check_all()` uses asyncio.gather; `AgentService` constructor updated with full dependency list | Reflects implemented adapters package |

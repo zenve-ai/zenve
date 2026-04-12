@@ -94,10 +94,10 @@ Filesystem mirrors the DB: `/data/orgs/{slug}/` holds a single git repo (`.git/`
 |----|--------------------------------|------------|-----------------------------------------------------|-----------------|------------|
 | 01 | Organizations CRUD             | —          | ORM model, service, routes, Pydantic models         | implemented     | 2026-04-05 |
 | 02 | API Key Auth                   | 01         | API key model, hashing, auth dependency, scopes, key routes | not started     | —          |
-| 03 | Agent Filesystem & Templates   | 01         | SOUL.md.j2, AGENTS.md.j2, HEARTBEAT.md.j2, memory stubs, FilesystemService, config | designed        | 2026-04-06 |
+| 03 | Agent Filesystem & Templates   | 01         | zenve-scaffolding package, SOUL/AGENTS/RUN/HEARTBEAT templates, manifest.json, ScaffoldingService, PresetService, TemplateService, /api/v1/templates, /api/v1/presets | implemented     | 2026-04-10 |
 | 04 | Agents CRUD                    | 01, 02, 03 | ORM model, service, routes, file read/write routes   | designed        | 2026-04-06 |
-| 05 | Adapter Interface              | 04         | BaseAdapter ABC, RunContext, RunResult, registry      | not started     | —          |
-| 06 | Claude Code Adapter            | 05         | ClaudeCodeAdapter implementation                     | not started     | —          |
+| 05 | Adapter Interface              | 04         | zenve-adapters package, BaseAdapter ABC, RunContext/RunResult, AdapterRegistry, config models | implemented     | 2026-04-10 |
+| 06 | Concrete Adapters              | 05         | ClaudeCodeAdapter (`claude_code`), OpenCodeAdapter (`open_code`), shared execution pattern, event streaming | implemented     | 2026-04-10 |
 | 07 | Celery Setup & Run Execution   | 05, 06     | Celery app, Redis broker, execute_agent_run task     | not started     | —          |
 | 08 | Runs CRUD                      | 07         | ORM model, service, routes, transcript read          | not started     | —          |
 | 09 | Agent Runtime Tokens (JWT)     | 02, 08     | Short-lived JWT generation, injection, validation    | not started     | —          |

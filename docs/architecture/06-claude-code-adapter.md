@@ -1,237 +1,194 @@
-# Chunk 06 — Claude Code Adapter
+# Chunk 06 — Concrete Adapters (ClaudeCode & OpenCode)
 
 ## Goal
-Implement the first concrete adapter: ClaudeCodeAdapter, which spawns the `claude` CLI as a subprocess.
+Implement the first two concrete adapters: `ClaudeCodeAdapter` (spawns the `claude` CLI) and `OpenCodeAdapter` (spawns the `opencode` CLI). Both follow the same pattern — subprocess spawn, stdin injection, streaming JSON event parsing, token usage capture — but differ in CLI interface and event format.
 
 ## Depends On
-- Chunk 05 (Adapter Interface)
-- Chunk 15 (Run Event System — emits execution events via `ctx.on_event`)
+- Chunk 05 — Adapter Interface (`BaseAdapter`, `RunContext`, `RunResult`, config models)
 
 ## Referenced By
-- Chunk 07 — Celery Setup & Run Execution (first adapter to test with)
+- Chunk 07 — Celery Setup & Run Execution (first adapters to execute with)
+
+---
 
 ## Deliverables
 
-### 1. Adapter Implementation — `agents/claude_code.py`
+### 1. Shared Execution Pattern
 
-```python
-class ClaudeCodeAdapter(BaseAdapter):
+Both adapters follow the same steps in `execute()`:
 
-    adapter_type: ClassVar[str] = "claude_code"
+1. Validate and coerce `ctx.adapter_config` into the typed config model.
+2. Read agent identity files from disk (`SOUL.md`, `AGENTS.md`, `RUN.md` or `HEARTBEAT.md`).
+3. Build a context block (runtime identity key/values) and compose the system prompt.
+4. Build env vars (gateway context injected as `GATEWAY_*` env vars).
+5. Spawn subprocess with `asyncio.create_subprocess_exec`, `cwd=ctx.agent_dir`.
+6. Write message to stdin, close stdin.
+7. Stream stdout line-by-line, parse JSON events, call `ctx.on_event()` for each.
+8. Wait for process exit, collect stderr.
+9. Return `RunResult`.
 
-    @classmethod
-    def get_default_config(cls) -> ClaudeCodeConfig:
-        """Return a ClaudeCodeConfig with all defaults."""
-        return ClaudeCodeConfig()
+---
 
-    @classmethod
-    def validate_config(cls, raw_config: dict) -> ClaudeCodeConfig:
-        """Validate and coerce raw adapter_config dict into ClaudeCodeConfig."""
-        return ClaudeCodeConfig.model_validate(raw_config)
+### 2. System Prompt Composition
 
-    async def health_check(self) -> bool:
-        """Check if `claude` CLI is installed and accessible."""
-        try:
-            proc = await asyncio.create_subprocess_exec(
-                "claude", "--version",
-                stdout=PIPE, stderr=PIPE
-            )
-            await proc.communicate()
-            return proc.returncode == 0
-        except FileNotFoundError:
-            return False
+Both adapters build the system prompt the same way:
 
-    async def execute(self, ctx: RunContext) -> RunResult:
-        start = time.monotonic()
-
-        # 1. Read agent identity files
-        soul = read_file(Path(ctx.agent_dir) / "SOUL.md")
-        agents_md = read_file(Path(ctx.agent_dir) / "AGENTS.md")
-
-        # 2. Build system prompt: runtime identity + persona + behavioral instructions
-        identity = (
-            f"# Your Identity\n"
-            f"- agent_id: {ctx.agent_id}\n"
-            f"- agent_slug: {ctx.agent_slug}\n"
-            f"- agent_name: {ctx.agent_name}\n"
-            f"- org_id: {ctx.org_id}\n"
-            f"- org_slug: {ctx.org_slug}\n"
-            f"- run_id: {ctx.run_id}\n"
-            f"- gateway_url: {ctx.gateway_url}\n"
-        )
-        system_prompt = f"{identity}\n\n{soul}\n\n{agents_md}"
-
-        # 3. Build the user message (task only — no instructions)
-        if ctx.heartbeat:
-            heartbeat_md = read_file(Path(ctx.agent_dir) / "HEARTBEAT.md")
-            message = f"Heartbeat tick. Review your checklist:\n\n{heartbeat_md}"
-        else:
-            message = ctx.message or "(no message provided)"
-
-        # 4. Build environment variables
-        env = {
-            **os.environ,
-            "GATEWAY_URL": ctx.gateway_url,
-            "GATEWAY_AGENT_TOKEN": ctx.agent_token,
-            "GATEWAY_AGENT_ID": ctx.agent_id,
-            "GATEWAY_AGENT_SLUG": ctx.agent_slug,
-            "GATEWAY_ORG_SLUG": ctx.org_slug,
-            "GATEWAY_RUN_ID": ctx.run_id,
-            **ctx.env_vars,
-        }
-
-        # 5. Build CLI args and spawn claude CLI
-        args = self._build_cli_args(config, message, system_prompt, ctx.tools)
-
-        proc = await asyncio.create_subprocess_exec(
-            *args,
-            cwd=ctx.agent_dir,
-            env=env,
-            stdin=PIPE,
-            stdout=PIPE,
-            stderr=PIPE,
-        )
-
-        # 6. Write message to stdin (non-interactive mode)
-        proc.stdin.write(message.encode())
-        await proc.stdin.drain()
-        proc.stdin.close()
-
-        # 7. Stream stdout line-by-line (JSON events from --output-format stream-json)
-        async for raw_line in proc.stdout:
-            line = raw_line.decode(errors="replace").strip()
-            if not line:
-                continue
-            # parse and emit events via ctx.on_event(type, text, metadata)
-            ...
-
-        await proc.wait()
-        duration = time.monotonic() - start
-
-        return RunResult(
-            exit_code=proc.returncode or 0,
-            stdout=...,
-            stderr=...,
-            token_usage=token_usage,
-            duration_seconds=duration,
-            error=stderr if proc.returncode != 0 else None,
-        )
+**Context block** (always first):
+```
+# IMPORTANT context:
+- agent_id: {ctx.agent_id}
+- agent_slug: {ctx.agent_slug}
+- agent_name: {ctx.agent_name}
+- org_id: {ctx.org_id}
+- org_slug: {ctx.org_slug}
+- run_id: {ctx.run_id}
+- gateway_url: {ctx.gateway_url}
 ```
 
-### 2. CLI Args Builder
+**Normal run system prompt:** `context + SOUL.md + AGENTS.md + RUN.md`
+**Normal run message (stdin):** `ctx.message or "(no message provided)"`
 
-`adapter_config` in `RunContext` is already merged (defaults + overrides) and validated as a `ClaudeCodeConfig` dict. Tool permissions come from `RunContext.tools` (populated from the Agent DB model by the context builder), not from adapter config.
+**Heartbeat system prompt:** `context + SOUL.md + AGENTS.md + HEARTBEAT.md`
+**Heartbeat message (stdin):** `"Heartbeat tick."`
 
-```python
-def _build_cli_args(
-    self,
-    config: ClaudeCodeConfig,
-    message: str,
-    system_prompt: str,
-    tools: list[str] | None = None,
-) -> list[str]:
-    args = [
-        "claude",
-        "--print",
-        "--verbose",
-        "--output-format", config.output_format,   # "stream-json"
-    ]
+HEARTBEAT.md is part of the system prompt, not the user message, so the agent's tick instructions are treated as permanent operational context.
 
-    # System prompt: identity + SOUL.md + AGENTS.md
-    args.extend(["--system-prompt", system_prompt])
+---
 
-    # Model override
-    if config.model:
-        args.extend(["--model", config.model])
+### 3. Environment Variables
 
-    # Max tokens
-    if config.max_tokens:
-        args.extend(["--max-tokens", str(config.max_tokens)])
+Both adapters inject:
 
-    # Max turns
-    if config.max_turns:
-        args.extend(["--max-turns", str(config.max_turns)])
+| Env Var | Value |
+|---------|-------|
+| `GATEWAY_URL` | `ctx.gateway_url` |
+| `GATEWAY_AGENT_TOKEN` | `ctx.agent_token` |
+| `GATEWAY_AGENT_ID` | `ctx.agent_id` |
+| `GATEWAY_AGENT_SLUG` | `ctx.agent_slug` |
+| `GATEWAY_ORG_SLUG` | `ctx.org_slug` |
+| `GATEWAY_RUN_ID` | `ctx.run_id` |
 
-    # Tool permissions from RunContext (sourced from Agent DB model)
-    if tools is not None:
-        # Explicit tool list: auto-approve these, deny everything else
-        args.extend(["--allowedTools", ",".join(tools)])
-    else:
-        # No tool restrictions: skip all permission prompts
-        args.append("--dangerously-skip-permissions")
+Plus any extra `ctx.env_vars` merged in. OpenCode additionally sets:
+- `OPENCODE_PERMISSION='{"*": "allow"}'` — grants all tool permissions
+- `OPENCODE_DISABLE_PROJECT_CONFIG=true` — prevents opencode from reading project config
 
-    # Message is passed via stdin, not --prompt
-    return args
+---
+
+### 4. ClaudeCodeAdapter — `adapters/claude_code.py`
+
+`adapter_type = "claude_code"` · spawns `claude` CLI
+
+**CLI args built by `build_cli_args()`:**
+```
+claude --print --verbose --output-format stream-json
+       --system-prompt <composed system prompt>
+       [--model <model>]
+       [--max-tokens <n>]
+       [--max-turns <n>]
+       [--allowedTools <tool1,tool2>]   # if ctx.tools is not None
+       [--dangerously-skip-permissions] # if ctx.tools is None
 ```
 
-### 3. Token Usage Parser
+Message is written to stdin (not via `--prompt` flag).
 
-Parse Claude CLI output/stderr for token usage information:
+**Stream-JSON event types parsed:**
 
-```python
-def _parse_usage(self, stderr: str) -> dict | None:
-    # Parse JSON output format for usage stats
-    # Return: {"input_tokens": N, "output_tokens": N, "cost_usd": N}
-    # Return None if parsing fails
-    ...
+| Event type | Action |
+|------------|--------|
+| `system` | Emit `("output", "Session started: {id}", {"session_id": ...})` |
+| `assistant` + text block | Emit `("output", text, None)` |
+| `assistant` + tool_use block | Emit `("tool_call", "Calling tool: {name}", {"tool", "tool_use_id", "input"})` |
+| `user` + tool_result block | Emit `("tool_result", summary[:500], {"tool_use_id", "is_error", "full_result"})` |
+| `result` | Emit `("usage", None, {input_tokens, output_tokens, cache_read_input_tokens, cache_creation_input_tokens, cost_usd})` |
+| `error` | Emit `("error", message, {"type": "error"})` |
+
+**Config — `ClaudeCodeConfig`:**
+
+| Field | Default | Description |
+|-------|---------|-------------|
+| `model` | `"claude-sonnet-4-6"` | Model override |
+| `max_tokens` | `None` | Max output tokens |
+| `max_turns` | `10` | Max agentic turns |
+| `output_format` | `"stream-json"` | CLI output format |
+
+**Health check:** `claude --version` → returncode 0.
+
+---
+
+### 5. OpenCodeAdapter — `adapters/open_code.py`
+
+`adapter_type = "open_code"` · spawns `opencode` CLI
+
+**CLI args:**
+```
+opencode run --format json [--model <model>]
 ```
 
-### 4. Register in Lifespan
+**Stdin payload:** `{system_prompt}\n\n---\n\n{message}` — system prompt and message are concatenated and written as a single stdin payload (opencode does not have a `--system-prompt` flag).
 
-Update `api/lifespan.py`:
+**Stream-JSON event types parsed:**
+
+| Event type | Action |
+|------------|--------|
+| First event with `sessionID` | Emit `("output", "Session started: {id}", {"session_id": ...})` |
+| `text` | Emit `("output", part.text, None)` |
+| `tool_use` | Emit `("tool_call", "Calling tool: {name}", {"tool", "input", ["error"]})` |
+| `step_finish` | Emit `("usage", None, {input_tokens, output_tokens, reasoning_tokens, cache_read_input_tokens, cost_usd})` |
+| `error` | Emit `("error", message, {"type": "error"})` |
+
+**Config — `OpenCodeConfig`:**
+
+| Field | Default | Description |
+|-------|---------|-------------|
+| `model` | `""` | Model override (empty = CLI default) |
+| `max_tokens` | `None` | Max output tokens |
+| `steps` | `10` | Max steps |
+| `output_format` | `"json"` | CLI output format |
+
+**Health check:** `opencode --version` → returncode 0.
+
+---
+
+### 6. `read_file()` Helper
+
+Both adapters share the same static helper:
+
 ```python
+@staticmethod
+def read_file(path: Path) -> str:
+    if path.exists():
+        return path.read_text(encoding="utf-8")
+    return f"(file not found: {path.name})"
+```
+
+Missing files return a descriptive placeholder rather than raising — the agent can still run and will see the missing-file note in its context.
+
+---
+
+### 7. Register in Lifespan
+
+```python
+# api/lifespan.py
 adapter_registry.register(ClaudeCodeAdapter())
+adapter_registry.register(OpenCodeAdapter())
 ```
 
-### 5. Adapter Config Schema
-
-Typed by `ClaudeCodeConfig` (defined in `models/adapter.py`). All fields are optional with `None` defaults — missing fields mean "use CLI default".
-
-| Field           | Type             | Default | Description                          |
-|-----------------|------------------|---------|--------------------------------------|
-| `model`         | `str \| None`    | `None`  | Model override (e.g. `claude-sonnet-4-6`) |
-| `max_tokens`    | `int \| None`    | `None`  | Max output tokens                    |
-| `max_turns`     | `int \| None`    | `None`  | Max agentic turns                    |
-
-**Note:** Tool permissions are NOT part of adapter config. They live on the Agent DB model (`tools` column) and are agent-level, not adapter-level. This allows any adapter type to enforce the same tool list.
-
-Example stored `adapter_config` (only overrides, not full defaults):
-
-```json
-{
-  "model": "claude-sonnet-4-6",
-  "max_turns": 10
-}
-```
+---
 
 ## Notes
-- **System prompt composition** — `--system-prompt` is built from three layers in order: runtime identity block → SOUL.md (persona) → AGENTS.md (behavioral instructions). This keeps the agent's operational context fixed and separate from the task.
-- **Message is task-only** — stdin carries only the user's task (or heartbeat content). No AGENTS.md prefix. This gives the model a clean human-turn with no instruction noise mixed in.
-- **Identity block** — injected at the top of the system prompt so the agent always knows its own `agent_id`, `agent_slug`, `agent_name`, `org_id`, `org_slug`, `run_id`, and `gateway_url`.
-- **AGENTS.md placement rationale** — behavioral instructions (On Start, Executing the Task, On Finish) are part of the agent's permanent operating context, not a task. Placing them in the system prompt (not the message) correctly models this distinction.
-- Tool permissions come from `RunContext.tools` (populated by the context builder from the Agent DB model).
-- When `tools` is a list: `--allowedTools` auto-approves those tools and denies everything else. Unapproved tool use fails the turn.
-- When `tools` is `None` (no restrictions): `--dangerously-skip-permissions` is passed to allow all tools without prompts.
-- For heartbeat runs, HEARTBEAT.md is used as the message (user turn), not the system prompt.
-- Gateway env vars are also injected as environment variables (redundant with identity block, but useful for shell scripts running inside the agent).
-- `--print` + `--verbose` + `--output-format stream-json` enables line-by-line JSON event streaming from stdout.
-- Message is written to stdin after process spawn, not via `--prompt` CLI flag.
-- `adapter_type = "claude_code"` class variable drives `name()` via `BaseAdapter`.
-- `validate_config()` raises `pydantic.ValidationError` on unknown or invalid fields; callers surface as HTTP 422.
-- Future: support `--resume` for session persistence across heartbeats (Open Question #1).
+
+- Tool permissions for `claude_code`: `--allowedTools` auto-approves listed tools and denies others. `--dangerously-skip-permissions` (when `tools=None`) allows everything without prompts — required for headless execution.
+- Tool permissions for `open_code`: controlled via `OPENCODE_PERMISSION='{"*": "allow"}'` env var — there is no per-tool CLI flag, so the env var grants all tools and per-agent restrictions are advisory only.
+- Token usage fields differ between adapters: Claude Code includes `cache_creation_input_tokens`; OpenCode includes `reasoning_tokens` instead.
+- Both adapters have a `parse_token_usage()` method but the primary token extraction is inline during stream parsing.
+- Non-zero `proc.returncode` sets `RunResult.error = stderr`; adapters never raise on non-zero exit.
 
 ## Change Log
 
-| Date       | Change                                                                                          |
-|------------|-------------------------------------------------------------------------------------------------|
-| 2026-04-06 | Added `adapter_type: ClassVar[str] = "claude_code"` class variable                             |
-| 2026-04-06 | Added `get_default_config()` classmethod returning `ClaudeCodeConfig()`                        |
-| 2026-04-06 | Added `validate_config()` classmethod returning `ClaudeCodeConfig.model_validate(raw_config)`  |
-| 2026-04-06 | Updated CLI args builder to use typed `ClaudeCodeConfig` (added `max_turns`, `allowed_tools`)  |
-| 2026-04-06 | Replaced JSON schema block with typed `ClaudeCodeConfig` field table referencing `models/adapter.py` |
-| 2026-04-08 | Tool permissions moved from `ClaudeCodeConfig.allowed_tools` to Agent DB model `tools` column |
-| 2026-04-08 | Added `--dangerously-skip-permissions` flag for headless execution; removed `allowed_tools` from adapter config |
-| 2026-04-09 | Injected runtime identity block (`agent_id`, `agent_slug`, `agent_name`, `org_id`, `org_slug`, `run_id`, `gateway_url`) as first section of `--system-prompt` |
-| 2026-04-09 | Moved AGENTS.md from user message prefix into `--system-prompt` (after SOUL.md); message now carries task only |
-| 2026-04-09 | Message delivery changed from `--prompt` CLI flag to stdin write after process spawn |
-| 2026-04-09 | Added `--verbose` flag; output format changed to `stream-json` for line-by-line event streaming |
+| Date | Change | Reason |
+|------|--------|--------|
+| 2026-04-06 | Created chunk: ClaudeCodeAdapter implementation, CLI args builder, token usage parser | First concrete adapter |
+| 2026-04-08 | Tool permissions moved to RunContext.tools; `--dangerously-skip-permissions` added for headless runs | Agent-level tool control |
+| 2026-04-09 | Runtime identity context block injected at top of `--system-prompt`; AGENTS.md moved to system prompt; message is task-only via stdin | Cleaner prompt structure |
+| 2026-04-09 | Output format changed to `stream-json`; `--verbose` added; message via stdin not `--prompt` | Line-by-line event streaming |
+| 2026-04-10 | Added OpenCodeAdapter (`open_code`); documented shared execution pattern; RUN.md added to system prompt for normal runs; HEARTBEAT.md in system prompt (not message); context block header changed to `# IMPORTANT context:`; full event parsing tables; token usage field details | Reflects implemented adapters package |

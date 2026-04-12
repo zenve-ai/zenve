@@ -1,39 +1,51 @@
 # Chunk 03 — Agent Filesystem & Templates
 
 ## Goal
-Define the agent directory structure and Jinja2 template scaffolding system. When an agent is created, the gateway renders these templates and writes the resulting files to disk. The templates establish an agent's identity, operational instructions, and heartbeat behaviour — all as human-readable markdown that the agent runtime reads at startup. Tool permissions are stored on the Agent DB model and enforced at runtime by the adapter.
+Define the agent directory structure and Jinja2 template scaffolding system. When an agent is created, `ScaffoldingService` renders templates and writes the resulting files to disk. Templates establish an agent's identity, run instructions, and heartbeat behaviour. A separate preset system ships named YAML configurations that pre-fill agent creation fields — making it easy to spin up opinionated agent types. A `TemplateService` exposes templates and their variable manifests via REST so callers can discover what each template needs before creating an agent.
 
 ## Depends On
 - Chunk 01 — Organizations (for `base_path`, `org_slug`, `org_name`)
 
 ## Referenced By
-- Chunk 04 — Agents CRUD (calls `FilesystemService.scaffold_agent_dir` at creation time)
-- Chunk 06 — Claude Code Adapter (reads SOUL.md, AGENTS.md, HEARTBEAT.md at run start)
+- Chunk 04 — Agents CRUD (calls `ScaffoldingService.scaffold_agent_dir` at creation time)
+- Chunk 06 — Claude Code Adapter (reads SOUL.md, AGENTS.md, RUN.md, HEARTBEAT.md at run start)
 - Chunk 10 — Heartbeat Scheduler (reads HEARTBEAT.md to drive tick behaviour)
 
 ---
 
 ## Deliverables
 
-### 1. Template Directory Layout
+### 1. Package — `packages/scaffolding/`
 
-Templates live under `TEMPLATES_DIR` (default `/data/templates`). Each named subdirectory is a template set. On creation the caller may specify `template: "default"` (or omit it); the gateway falls back to `"default"` if the named set doesn't exist.
+Templates and preset management live in their own package `zenve-scaffolding`, not in `zenve-services`.
 
 ```
-/data/templates/
-  default/
-    SOUL.md.j2
-    AGENTS.md.j2
-    HEARTBEAT.md.j2
+packages/scaffolding/
+  src/zenve_scaffolding/
+    scaffolding_service.py   # ScaffoldingService
+    preset_service.py        # PresetService
+    templates/
+      default/
+        manifest.json        # variable schema for this template set
+        SOUL.md.j2
+        AGENTS.md.j2
+        RUN.md.j2
+        HEARTBEAT.md.j2
+    presets/
+      architect.yaml
+      dev.yaml
 ```
+
+**Dependency chain:** `zenve-scaffolding` → `zenve-config`, `zenve-models`
 
 Agent directory created at scaffold time:
 
 ```
 {org.base_path}/agents/{agent_slug}/
-  SOUL.md               ← rendered from SOUL.md.j2
-  AGENTS.md             ← rendered from AGENTS.md.j2
-  HEARTBEAT.md          ← rendered from HEARTBEAT.md.j2
+  SOUL.md               ← identity, personality, workspace context
+  AGENTS.md             ← task-specific instructions (injected via template_vars)
+  RUN.md                ← run execution protocol (memory, signals, gateway URL)
+  HEARTBEAT.md          ← autonomous tick instructions
   memory/
     long_term.md        ← empty stub
     scratch.md          ← empty stub
@@ -44,199 +56,109 @@ Agent directory created at scaffold time:
 
 ### 2. Template Variables
 
-All three templates share the same variable set:
+All templates share these variables. Most are injected by the gateway at creation time; others come from the agent creation request or preset.
 
-| Variable | Type | Description |
-|----------|------|-------------|
-| `agent_name` | str | Human-readable display name |
-| `agent_slug` | str | URL-safe slug used in paths and API |
-| `org_name` | str | Organization display name |
-| `org_slug` | str | Organization slug |
-| `role` | str \| None | Optional role description from creation request |
-| `adapter_type` | str | Runtime identifier: `"claude_code"`, `"codex"`, etc. |
-| `gateway_url` | str | Base URL of the gateway API |
-| `created_at` | str | ISO-8601 timestamp of agent creation |
+| Variable | Type | Source | Description |
+|----------|------|--------|-------------|
+| `agent_name` | str | DB | Human-readable display name |
+| `agent_slug` | str | DB | URL-safe slug used in paths and API |
+| `org_name` | str | Org | Organization display name |
+| `org_slug` | str | Org | Organization slug |
+| `org_dir` | str | Settings | Absolute path to org filesystem root |
+| `gateway_url` | str | Settings | Base URL of the gateway API |
+| `created_at` | str | DB | ISO-8601 timestamp of agent creation |
+| `role` | str \| None | Request/preset | Optional role description |
+| `personality` | str \| None | Request/preset | Personality traits (markdown list). Falls back to scoped/conservative defaults |
+| `cares_about` | str \| None | Request/preset | What the agent cares about (markdown list). Falls back to org-aligned defaults |
+| `does_not_do` | str \| None | Request/preset | Behavioural guardrails (markdown list). Falls back to safe defaults |
+| `instructions` | str | Request/preset | Task instructions injected into AGENTS.md (**required** for default template) |
 
 ---
 
 ### 3. `SOUL.md.j2` — Agent Identity
 
-This is the agent's core identity file. The runtime injects it as the system prompt (or leading context) at the start of every run.
+Core identity file. The adapter injects it as system prompt or leading context at the start of every run.
 
-```markdown
-# {{ agent_name }}
-
-You are **{{ agent_name }}**, an AI agent operating inside the **{{ org_name }}** organization.
-{% if role %}
-
-## Role
-
-{{ role }}
-{% endif %}
-
-## Identity
-
-| Property | Value |
-|----------|-------|
-| Slug | `{{ agent_slug }}` |
-| Organization | {{ org_name }} (`{{ org_slug }}`) |
-| Runtime | {{ adapter_type }} |
-| Created | {{ created_at }} |
-
-## Core Directives
-
-1. You act on behalf of the **{{ org_name }}** organization.
-2. You follow the instructions in `AGENTS.md` for how to behave during a run.
-3. You follow the instructions in `HEARTBEAT.md` for autonomous scheduled behaviour.
-4. Tool permissions are enforced by the runtime. Only use tools that have been granted.
-5. You do not take actions outside the scope of your role.
-6. When in doubt, do less and report back rather than acting unilaterally.
-
-## Memory
-
-- **Long-term memory** — persisted facts and decisions: `memory/long_term.md`
-- **Scratch memory** — ephemeral working notes (cleared between runs): `memory/scratch.md`
-
-Read both files at the start of each run. Write useful observations back before finishing.
-```
+Sections rendered:
+- **Identity** — agent name, org, personality (custom or fallback defaults)
+- **What you care about** — `cares_about` variable or org-aligned defaults
+- **What you don't do** — `does_not_do` variable or safe defaults
+- **Workspace** — explains `{org_dir}` layout with agents/, projects/; sets CWD expectation
 
 ---
 
-### 4. `AGENTS.md.j2` — Run Instructions
+### 4. `AGENTS.md.j2` — Task Instructions
 
-This file drives how the agent behaves during an explicitly triggered run (via the Runs API). The runtime reads it once per run invocation.
+Minimal injection point for task-specific instructions:
+
+```
+# You are {agent_name}
+
+{{ instructions }}
+```
+
+The `instructions` variable is required by the `default` manifest. It is typically supplied by the preset or directly in the agent creation request.
+
+---
+
+### 5. `RUN.md.j2` — Run Execution Protocol
+
+Contains the runtime execution contract: memory loading, task execution, finish behaviour, signal protocol, and gateway URL. This file is stable across templates and agents — presets do not override it.
 
 ```markdown
-# {{ agent_name }} — Run Instructions
-
-These instructions govern how you behave when the gateway invokes a run.
-
-## On Start
-
-1. Read `SOUL.md` — internalize your identity and role.
-2. Read `memory/long_term.md` — load any persisted context.
-3. Read `memory/scratch.md` — load working notes from previous runs.
-4. Read the run prompt (provided by the caller in the run request).
-
-## Executing the Task
-
-- Complete the task described in the run prompt.
-- Stay within the tool permissions enforced by the runtime.
-- Use `memory/scratch.md` for notes you need within this run only.
-- Use `memory/long_term.md` for facts worth keeping across runs.
-
-## On Finish
-
-Before ending the session:
-
-1. Update `memory/long_term.md` with any durable observations.
-2. Clear `memory/scratch.md` or leave a brief summary for the next run.
-3. Produce a final response that the gateway will store as the run result.
-
 ## Signalling Outcomes
-
-End your response with one of these signal lines so the gateway can parse the outcome:
-
 | Signal | Meaning |
 |--------|---------|
 | `RUN_OK` | Task completed successfully |
 | `RUN_FAILED: <reason>` | Task failed; include a short reason |
 | `RUN_NEEDS_INPUT: <question>` | Blocked; waiting for more information |
-
-## Gateway API
-
-The gateway is reachable at `{{ gateway_url }}`. Your organization slug is `{{ org_slug }}`.
-You may call the API using the JWT token injected in the `ZENVE_TOKEN` environment variable.
 ```
 
 ---
 
-### 5. `HEARTBEAT.md.j2` — Autonomous Scheduled Behaviour
+### 6. `HEARTBEAT.md.j2` — Autonomous Scheduled Behaviour
 
-This file is read by the heartbeat scheduler (APScheduler) and injected into the run context for scheduled ticks. It defines what the agent should do when invoked autonomously on a timer.
+Read by the heartbeat scheduler (Chunk 10). Contains a `## Tasks` section (empty stub by default — operators fill it in) and the tick protocol.
 
 ```markdown
-# {{ agent_name }} — Heartbeat Instructions
-
-These instructions govern your behaviour during a scheduled heartbeat tick.
-A heartbeat is an autonomous, timer-driven invocation — no caller prompt is provided.
-
-## Purpose
-
-Describe what this agent should do autonomously. Replace this section with
-the agent's recurring responsibilities. Examples:
-
-- Monitor a queue and process pending items
-- Check for new data and summarise findings
-- Run maintenance tasks on a schedule
-
-## On Each Tick
-
-1. Read `memory/long_term.md` — load persisted context.
-2. Assess the current state: is there work to do?
-3. If yes: perform the work and write results to `memory/long_term.md`.
-4. If no: do nothing and signal `HEARTBEAT_OK` with a brief status note.
-
 ## Signalling Outcomes
-
-End each heartbeat run with one of these signals:
-
 | Signal | Meaning |
 |--------|---------|
-| `HEARTBEAT_OK` | Tick completed; nothing blocking |
-| `HEARTBEAT_OK: <note>` | Tick completed; brief status |
+| `HEARTBEAT_OK: nothing to do` | No tasks defined; tick skipped |
+| `HEARTBEAT_OK: <note>` | Tasks completed; brief summary |
 | `HEARTBEAT_FAILED: <reason>` | Tick failed; needs attention |
 | `HEARTBEAT_NEEDS_INPUT: <question>` | Blocked; cannot proceed autonomously |
-
-## Constraints
-
-- Heartbeat runs have a hard timeout (set by the gateway).
-- Do not start long-running processes that outlive the tick.
-- Do not prompt for user input — you are running unattended.
-
-## Gateway API
-
-The gateway is reachable at `{{ gateway_url }}`. Your organization slug is `{{ org_slug }}`.
-Your JWT token is in the `ZENVE_TOKEN` environment variable.
 ```
 
 ---
 
-### 6. Memory File Stubs
+### 7. `manifest.json` — Template Variable Schema
 
-Two empty markdown files are created at scaffold time. They are intentionally minimal.
+Each template set ships a `manifest.json` declaring its name, description, and required variables:
 
-**`memory/long_term.md`**
-```markdown
-# {{ agent_name }} — Long-Term Memory
-
-This file persists facts, decisions, and context across runs.
-Update it at the end of each run with anything worth keeping.
-
----
-
-_No entries yet._
+```json
+{
+  "name": "default",
+  "description": "General-purpose agent with configurable identity, personality, and behavioral guardrails.",
+  "variables": [
+    { "name": "instructions", "type": "string", "required": true, "description": "..." },
+    { "name": "role",         "type": "string", "required": true,  "description": "..." },
+    { "name": "personality",  "type": "string", "required": false, "description": "..." },
+    { "name": "cares_about",  "type": "string", "required": false, "description": "..." },
+    { "name": "does_not_do",  "type": "string", "required": false, "description": "..." }
+  ]
+}
 ```
 
-**`memory/scratch.md`**
-```markdown
-# {{ agent_name }} — Scratch Memory
-
-This file holds ephemeral notes within a single run.
-Clear or summarize it at the end of each run.
+`manifest.json` is always re-synced on gateway startup (even if the template directory already exists), so variable schema updates ship automatically without touching user-customised `.j2` files.
 
 ---
 
-_Empty._
-```
-
----
-
-### 7. Filesystem Service — `services/filesystem.py`
+### 8. `ScaffoldingService` — `packages/scaffolding/`
 
 ```python
-class FilesystemService:
-    def __init__(self, settings: Settings): ...
+class ScaffoldingService:
+    def __init__(self, settings: Settings) -> None: ...
 
     def scaffold_agent_dir(
         self,
@@ -246,113 +168,119 @@ class FilesystemService:
         template_vars: dict,
         template_name: str = "default",
     ) -> str:
+        """Render templates and create agent directory. Returns absolute path.
+        Raises FileExistsError if directory already exists.
+        Falls back to 'default' if template_name directory is not found.
         """
-        Render templates and create the agent directory structure.
-        Returns the absolute path to the created agent directory.
-        Raises FileExistsError if the directory already exists.
-        """
-
-    def read_agent_file(self, agent_dir: str, file_path: str) -> str:
-        """Read a file relative to agent_dir. Validates no path traversal."""
-
-    def write_agent_file(self, agent_dir: str, file_path: str, content: str) -> None:
-        """Write a file relative to agent_dir. Validates no path traversal."""
-
-    def list_agent_files(self, agent_dir: str) -> list[str]:
-        """Return relative paths of all files under agent_dir."""
-
-    def ensure_org_dir(self, base_path: str) -> None:
-        """Create {base_path}/agents/ if it does not exist."""
-
-    def _validate_path(self, agent_dir: str, file_path: str) -> str:
-        """
-        Resolve file_path relative to agent_dir.
-        Raise ValueError if the resolved path escapes agent_dir.
-        """
-```
-
----
-
-### 8. Config Additions — `config/settings.py`
-
-```python
-DATA_DIR: str = "/data"                        # root for all org/agent data
-TEMPLATES_DIR: str = "/data/templates"         # Jinja2 template sets
-GATEWAY_URL: str = "http://localhost:8000/api/v1"
-```
-
----
-
-### 9. Bundled Templates & Bootstrap Seeding
-
-#### Problem
-
-On a fresh deployment `TEMPLATES_DIR` is empty — there are no templates to scaffold agents from. The templates must ship with the gateway release so the system is usable out of the box.
-
-#### Solution: package data + startup seeding
-
-**10a. Package layout**
-
-The default template set is stored inside the Python package so it is included in the wheel and available at any path via `importlib.resources`:
-
-```
-src/zenve/
-  templates/
-    default/
-      SOUL.md.j2
-      AGENTS.md.j2
-      HEARTBEAT.md.j2
-```
-
-`pyproject.toml` must declare these as package data so they are included in the built distribution:
-
-```toml
-[tool.setuptools.package-data]
-"zenve" = ["templates/**/*.j2"]
-```
-
-**10b. Startup seeding in `api/lifespan.py`**
-
-On gateway startup, `FilesystemService.seed_default_templates()` is called. It copies the bundled `default/` set to `TEMPLATES_DIR/default/` only if that directory does not already exist — preserving any customisations the operator has made.
-
-```python
-# api/lifespan.py  (inside the startup block)
-filesystem_service.seed_default_templates()
-```
-
-```python
-# services/filesystem.py
-import importlib.resources
-import shutil
-
-class FilesystemService:
-    ...
 
     def seed_default_templates(self) -> None:
+        """Copy bundled default template set to TEMPLATES_DIR/default/ if absent.
+        Always re-syncs manifest.json. Idempotent — safe to call on every startup.
         """
-        Copy the bundled default template set to TEMPLATES_DIR/default/
-        if it does not already exist on disk.
-        Idempotent — safe to call on every startup.
-        """
-        dest = Path(self.settings.TEMPLATES_DIR) / "default"
-        if dest.exists():
-            return  # operator may have customised; never overwrite
-        with importlib.resources.files("zenve.templates") as pkg_templates:
-            shutil.copytree(str(pkg_templates / "default"), str(dest))
+
+    def copy_traversable(self, src: Traversable, dest: Path) -> None:
+        """Recursively copy a package-data Traversable tree to a real filesystem path."""
+
+    def write_memory_stub(self, path: Path, content: str) -> None:
+        """Write a memory stub file."""
 ```
 
-#### Behaviour summary
+---
+
+### 9. `TemplateService` — `packages/services/`
+
+```python
+class TemplateService:
+    def list_templates(self) -> list[TemplateSummary]: ...
+    def get_manifest(self, template_name: str) -> TemplateManifest: ...   # 404 if missing
+    def validate_vars(self, template_name: str, template_vars: dict | None) -> None:
+        """Raise HTTP 422 if any required manifest variables are missing."""
+    def resolve_template_name(self, template_name: str) -> str:
+        """Return template_name if it exists on disk, else 'default'."""
+```
+
+---
+
+### 10. Preset System
+
+Presets are named YAML files bundled inside `zenve_scaffolding/presets/`. Each preset is a complete agent configuration — callers load a preset and receive all fields needed to create an agent.
+
+**Pydantic model — `models/preset.py`:**
+
+```python
+class Preset(BaseModel):
+    name: str
+    description: str = ""
+    adapter_type: str = "claude_code"
+    template: str = "default"
+    template_vars: dict[str, str] = {}   # role, personality, cares_about, does_not_do, instructions
+    adapter_config: dict = {}
+    skills: list[str] = []
+    tools: list[str] = ["Read", "Write", "Bash"]
+    heartbeat_interval_seconds: int = 0
+
+class PresetSummary(BaseModel):
+    name: str
+    description: str = ""
+```
+
+**`PresetService` — `packages/scaffolding/`:**
+
+```python
+class PresetService:
+    def list_presets(self) -> list[PresetSummary]: ...  # reads all .yaml from package data
+    def load_preset(self, name: str) -> Preset: ...     # 404 if not found
+```
+
+**Bundled presets:**
+
+| Preset | Adapter | Description |
+|--------|---------|-------------|
+| `architect` | `claude_code` | Software architect that maintains living architecture docs |
+| `dev` | `open_code` | Python developer working on FastAPI backends |
+
+---
+
+### 11. Routes
+
+**Templates — `api/routes/template.py`:**
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/api/v1/templates` | List all available template sets |
+| GET | `/api/v1/templates/{name}` | Get manifest (variable schema) for a template |
+
+**Presets — `api/routes/preset.py`:**
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/api/v1/presets` | List all bundled presets |
+| GET | `/api/v1/presets/{name}` | Get full preset configuration |
+
+Both routes are read-only and do not require API key auth — they expose static package data.
+
+---
+
+### 12. Config
+
+```python
+templates_dir: str = "/data/templates"   # Jinja2 template sets
+data_dir: str = "/data"                  # root for all org/agent data
+gateway_url: str = "http://localhost:8000/api/v1"
+```
+
+---
+
+### 13. Startup Seeding
+
+`ScaffoldingService.seed_default_templates()` is called from `api/lifespan.py` on every gateway startup:
 
 | Scenario | Result |
 |----------|--------|
-| Fresh deployment, empty `TEMPLATES_DIR` | Bundled defaults are seeded on first startup |
-| Existing `TEMPLATES_DIR/default/` | Not touched — operator customisations preserved |
+| Fresh deployment, empty `TEMPLATES_DIR` | Bundled defaults seeded in full |
+| Existing `TEMPLATES_DIR/default/` | `.j2` files untouched; `manifest.json` always re-synced |
 | Custom template set (e.g. `minimal/`) | Not affected; only `default/` is managed |
-| Gateway upgrade (new template version) | Default set is **not** auto-updated; operator must delete `default/` to re-seed |
-
-#### Upgrade path
-
-If a gateway release ships updated default templates, operators who want the new defaults must delete `TEMPLATES_DIR/default/` before restarting. A future migration utility can handle this automatically, but is out of scope for this chunk.
+| Gateway upgrade | Updated `manifest.json` applied automatically; `.j2` files preserved |
 
 ---
 
@@ -360,29 +288,29 @@ If a gateway release ships updated default templates, operators who want the new
 
 | Decision | Choice | Rationale |
 |----------|--------|-----------|
-| Template format | Jinja2 | Standard Python templating; readable conditionals for optional fields |
-| Template discovery | Named directories under `TEMPLATES_DIR` | Deployers can add custom sets without code changes |
-| Bundled defaults | Package data in `src/zenve/templates/default/` | Ships with the wheel; no separate asset distribution needed |
-| Seeding strategy | Copy-once on startup (skip if exists) | Idempotent; preserves operator customisations across restarts |
-| Signal protocol | Plain text suffix (`RUN_OK`, `HEARTBEAT_OK`, etc.) | Simple to parse, works with any LLM output |
-| Memory split | `long_term.md` + `scratch.md` | Separates durable facts from ephemeral notes; keeps long_term.md clean |
-| No credentials on disk | Enforced by policy | Secrets go in env vars (ZENVE_TOKEN), never in agent files |
-| Tool permissions in DB | `tools` column on Agent model | Machine-readable, adapter-enforced at runtime; DB is the single source of truth |
+| Dedicated package | `zenve-scaffolding` | Templates and presets are self-contained; separate from business-logic services |
+| 4 template files | SOUL + AGENTS + RUN + HEARTBEAT | RUN.md isolates the execution protocol; AGENTS.md stays minimal for task injection |
+| AGENTS.md as thin wrapper | `# You are {name}\n\n{{ instructions }}` | Task instructions are agent-specific and change often; separating them from identity keeps SOUL.md stable |
+| manifest.json always synced | Re-written on every startup | Allows variable schema updates to ship without forcing operators to delete template dirs |
+| Presets in package data | YAML files in `zenve_scaffolding/presets/` | Ships with the wheel; no DB needed; version-controlled alongside code |
+| Preset model includes `tools` + `skills` | Full agent config in one payload | Callers load one preset and have everything needed to POST `/agents` |
+| Template fallback | Unknown template → `default` | Prevents hard failures on misconfiguration |
+| Signal protocol | Plain text suffix (`RUN_OK`, `HEARTBEAT_OK`, etc.) | Simple to parse; works with any LLM output |
 
 ## Notes
 
-- The `role` variable is optional; templates use `{% if role %}` guards to avoid blank sections.
-- The `runs/` directory is created empty. Run transcripts written here by adapters follow the naming convention `{run_id}.md` (defined in Chunk 08).
+- The `instructions` variable is **required** by the default manifest. Agent creation will return HTTP 422 if it is missing and not supplied by a preset.
 - `memory/scratch.md` clearing policy is advisory — the agent is responsible; the gateway does not truncate it.
-- The signal protocol (`RUN_OK`, `HEARTBEAT_OK`, etc.) must be documented in AGENTS.md and HEARTBEAT.md consistently. The adapter parser (Chunk 06) and heartbeat service (Chunk 10) depend on these exact strings.
-- Custom template sets inherit no defaults from `default/` — each set must provide all three template files (SOUL.md.j2, AGENTS.md.j2, HEARTBEAT.md.j2).
-- `src/zenve/templates/` is never imported as Python — it is pure data. The `importlib.resources` API is used to locate it at runtime regardless of install method (editable, wheel, zip).
+- Custom template sets must provide all four `.j2` files (SOUL, AGENTS, RUN, HEARTBEAT). No inheritance from `default/`.
+- The `runs/` directory is created empty. Transcript naming convention is defined in Chunk 08.
+- `zenve_scaffolding/templates/` and `zenve_scaffolding/presets/` are never imported as Python — they are package data accessed via `importlib.resources`.
 
 ## Change Log
 
 | Date | Change | Reason |
 |------|--------|--------|
-| 2026-04-06 | Created chunk with full template designs for SOUL.md.j2, AGENTS.md.j2, HEARTBEAT.md.j2, memory stubs, FilesystemService signature, and config additions | Initial design of agent file templates |
-| 2026-04-06 | Added section for bundled templates & bootstrap seeding — package data layout, `seed_default_templates()`, behaviour table, upgrade path | Fresh deployments have empty TEMPLATES_DIR; defaults must ship with the gateway |
-| 2026-04-08 | Removed TOOLS.md.j2 template; tool permissions stored on Agent DB model | Tool permissions are machine-readable, enforced by adapters at runtime. TOOLS.md was redundant — SOUL.md/AGENTS.md handle instructional context. |
-| 2026-04-09 | Removed `gateway.json` — all agent metadata lives in the DB; identity is injected at runtime via system prompt and env vars | gateway.json was redundant with DB as source of truth and adapter-injected context |
+| 2026-04-06 | Created chunk with template designs, FilesystemService signature, config additions | Initial design |
+| 2026-04-06 | Added bundled templates & bootstrap seeding section | Fresh deployments need defaults shipped with gateway |
+| 2026-04-08 | Removed TOOLS.md.j2; tool permissions stored on Agent DB model | Redundant with DB as source of truth |
+| 2026-04-09 | Removed `gateway.json`; identity injected at runtime via system prompt and env vars | gateway.json was redundant with DB |
+| 2026-04-10 | Major update: scaffolding extracted to `zenve-scaffolding` package; added RUN.md.j2; AGENTS.md.j2 simplified to instructions injection; added manifest.json per template set with always-sync seeding; added PresetService with YAML presets (architect, dev); added TemplateService with manifest validation; added /api/v1/templates and /api/v1/presets routes; expanded template variables (personality, cares_about, does_not_do, instructions, org_dir) | Reflects implemented scaffolding package with preset and template discovery APIs |
