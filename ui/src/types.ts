@@ -36,11 +36,59 @@ export interface Agent {
   adapterType: string
   adapterConfig: Record<string, unknown>
   skills: string[]
+  tools: string[]
   status: string
   heartbeatIntervalSeconds: number
   lastHeartbeatAt: string | null
   createdAt: string
   updatedAt: string
+}
+
+export interface Run {
+  id: string
+  orgId: string
+  agentId: string
+  trigger: string
+  status: string
+  adapterType: string
+  message: string | null
+  startedAt: string | null
+  finishedAt: string | null
+  exitCode: number | null
+  errorSummary: string | null
+  tokenUsage: Record<string, unknown> | null
+  transcriptPath: string | null
+  outcome: string | null
+  createdAt: string
+}
+
+export type RunStatus = 'queued' | 'running' | 'completed' | 'failed' | 'cancelled' | 'timeout'
+
+export type RunEventType = 'output' | 'tool_call' | 'tool_result' | 'error' | 'usage'
+
+export interface RunEvent {
+  id: string
+  runId: string
+  eventType: RunEventType
+  content: string | null
+  meta: Record<string, unknown> | null
+  createdAt: string
+}
+
+export interface AgentUpdateBody {
+  name?: string
+  adapterConfig?: Record<string, unknown>
+  skills?: string[]
+  tools?: string[]
+  status?: string
+  heartbeatIntervalSeconds?: number
+}
+
+export interface RunCreateBody {
+  agent: string
+  message?: string | null
+  adapterType?: string | null
+  adapterConfig?: Record<string, unknown> | null
 }
 
 export interface OrganizationSummary {
