@@ -73,6 +73,26 @@ def test_build_cli_args_no_tools_skips_permissions():
     assert "--allowedTools" not in args
 
 
+def test_build_cli_args_with_session_id():
+    adapter = ClaudeCodeAdapter()
+    config = ClaudeCodeConfig()
+
+    args = adapter.build_cli_args(config, "hello", "system prompt", session_id="sess-123")
+
+    assert "--resume" in args
+    idx = args.index("--resume")
+    assert args[idx + 1] == "sess-123"
+
+
+def test_build_cli_args_without_session_id():
+    adapter = ClaudeCodeAdapter()
+    config = ClaudeCodeConfig()
+
+    args = adapter.build_cli_args(config, "hello", "system prompt", session_id=None)
+
+    assert "--resume" not in args
+
+
 # ---------------------------------------------------------------------------
 # on_event tests
 # ---------------------------------------------------------------------------
@@ -89,9 +109,22 @@ async def test_on_event_system():
         ]
     )
     with patch("asyncio.create_subprocess_exec", new=AsyncMock(return_value=proc)):
-        await ClaudeCodeAdapter().execute(ctx)
+        result = await ClaudeCodeAdapter().execute(ctx)
 
     assert events == [("output", "Session started: sess-abc", {"session_id": "sess-abc"})]
+    assert result.session_id == "sess-abc"
+
+
+@pytest.mark.asyncio
+async def test_execute_preserves_input_session_id():
+    """When ctx.session_id is set, the result retains it even without a system event."""
+    ctx = make_ctx(session_id="existing-sess")
+
+    proc = make_proc([])
+    with patch("asyncio.create_subprocess_exec", new=AsyncMock(return_value=proc)):
+        result = await ClaudeCodeAdapter().execute(ctx)
+
+    assert result.session_id == "existing-sess"
 
 
 @pytest.mark.asyncio

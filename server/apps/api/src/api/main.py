@@ -19,6 +19,7 @@ from api.routes import (
     org_router,
     preset_router,
     run_router,
+    sessions_router,
     template_router,
     ws_router,
 )
@@ -45,6 +46,7 @@ app.include_router(org_router)
 app.include_router(api_key_router)
 app.include_router(agent_router)
 app.include_router(run_router)
+app.include_router(sessions_router)
 app.include_router(preset_router)
 app.include_router(template_router)
 app.include_router(ws_router)

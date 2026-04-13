@@ -117,6 +117,7 @@ class Run(Base):
     )  # queued, running, completed, failed, cancelled, needs_input
     adapter_type: Mapped[str] = mapped_column(nullable=False)
     message: Mapped[str | None] = mapped_column(nullable=True)
+    session_id: Mapped[str | None] = mapped_column(String(256), nullable=True)
     started_at: Mapped[datetime | None] = mapped_column(nullable=True)
     finished_at: Mapped[datetime | None] = mapped_column(nullable=True)
     exit_code: Mapped[int | None] = mapped_column(nullable=True)

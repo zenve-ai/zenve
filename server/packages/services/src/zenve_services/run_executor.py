@@ -37,6 +37,7 @@ class RunExecutor:
         extra_env: dict | None = None,
         adapter_type: str | None = None,
         adapter_config: dict | None = None,
+        session_id: str | None = None,
     ) -> RunContext:
         """Build a RunContext from an Agent ORM record.
 
@@ -56,6 +57,7 @@ class RunExecutor:
             adapter_type=resolved_adapter_type,
             adapter_config=resolved_adapter_config,
             message=message,
+            session_id=session_id,
             heartbeat=heartbeat,
             gateway_url=get_settings().gateway_url,
             agent_token=agent_token,
@@ -106,6 +108,10 @@ class RunExecutor:
 
             adapter = self.adapter_registry.get(ctx.adapter_type)
             result: RunResult = await adapter.execute(ctx)
+
+            if result.session_id:
+                run.session_id = result.session_id
+                db.commit()
 
             logger.info(f"Writing transcript for run: {run_id}")
             transcript_path = self.write_transcript_json(ctx, result)
@@ -173,6 +179,7 @@ class RunExecutor:
             transcript = {
                 "run_id": ctx.run_id,
                 "agent_slug": ctx.agent_slug,
+                "session_id": result.session_id,
                 "adapter_type": ctx.adapter_type,
                 "adapter_config": ctx.adapter_config,
                 "exit_code": result.exit_code,

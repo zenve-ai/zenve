@@ -92,7 +92,7 @@ class OpenCodeAdapter(BaseAdapter):
             **ctx.env_vars,
         }
 
-        args = self.build_cli_args(config)
+        args = self.build_cli_args(config, session_id=ctx.session_id)
 
         proc = await asyncio.create_subprocess_exec(
             *args,
@@ -111,7 +111,7 @@ class OpenCodeAdapter(BaseAdapter):
         full_stdout_lines: list[str] = []
 
         token_usage: dict | None = None
-        session_id: str | None = None
+        session_id: str | None = ctx.session_id
         last_text: str | None = None
         outcome: str | None = None
 
@@ -207,19 +207,22 @@ class OpenCodeAdapter(BaseAdapter):
             token_usage=token_usage,
             error=stderr if proc.returncode != 0 else None,
             outcome=outcome,
+            session_id=session_id,
         )
 
     # ------------------------------------------------------------------
     # Private helpers
     # ------------------------------------------------------------------
 
-    def build_cli_args(self, config: OpenCodeConfig) -> list[str]:
+    def build_cli_args(self, config: OpenCodeConfig, session_id: str | None = None) -> list[str]:
         args = [
             "opencode",
             "run",
             "--format",
             config.output_format,
         ]
+        if session_id:
+            args.extend(["--session", session_id])
         if config.model:
             args.extend(["--model", config.model])
         return args

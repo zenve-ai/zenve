@@ -10,6 +10,7 @@ class RunCreate(BaseModel):
     message: str | None = None
     adapter_type: str | None = None
     adapter_config: dict | None = None
+    session_id: str | None = None
 
 
 class RunResponse(BaseModel):
@@ -22,6 +23,7 @@ class RunResponse(BaseModel):
     status: str
     adapter_type: str
     message: str | None
+    session_id: str | None
     started_at: datetime | None
     finished_at: datetime | None
     exit_code: int | None
@@ -30,6 +32,13 @@ class RunResponse(BaseModel):
     transcript_path: str | None
     outcome: str | None
     created_at: datetime
+
+
+class SessionResponse(BaseModel):
+    session_id: str
+    agent_id: str
+    agent_slug: str
+    runs: list[RunResponse]
 
 
 class RunTranscript(BaseModel):

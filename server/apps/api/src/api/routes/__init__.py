@@ -5,6 +5,7 @@ from .core import router as core_router
 from .org import router as org_router
 from .preset import router as preset_router
 from .run import router as run_router
+from .run import sessions_router
 from .template import router as template_router
 from .ws import router as ws_router
 
@@ -16,6 +17,7 @@ __all__ = [
     "org_router",
     "preset_router",
     "run_router",
+    "sessions_router",
     "template_router",
     "ws_router",
 ]
