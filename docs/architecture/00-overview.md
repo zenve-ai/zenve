@@ -10,7 +10,7 @@ A self-hosted FastAPI REST gateway that manages organizations of AI agents, exec
 - **Organization-scoped everything.** Every entity (agent, run, collaboration) belongs to an organization. One deployment serves multiple orgs with data isolation.
 - **Adapter pattern for runtimes.** The gateway doesn't know how Claude Code or Codex work. Adapters do. New runtimes plug in without touching core.
 - **Celery for execution.** Agent runs are async tasks. The gateway enqueues, workers execute. Natural concurrency, retries, and observability.
-- **API-first.** No UI, no channels, no WebSocket — pure REST with token auth. Channels are a future layer on top.
+- **API-first.** REST for operations, WebSocket for real-time observation. Org-scoped WebSocket pushes run lifecycle events to connected clients without polling.
 
 ## High-Level Architecture
 
@@ -106,8 +106,9 @@ Filesystem mirrors the DB: `/data/orgs/{slug}/` holds a single git repo (`.git/`
 | 12 | Collaboration Execution Engine | 11, 05     | execute_group_run task, routing strategies, RESOLVE  | not started     | —          |
 | 13 | Collaboration API & Messages   | 12         | Full REST API, message thread, cancel                | not started     | —          |
 | 14 | Health & Observability         | 07, 10     | /health, /health/workers, status checks              | not started     | —          |
-| 15 | Run Event System               | 05, 07, 08 | RunEvent model, on_event callback, event timeline API | not started     | —          |
+| 15 | Run Event System               | 05, 07, 08 | RunEvent model, on_event callback, event timeline API | implemented     | 2026-04-12 |
 | 16 | Org-Level Git Versioning       | 07, 08     | OrgRepo helper, commit-per-run lifecycle, rollback, diff endpoint, remote push, org git config | not started     | —          |
+| 17 | Org-Level WebSocket            | 01, 08, 15 | WebSocketManager, WS endpoint with JWT auth, run.* broadcast messages, frontend hook + Redux slice | implemented     | 2026-04-13 |
 
 ## Cross-Cutting Concerns
 
@@ -115,13 +116,14 @@ Filesystem mirrors the DB: `/data/orgs/{slug}/` holds a single git repo (`.git/`
 - **Dual identification** — All entities support UUID and slug lookup. UUID-first resolution, slug fallback.
 - **Hybrid storage** — DB for queryable metadata, filesystem for agent identity and full transcripts.
 - **Path safety** — All filesystem operations validate against path traversal. Agent dirs are sandboxed under org base_path.
+- **Real-time push** — `WebSocketManager` (chunk 17) holds one in-process registry of connections keyed by org ID. `RunExecutor` and run routes broadcast lifecycle events (`run.created`, `run.status_changed`, `run.event`, `run.finished`) without coupling to HTTP request lifecycle.
 - **Org-level git versioning** — Each org has one git repo at its filesystem root. The gateway commits once per run after the adapter returns, recording `pre_commit_sha` and `post_commit_sha` on the run record. Concurrent commits serialize via a per-org lock (chunk 16).
 
 ## Key Decisions
 
 | Decision | Choice | Rationale |
 |----------|--------|-----------|
-| Transport | REST API | Simple, stateless, easy to test. WS later for streaming. |
+| Transport | REST + WebSocket | REST for operations (stateless, easy to test); WebSocket for real-time run observation (chunk 17). |
 | Agent identity | Markdown files on disk | Inspectable, git-friendly, proven pattern. |
 | Agent registry | SQLAlchemy (DB-agnostic) | Queryable metadata. SQLite dev, Postgres prod. |
 | Run results | Hybrid (DB + filesystem) | DB for metadata queries, filesystem for full transcripts. |
