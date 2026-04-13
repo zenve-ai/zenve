@@ -1,4 +1,5 @@
 import { useEffect } from 'react'
+import { Toaster } from 'sonner'
 import './main.css'
 import AppRoutes from '@/routes'
 import { useAppDispatch } from '@/store/hooks'
@@ -13,5 +14,10 @@ export default function App() {
     dispatch(restoreOrganizationFromStorage())
   }, [dispatch])
 
-  return <AppRoutes />
+  return (
+    <>
+      <AppRoutes />
+      <Toaster richColors closeButton position="top-center" />
+    </>
+  )
 }

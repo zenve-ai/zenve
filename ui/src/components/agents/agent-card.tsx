@@ -1,14 +1,6 @@
 import { useNavigate } from 'react-router'
-import {
-  Code,
-  Compass,
-  Crown,
-  ListTodo,
-  MessageCircle,
-  Pause,
-  Play,
-  type LucideIcon,
-} from 'lucide-react'
+import { ListTodo, MessageCircle, Pause, Play } from 'lucide-react'
+import { AgentIcon } from '@/components/agents/agent-icon'
 import { Button } from '@/components/ui/button'
 import {
   Tooltip,
@@ -17,23 +9,7 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip'
 import { cn } from '@/lib/utils'
-import type { Agent, AgentIconKey } from '@/types'
-
-const AGENT_ICONS: Record<AgentIconKey, LucideIcon> = {
-  crown: Crown,
-  compass: Compass,
-  code: Code,
-}
-
-const ICON_KEYS: AgentIconKey[] = ['crown', 'compass', 'code']
-
-function assignIconKey(slug: string): AgentIconKey {
-  let hash = 0
-  for (let i = 0; i < slug.length; i++) {
-    hash = (hash * 31 + slug.charCodeAt(i)) | 0
-  }
-  return ICON_KEYS[Math.abs(hash) % ICON_KEYS.length]
-}
+import type { Agent } from '@/types'
 
 type StatusKey = 'active' | 'archived' | 'error' | 'paused'
 
@@ -90,7 +66,6 @@ export function AgentCard({
   to: string
 }) {
   const navigate = useNavigate()
-  const Icon = AGENT_ICONS[assignIconKey(agent.slug)] ?? Code
   const status = getStatus(agent.status)
   const isPaused = agent.status === 'paused'
 
@@ -119,9 +94,7 @@ export function AgentCard({
       <div className="flex min-w-0 flex-1 flex-col">
         {/* Top row — icon, identity, status */}
         <div className="flex items-center gap-2.5 px-3 py-2">
-          <div className="flex size-6 shrink-0 items-center justify-center border border-border bg-muted/50">
-            <Icon className="size-3" aria-hidden />
-          </div>
+          <AgentIcon slug={agent.slug} className="size-6" />
 
           <div className="flex min-w-0 flex-1 items-center gap-2">
             <span className="truncate text-[13px] font-semibold leading-none">

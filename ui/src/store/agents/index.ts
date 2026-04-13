@@ -1,1 +1,6 @@
-export { agentsApi, useListAgentsQuery } from './api'
+export {
+  agentsApi,
+  useListAgentsQuery,
+  useGetAgentQuery,
+  useUpdateAgentMutation,
+} from './api'

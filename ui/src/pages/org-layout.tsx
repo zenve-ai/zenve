@@ -20,6 +20,8 @@ import {
   setCurrentOrganization,
 } from '@/store/organization'
 import { useListAgentsQuery } from '@/store/agents'
+import { selectWsStatus } from '@/store/ws'
+import { useOrgWebSocket } from '@/hooks/use-org-websocket'
 import { OrgLoading } from './org-loading'
 
 export default function OrgLayout() {
@@ -43,6 +45,9 @@ export default function OrgLayout() {
   const agent = detailMatch?.params.agentSlug
     ? agents.find((a) => a.slug === detailMatch.params.agentSlug)
     : undefined
+  const wsStatus = useAppSelector(selectWsStatus)
+
+  useOrgWebSocket(currentOrgId ?? '')
 
   // --- effects ---
   useEffect(() => {
@@ -91,9 +96,26 @@ export default function OrgLayout() {
     )
   }
 
+  const renderWsStatusDot = () => {
+    if (wsStatus === 'idle') return null
+    const dotClass = {
+      connecting: 'bg-gray-400 animate-pulse',
+      connected: 'bg-green-500',
+      reconnecting: 'bg-amber-400 animate-pulse',
+      failed: 'bg-red-500',
+    }[wsStatus]
+    const title = {
+      connecting: 'Connecting…',
+      connected: 'Connected',
+      reconnecting: 'Reconnecting…',
+      failed: 'Connection failed',
+    }[wsStatus]
+    return <span className={`size-2 rounded-full ${dotClass}`} title={title} />
+  }
+
   const renderHeader = () => (
     <header className="flex h-12 shrink-0 items-center gap-2 border-b border-dashed border-border/60">
-      <div className="flex items-center gap-2 px-4">
+      <div className="flex flex-1 items-center gap-2 px-4">
         <SidebarTrigger className="-ml-1" />
         <Separator orientation="vertical" className="mr-2 data-[orientation=vertical]:h-4" />
         <Breadcrumb>
@@ -107,6 +129,9 @@ export default function OrgLayout() {
             {renderBreadcrumbTrail()}
           </BreadcrumbList>
         </Breadcrumb>
+        <div className="ml-auto flex items-center pr-2">
+          {renderWsStatusDot()}
+        </div>
       </div>
     </header>
   )

@@ -1,7 +1,7 @@
 import { createApi } from '@reduxjs/toolkit/query/react'
 import { createBaseQueryWithReauth } from '@/lib/api'
 import config from '@/config'
-import type { Agent } from '@/types'
+import type { Agent, AgentUpdateBody } from '@/types'
 
 interface AgentResponse {
   id: string
@@ -12,6 +12,7 @@ interface AgentResponse {
   adapter_type: string
   adapter_config: Record<string, unknown>
   skills: string[]
+  tools?: string[]
   status: string
   heartbeat_interval_seconds: number
   last_heartbeat_at: string | null
@@ -28,6 +29,7 @@ function toAgent(r: AgentResponse): Agent {
     adapterType: r.adapter_type,
     adapterConfig: r.adapter_config,
     skills: r.skills,
+    tools: r.tools ?? [],
     status: r.status,
     heartbeatIntervalSeconds: r.heartbeat_interval_seconds,
     lastHeartbeatAt: r.last_heartbeat_at,
@@ -46,7 +48,27 @@ export const agentsApi = createApi({
       transformResponse: (response: AgentResponse[]) => response.map(toAgent),
       providesTags: ['Agent'],
     }),
+    getAgent: builder.query<Agent, { orgSlug: string; agentSlug: string }>({
+      query: ({ orgSlug, agentSlug }) => `/orgs/${orgSlug}/agents/${agentSlug}`,
+      transformResponse: (response: AgentResponse) => toAgent(response),
+      providesTags: (_result, _err, { agentSlug }) => [{ type: 'Agent', id: agentSlug }],
+    }),
+    updateAgent: builder.mutation<
+      Agent,
+      { orgSlug: string; agentIdOrSlug: string; body: AgentUpdateBody }
+    >({
+      query: ({ orgSlug, agentIdOrSlug, body }) => ({
+        url: `/orgs/${orgSlug}/agents/${agentIdOrSlug}`,
+        method: 'PATCH',
+        body,
+      }),
+      transformResponse: (response: AgentResponse) => toAgent(response),
+      invalidatesTags: (_result, _err, { agentIdOrSlug }) => [
+        'Agent',
+        { type: 'Agent', id: agentIdOrSlug },
+      ],
+    }),
   }),
 })
 
-export const { useListAgentsQuery } = agentsApi
+export const { useListAgentsQuery, useGetAgentQuery, useUpdateAgentMutation } = agentsApi
