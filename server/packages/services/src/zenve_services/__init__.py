@@ -15,6 +15,7 @@ from zenve_services.run import RunService
 from zenve_services.run_event import RunEventService
 from zenve_services.run_executor import RunExecutor
 from zenve_services.template import TemplateService
+from zenve_services.ws_manager import WebSocketManager
 
 
 def get_auth_service(db: Session = Depends(get_db)) -> AuthService:
@@ -80,7 +81,12 @@ def get_run_event_service(db: Session = Depends(get_db)) -> RunEventService:
     return RunEventService(db)
 
 
+def get_ws_manager(request: Request) -> WebSocketManager:
+    return request.app.state.ws_manager
+
+
 def get_run_executor(
     adapter_registry: AdapterRegistry = Depends(get_adapter_registry),
+    ws_manager: WebSocketManager = Depends(get_ws_manager),
 ) -> RunExecutor:
-    return RunExecutor(adapter_registry)
+    return RunExecutor(adapter_registry, ws_manager)

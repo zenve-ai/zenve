@@ -10,6 +10,7 @@ from zenve_adapters.registry import AdapterRegistry
 from zenve_config.settings import get_settings
 from zenve_db.database import Base, engine
 from zenve_scaffolding import ScaffoldingService
+from zenve_services.ws_manager import WebSocketManager
 
 logger = logging.getLogger(__name__)
 
@@ -51,6 +52,8 @@ async def lifespan(app: FastAPI):
     setup_database(app)
     setup_filesystem(app)
     setup_adapters(app)
+    app.state.ws_manager = WebSocketManager()
+    logger.info("WebSocket ready at ws://0.0.0.0:8000/api/v1/orgs/{org_id}/ws")
 
     yield
 

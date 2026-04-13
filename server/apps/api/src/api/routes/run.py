@@ -12,12 +12,14 @@ from zenve_services import (
     get_run_event_service,
     get_run_executor,
     get_run_service,
+    get_ws_manager,
 )
 from zenve_services.membership import MembershipService
 from zenve_services.org import OrgService
 from zenve_services.run import RunService
 from zenve_services.run_event import RunEventService
 from zenve_services.run_executor import RunExecutor
+from zenve_services.ws_manager import WebSocketManager
 from zenve_utils.auth import get_current_user
 
 router = APIRouter(prefix="/api/v1/orgs/{org_id}/runs", tags=["runs"])
@@ -32,6 +34,7 @@ async def trigger_run(
     membership_service: MembershipService = Depends(get_membership_service),
     run_service: RunService = Depends(get_run_service),
     run_executor: RunExecutor = Depends(get_run_executor),
+    ws_manager: WebSocketManager = Depends(get_ws_manager),
 ):
     org = org_service.get_by_id_or_slug(org_id)
     membership_service.require_membership(user.id, org.id)
@@ -55,6 +58,8 @@ async def trigger_run(
         adapter_type=body.adapter_type,
         adapter_config=body.adapter_config,
     )
+
+    await ws_manager.broadcast(org.id, {"type": "run.created", "data": RunResponse.model_validate(run).model_dump(mode="json")})
     asyncio.ensure_future(run_executor.execute(run.id, ctx))
 
     return run

@@ -6,6 +6,7 @@ from .org import router as org_router
 from .preset import router as preset_router
 from .run import router as run_router
 from .template import router as template_router
+from .ws import router as ws_router
 
 __all__ = [
     "agent_router",
@@ -16,4 +17,5 @@ __all__ = [
     "preset_router",
     "run_router",
     "template_router",
+    "ws_router",
 ]

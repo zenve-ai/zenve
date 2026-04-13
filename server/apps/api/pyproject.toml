@@ -5,7 +5,7 @@ description = "zenve FastAPI application"
 requires-python = ">=3.13"
 dependencies = [
     "fastapi>=0.115.0",
-    "uvicorn>=0.30.0",
+    "uvicorn[standard]>=0.30.0",
     "zenve-config",
     "zenve-db",
     "zenve-models",

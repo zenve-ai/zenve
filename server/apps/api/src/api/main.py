@@ -20,6 +20,7 @@ from api.routes import (
     preset_router,
     run_router,
     template_router,
+    ws_router,
 )
 
 app = FastAPI(lifespan=lifespan)
@@ -46,6 +47,7 @@ app.include_router(agent_router)
 app.include_router(run_router)
 app.include_router(preset_router)
 app.include_router(template_router)
+app.include_router(ws_router)
 
 logger = logging.getLogger(__name__)
 
