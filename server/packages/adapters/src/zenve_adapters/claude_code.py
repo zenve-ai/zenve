@@ -88,7 +88,7 @@ class ClaudeCodeAdapter(BaseAdapter):
             **ctx.env_vars,
         }
 
-        args = self.build_cli_args(config, message, system_prompt, ctx.tools)
+        args = self.build_cli_args(config, message, system_prompt, ctx.tools, session_id=ctx.session_id)
         # print(f"Args: {args}")
 
         proc = await asyncio.create_subprocess_exec(
@@ -108,6 +108,7 @@ class ClaudeCodeAdapter(BaseAdapter):
         full_stdout_lines: list[str] = []
         token_usage: dict | None = None
         outcome: str | None = None
+        session_id: str | None = ctx.session_id
 
         async for raw_line in proc.stdout:
             line = raw_line.decode(errors="replace").strip()
@@ -126,8 +127,10 @@ class ClaudeCodeAdapter(BaseAdapter):
             event: tuple | None = None
 
             if event_type == "system":
-                session_id = parsed.get("session_id", "unknown")
-                event = ("output", f"Session started: {session_id}", {"session_id": session_id})
+                captured_session = parsed.get("session_id", "unknown")
+                if session_id is None:
+                    session_id = captured_session
+                event = ("output", f"Session started: {captured_session}", {"session_id": captured_session})
 
             elif event_type == "assistant":
                 blocks = parsed.get("message", {}).get("content", "")
@@ -214,6 +217,7 @@ class ClaudeCodeAdapter(BaseAdapter):
             token_usage=token_usage,
             error=stderr if proc.returncode != 0 else None,
             outcome=outcome,
+            session_id=session_id,
         )
 
     # ------------------------------------------------------------------
@@ -226,6 +230,7 @@ class ClaudeCodeAdapter(BaseAdapter):
         message: str,
         system_prompt: str,
         tools: list[str] | None = None,
+        session_id: str | None = None,
     ) -> list[str]:
         args = [
             "claude",
@@ -235,6 +240,8 @@ class ClaudeCodeAdapter(BaseAdapter):
             config.output_format,
         ]
         args.extend(["--system-prompt", system_prompt])
+        if session_id:
+            args.extend(["--resume", session_id])
         if config.model:
             args.extend(["--model", config.model])
         if config.max_tokens is not None:

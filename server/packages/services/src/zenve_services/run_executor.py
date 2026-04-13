@@ -78,6 +78,7 @@ def write_transcript_json(ctx: RunContext, result: RunResult) -> Path | None:
         transcript = {
             "run_id": ctx.run_id,
             "agent_slug": ctx.agent_slug,
+            "session_id": result.session_id,
             "exit_code": result.exit_code,
             "duration_seconds": result.duration_seconds,
             "stdout": parse_json_safe(result.stdout),
@@ -113,6 +114,10 @@ async def execute_run(
 
         adapter = adapter_registry.get(ctx.adapter_type)
         result: RunResult = await adapter.execute(ctx)
+
+        if result.session_id:
+            run.session_id = result.session_id
+            db.commit()
 
         transcript_path = write_transcript_json(ctx, result)
 

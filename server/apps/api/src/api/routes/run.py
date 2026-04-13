@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, Query, status
 
 from zenve_adapters.registry import AdapterRegistry
 from zenve_db.models import UserRecord
-from zenve_models.run import RunCreate, RunResponse, RunTranscript
+from zenve_models.run import RunCreate, RunResponse, RunTranscript, SessionResponse
 from zenve_services import (
     get_adapter_registry,
     get_membership_service,
@@ -41,12 +41,13 @@ async def trigger_run(
         trigger="manual",
         adapter_type=agent.adapter_type,
         message=body.message,
+        session_id=body.session_id,
     )
 
     # Load organization onto agent so build_run_context can access org_slug
     agent.organization = org
 
-    ctx = build_run_context(agent=agent, run_id=run.id, message=body.message)
+    ctx = build_run_context(agent=agent, run_id=run.id, message=body.message, session_id=body.session_id)
     asyncio.ensure_future(execute_run(run.id, ctx, adapter_registry))
 
     return run
@@ -58,6 +59,7 @@ def list_runs(
     agent_id: str | None = Query(None),
     run_status: str | None = Query(None, alias="status"),
     trigger: str | None = Query(None),
+    session_id: str | None = Query(None),
     limit: int = Query(50, ge=1, le=200),
     user: UserRecord = Depends(get_current_user),
     org_service: OrgService = Depends(get_org_service),
@@ -67,7 +69,8 @@ def list_runs(
     org = org_service.get_by_id_or_slug(org_id)
     membership_service.require_membership(user.id, org.id)
     return run_service.list_runs(
-        org.id, agent_id=agent_id, status=run_status, trigger=trigger, limit=limit
+        org.id, agent_id=agent_id, status=run_status, trigger=trigger,
+        session_id=session_id, limit=limit,
     )
 
 
@@ -118,3 +121,21 @@ def cancel_run(
     membership_service.require_membership(user.id, org.id)
     run = run_service.get_by_id(org.id, run_id)
     return run_service.cancel_run(run)
+
+
+sessions_router = APIRouter(prefix="/api/v1/orgs/{org_id}/sessions", tags=["sessions"])
+
+
+@sessions_router.get("", response_model=list[SessionResponse])
+def list_sessions(
+    org_id: str,
+    agent_id: str | None = Query(None),
+    limit: int = Query(50, ge=1, le=200),
+    user: UserRecord = Depends(get_current_user),
+    org_service: OrgService = Depends(get_org_service),
+    membership_service: MembershipService = Depends(get_membership_service),
+    run_service: RunService = Depends(get_run_service),
+):
+    org = org_service.get_by_id_or_slug(org_id)
+    membership_service.require_membership(user.id, org.id)
+    return run_service.list_sessions(org.id, agent_id=agent_id, limit=limit)

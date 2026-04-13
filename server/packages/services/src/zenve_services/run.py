@@ -20,6 +20,7 @@ class RunService:
         trigger: str,
         adapter_type: str,
         message: str | None = None,
+        session_id: str | None = None,
         status: str = "queued",
     ) -> Run:
         run = Run(
@@ -29,6 +30,7 @@ class RunService:
             status=status,
             adapter_type=adapter_type,
             message=message,
+            session_id=session_id,
         )
         self.db.add(run)
         self.db.commit()
@@ -47,6 +49,7 @@ class RunService:
         agent_id: str | None = None,
         status: str | None = None,
         trigger: str | None = None,
+        session_id: str | None = None,
         limit: int = 50,
     ) -> list[Run]:
         q = self.db.query(Run).filter(Run.org_id == org_id)
@@ -56,7 +59,42 @@ class RunService:
             q = q.filter(Run.status == status)
         if trigger:
             q = q.filter(Run.trigger == trigger)
+        if session_id:
+            q = q.filter(Run.session_id == session_id)
         return q.order_by(Run.created_at.desc()).limit(limit).all()
+
+    def list_sessions(
+        self,
+        org_id: str,
+        agent_id: str | None = None,
+        limit: int = 50,
+    ) -> list[dict]:
+        """Return sessions grouped with their runs.
+
+        Returns a list of dicts: {session_id, agent_id, agent_slug, runs}.
+        """
+        q = self.db.query(Run).filter(
+            Run.org_id == org_id,
+            Run.session_id.isnot(None),
+        )
+        if agent_id:
+            q = q.filter(Run.agent_id == agent_id)
+        runs = q.order_by(Run.created_at.desc()).all()
+
+        sessions: dict[str, dict] = {}
+        for run in runs:
+            sid = run.session_id
+            if sid not in sessions:
+                sessions[sid] = {
+                    "session_id": sid,
+                    "agent_id": run.agent_id,
+                    "agent_slug": run.agent.slug if run.agent else "",
+                    "runs": [],
+                }
+            sessions[sid]["runs"].append(run)
+
+        result = list(sessions.values())[:limit]
+        return result
 
     def update(self, run_id: str, **kwargs) -> Run:
         run = self.db.get(Run, run_id)
