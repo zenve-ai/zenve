@@ -5,53 +5,15 @@ import {
   AgentDashboardTab,
   AgentDetailHeader,
   AssignTaskDialog,
+  ConfigurationTab,
+  PlaceholderTab,
+  SkillsTab,
 } from '@/components/agents'
 import { Button } from '@/components/ui/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useGetAgentQuery, useUpdateAgentMutation } from '@/store/agents'
 import { useCreateRunMutation } from '@/store/runs'
 import type { Agent } from '@/types'
-
-function PlaceholderTab({ title, children }: { title: string; children?: React.ReactNode }) {
-  return (
-    <div className="p-4">
-      <p className="text-[13px] font-medium">{title}</p>
-      <div className="mt-3 text-[12px] text-muted-foreground">{children}</div>
-    </div>
-  )
-}
-
-function JsonBlock({ value }: { value: unknown }) {
-  return (
-    <pre className="mt-2 max-h-[min(50vh,420px)] overflow-auto border border-border bg-muted/20 p-3 font-mono text-[11px] leading-relaxed">
-      {JSON.stringify(value, null, 2)}
-    </pre>
-  )
-}
-
-function SkillsTab({ agent }: { agent: Agent }) {
-  return (
-    <PlaceholderTab title="Skills">
-      {agent.skills.length === 0 ? (
-        <span>No skills configured.</span>
-      ) : (
-        <ul className="mt-2 list-inside list-disc space-y-1 text-foreground">
-          {agent.skills.map((s) => (
-            <li key={s}>{s}</li>
-          ))}
-        </ul>
-      )}
-    </PlaceholderTab>
-  )
-}
-
-function ConfigurationTab({ agent }: { agent: Agent }) {
-  return (
-    <PlaceholderTab title="Adapter configuration">
-      <JsonBlock value={agent.adapterConfig} />
-    </PlaceholderTab>
-  )
-}
 
 export default function AgentDetail() {
   const { orgSlug, agentSlug } = useParams<{ orgSlug: string; agentSlug: string }>()

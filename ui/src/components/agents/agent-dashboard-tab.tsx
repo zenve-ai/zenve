@@ -2,7 +2,12 @@ import { ArrowRight, Check, Clock, Loader2 } from 'lucide-react'
 import { AgentDashboardBarChartCard } from '@/components/agents/agent-dashboard-bar-chart-card'
 import { Button } from '@/components/ui/button'
 import type { ChartConfig } from '@/components/ui/chart'
-import type { DayBucket } from '@/components/ui/day-bucket-bar-chart'
+import {
+  buildDayGroupsForLastNDays,
+  type DayBucket,
+  type DayGroup,
+  timestampToLocalCalendarDateKey,
+} from '@/components/ui/day-bucket-bar-chart'
 import { cn } from '@/lib/utils'
 import {
   MOCK_COST_ROWS,
@@ -128,33 +133,8 @@ function RunRow({ run, onViewDetails }: { run: Run; onViewDetails?: () => void }
 
 // ─── daily aggregation helpers ──────────────────────────────────────────────
 
-interface DayGroup<T = Run> {
-  label: string   // e.g. "14/Apr"
-  dateKey: string // e.g. "2026-04-14"
-  items: T[]
-}
-
-function groupItemsByDay<T>(items: T[], getItemDateKey: (item: T) => string, days = 7): DayGroup<T>[] {
-  const groups: DayGroup<T>[] = []
-  const nowMs = Date.now()
-  for (let i = days - 1; i >= 0; i--) {
-    const d = new Date(nowMs - i * 86_400_000)
-    const dateKey = d.toISOString().slice(0, 10)
-    const day = String(d.getUTCDate()).padStart(2, '0')
-    const month = d.toLocaleDateString('en-US', { month: 'short', timeZone: 'UTC' })
-    const label = `${day}/${month}`
-    groups.push({ label, dateKey, items: [] })
-  }
-  for (const item of items) {
-    const key = getItemDateKey(item)
-    const group = groups.find((g) => g.dateKey === key)
-    if (group) group.items.push(item)
-  }
-  return groups
-}
-
 function groupRunsByDay(runs: Run[], days = 7): DayGroup<Run>[] {
-  return groupItemsByDay(runs, (r) => r.createdAt.slice(0, 10), days)
+  return buildDayGroupsForLastNDays(runs, (r) => timestampToLocalCalendarDateKey(r.createdAt), { days })
 }
 
 function toBuckets<T>(groups: DayGroup<T>[], reducer: (items: T[]) => number): DayBucket[] {
@@ -222,7 +202,10 @@ export function AgentDashboardTab({
   const runActivity = toBuckets(dayGroups, (rs) => rs.length)
   const runFailures = toBuckets(dayGroups, (rs) => rs.filter((r) => r.status === 'failed' || r.status === 'timeout').length)
   const runCost = toBuckets(dayGroups, (rs) => rs.reduce((sum, r) => sum + getRunCostUsd(r), 0))
-  const issueDayGroups = groupItemsByDay(MOCK_ISSUE_ROWS, (row) => row.createdAt.slice(0, 10))
+  const issueDayGroups = buildDayGroupsForLastNDays(
+    MOCK_ISSUE_ROWS,
+    (row) => timestampToLocalCalendarDateKey(row.createdAt),
+  )
   const issueActivity = toBuckets(issueDayGroups, (rows) => rows.length)
 
   const renderRuns = () => (

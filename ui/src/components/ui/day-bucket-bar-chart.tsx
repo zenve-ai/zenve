@@ -70,6 +70,60 @@ export interface DayBucket {
   value: number
 }
 
+/** One calendar day bucket with grouped items (oldest → newest in the returned array). */
+export interface DayGroup<T = unknown> {
+  label: string
+  dateKey: string
+  items: T[]
+}
+
+/** `YYYY-MM-DD` for the given instant in the **local** calendar (not UTC slice of ISO string). */
+export function formatLocalCalendarDateKey(d: Date): string {
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
+}
+
+/** Local calendar `YYYY-MM-DD` for an ISO / date string (e.g. run `createdAt`). */
+export function timestampToLocalCalendarDateKey(iso: string): string {
+  return formatLocalCalendarDateKey(new Date(iso))
+}
+
+/**
+ * Last `days` **local calendar** days ending on `referenceDate`’s date (default: today),
+ * not anchored to the newest item and not rolling raw 24h steps from `Date.now()`.
+ * Match items with `getItemDateKey` returning the same `YYYY-MM-DD` keys (e.g. `timestampToLocalCalendarDateKey`).
+ */
+export function buildDayGroupsForLastNDays<T>(
+  items: T[],
+  getItemDateKey: (item: T) => string,
+  options?: { days?: number; referenceDate?: Date },
+): DayGroup<T>[] {
+  const days = options?.days ?? 7
+  const ref = options?.referenceDate ?? new Date()
+  const groups: DayGroup<T>[] = []
+
+  const end = new Date(ref.getFullYear(), ref.getMonth(), ref.getDate())
+
+  for (let back = days - 1; back >= 0; back -= 1) {
+    const d = new Date(end)
+    d.setDate(d.getDate() - back)
+    const dateKey = formatLocalCalendarDateKey(d)
+    const dayNum = String(d.getDate()).padStart(2, '0')
+    const month = d.toLocaleDateString('en-US', { month: 'short' })
+    const label = `${dayNum}/${month}`
+    groups.push({ label, dateKey, items: [] })
+  }
+
+  for (const item of items) {
+    const key = getItemDateKey(item)
+    const group = groups.find((g) => g.dateKey === key)
+    if (group) group.items.push(item)
+  }
+  return groups
+}
+
 export type DayBucketBarChartProps = {
   buckets: DayBucket[]
   config: ChartConfig
