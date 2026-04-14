@@ -12,19 +12,19 @@ import {
 import { cn } from '@/lib/utils'
 import type { Agent } from '@/types'
 
-function StatusPill({ status }: { status: string }) {
-  const s = status.toLowerCase()
-  const isPaused = s === 'paused'
+const STATUS_CONFIG: Record<string, { label: string; className: string; dot: string }> = {
+  active:   { label: 'LIVE', className: 'border-emerald-500/40 text-emerald-700 dark:text-emerald-400', dot: 'bg-emerald-500 animate-pulse' },
+  paused:   { label: 'HOLD', className: 'border-amber-500/50 text-amber-600 dark:text-amber-400',     dot: 'bg-amber-500' },
+  error:    { label: 'ERR',  className: 'border-red-500/40 text-red-600 dark:text-red-400',            dot: 'bg-red-500' },
+  archived: { label: 'OFF',  className: 'border-border text-muted-foreground',                         dot: 'bg-muted-foreground/50' },
+}
+
+function StatusBadge({ status }: { status: string }) {
+  const cfg = STATUS_CONFIG[status.toLowerCase()] ?? STATUS_CONFIG.active
   return (
-    <span
-      className={cn(
-        'rounded-full border px-2 py-0.5 font-mono text-[10px] font-semibold tracking-wide uppercase',
-        isPaused
-          ? 'border-amber-500/50 text-amber-600 dark:text-amber-400'
-          : 'border-emerald-500/40 text-emerald-700 dark:text-emerald-400',
-      )}
-    >
-      {status}
+    <span className={cn('flex items-center gap-1.5 border px-2 py-0.5 font-mono text-[10px] font-bold tracking-widest', cfg.className)}>
+      <span className={cn('size-1.5 rounded-full', cfg.dot)} />
+      {cfg.label}
     </span>
   )
 }
@@ -70,7 +70,7 @@ export function AgentDetailHeader({
 
       <div className="flex flex-wrap items-center gap-1.5 sm:justify-end">
         <Button
-          variant="outline"
+          variant="default"
           size="xs"
           className="rounded-none"
           disabled={busy}
@@ -84,7 +84,7 @@ export function AgentDetailHeader({
           Assign task
         </Button>
         <Button
-          variant="outline"
+          variant="secondary"
           size="xs"
           className="rounded-none"
           disabled={busy}
@@ -113,7 +113,6 @@ export function AgentDetailHeader({
           )}
           {isPaused ? 'Resume' : 'Pause'}
         </Button>
-        <StatusPill status={agent.status} />
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" size="icon-sm" className="rounded-none" disabled={busy}>

@@ -82,7 +82,7 @@ export function AgentCard({
         }
       }}
       className={cn(
-        'group relative flex cursor-pointer border border-border bg-card outline-none rounded-md overflow-hidden',
+        'group relative flex cursor-pointer border border-border bg-card outline-none overflow-hidden',
         'transition-colors hover:bg-accent/50',
         'focus-visible:ring-2 focus-visible:ring-ring',
       )}

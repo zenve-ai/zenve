@@ -24,15 +24,20 @@ export default function AgentsList() {
     <div className="flex min-w-0 flex-1 flex-col">
       {/* Title bar — full width border */}
       <div className="flex items-center justify-between border-b border-dashed border-border/60 px-4 py-1 bg-muted/20">
-        <div className="flex flex-start flex-col">
+        <div className="flex items-center gap-2.5">
           <h1 className="text-lg font-semibold tracking-tight">Agents</h1>
+          {!isLoading && (
+            <span className="font-mono text-[10px] font-bold tracking-widest text-muted-foreground/60">
+              [{String(agents.length).padStart(2, '0')}]
+            </span>
+          )}
         </div>
 
         <div className="flex items-center gap-1.5">
           <Button variant="ghost" size="icon-sm" className="rounded-none">
             <Search className="size-3.5" />
           </Button>
-          <Button variant="outline" size="xs" className="rounded-none">
+          <Button variant="default" size="xs" className="rounded-none">
             <Plus className="size-3" />
             Create agent
           </Button>
@@ -42,8 +47,9 @@ export default function AgentsList() {
       {/* Cards, loading, or empty */}
       <div className="flex min-h-0 flex-1 flex-col">
         {isLoading ? (
-          <div className="flex flex-1 items-center justify-center">
-            <Loader2 className="size-5 animate-spin text-muted-foreground" />
+          <div className="flex flex-1 flex-col items-center justify-center gap-2">
+            <Loader2 className="size-4 animate-spin text-muted-foreground" />
+            <span className="font-mono text-[10px] font-bold tracking-widest text-muted-foreground/60">LOADING...</span>
           </div>
         ) : agents.length === 0 ? (
           <Empty className="m-4 border border-dashed border-border/60 bg-muted/10">

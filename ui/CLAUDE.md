@@ -72,6 +72,20 @@ return <div>{renderMain()}</div>
 - Extract complex logic to custom hooks
 - Add utility functions to `src/lib/utils.ts`, not inline
 
+## Design Style — Industrial Control Panel
+
+The Zenve UI uses an **industrial control panel / operator dashboard** aesthetic. When building new pages or components, follow this direction:
+
+- **Status indicators** — colored left-edge bars (`w-[3px]`) on cards, monospace all-caps labels (`LIVE`, `HOLD`, `ERR`, `OFF`) with pulsing dots
+- **Dividers** — dashed borders (`border-dashed border-border/60`) to separate card sections; pipe `|` separators in meta strips
+- **Typography** — `font-mono` for metadata, slugs, timestamps, and status labels; small tight tracking (`tracking-widest`) on status badges
+- **Density** — compact padding (`px-3 py-1.5`, `py-2`), small text sizes (`text-[10px]`–`text-[13px]`), high information density
+- **Toolbars** — ghost button rows at card bottoms with `bg-muted/30`, `rounded-none`, hairline dividers between actions
+- **Color** — semantic status colors only (emerald = active, amber = paused, red = error, muted = off); no decorative color fills
+- **Tone** — utilitarian, no-nonsense; feels like a network operations terminal or industrial SCADA interface
+- **Button size** — all action buttons across pages use `size="xs" className="rounded-none"`; never mix `xs` and `sm` in the same UI context
+- **No rounded corners** — all cards, panels, and buttons use sharp edges (`rounded-none`); never use `rounded-md` or any border-radius on structural elements
+
 ## Adding a domain
 1. Types → `src/types.ts`
 2. `src/store/{domain}/slice.ts` → `api.ts` → `index.ts`
