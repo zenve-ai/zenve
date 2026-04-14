@@ -12,6 +12,14 @@ export interface MockIssueRow {
   id: string
   title: string
   status: 'done' | 'open' | 'in_progress'
+  /** Issue creation time (ISO), used for daily charts and sorting. */
+  createdAt: string
+}
+
+function utcNoonIsoDaysAgo(daysAgo: number): string {
+  const d = new Date(Date.now() - daysAgo * 86_400_000)
+  d.setUTCHours(12, 0, 0, 0)
+  return d.toISOString()
 }
 
 export interface MockCostRow {
@@ -63,10 +71,6 @@ export const MOCK_CHART_ISSUES_STATUS: number[] = [
   42, 38, 45, 50, 48, 55, 40, 52, 47, 44, 49, 51, 46, 53,
 ]
 
-export const MOCK_CHART_SUCCESS_RATE: number[] = [
-  72, 68, 75, 80, 77, 82, 70, 85, 78, 74, 79, 81, 76, 88,
-]
-
 export const MOCK_LATEST_RUN: MockLatestRun = {
   statusLabel: 'succeeded',
   statusVariant: 'success',
@@ -76,10 +80,19 @@ export const MOCK_LATEST_RUN: MockLatestRun = {
 }
 
 export const MOCK_ISSUE_ROWS: MockIssueRow[] = [
-  { id: 'LOG-12', title: 'Define account creation requirements and edge cases.', status: 'done' },
-  { id: 'LOG-11', title: 'Review API error format with backend team.', status: 'done' },
-  { id: 'LOG-10', title: 'Draft acceptance criteria for onboarding flow.', status: 'in_progress' },
-  { id: 'LOG-09', title: 'Sync with design on empty states.', status: 'open' },
+  { id: 'LOG-16', title: 'Verify rate limits on public signup endpoint.', status: 'open', createdAt: utcNoonIsoDaysAgo(0) },
+  { id: 'LOG-15', title: 'Tighten copy for session expiry modal.', status: 'in_progress', createdAt: utcNoonIsoDaysAgo(0) },
+  { id: 'LOG-12', title: 'Define account creation requirements and edge cases.', status: 'done', createdAt: utcNoonIsoDaysAgo(0) },
+  { id: 'LOG-11', title: 'Review API error format with backend team.', status: 'done', createdAt: utcNoonIsoDaysAgo(1) },
+  { id: 'LOG-14', title: 'Add telemetry for failed login reasons.', status: 'done', createdAt: utcNoonIsoDaysAgo(1) },
+  { id: 'LOG-10', title: 'Draft acceptance criteria for onboarding flow.', status: 'in_progress', createdAt: utcNoonIsoDaysAgo(2) },
+  { id: 'LOG-13', title: 'Document webhook retry policy.', status: 'done', createdAt: utcNoonIsoDaysAgo(2) },
+  { id: 'LOG-09', title: 'Sync with design on empty states.', status: 'open', createdAt: utcNoonIsoDaysAgo(3) },
+  { id: 'LOG-08', title: 'List edge cases for org invite flow.', status: 'done', createdAt: utcNoonIsoDaysAgo(3) },
+  { id: 'LOG-07', title: 'Align on audit log retention.', status: 'done', createdAt: utcNoonIsoDaysAgo(4) },
+  { id: 'LOG-06', title: 'Spike: export run history as CSV.', status: 'done', createdAt: utcNoonIsoDaysAgo(4) },
+  // { id: 'LOG-05', title: 'Clarify RBAC matrix for agent roles.', status: 'done', createdAt: utcNoonIsoDaysAgo(5) },
+  // { id: 'LOG-04', title: 'Capture screenshots for operator manual.', status: 'open', createdAt: utcNoonIsoDaysAgo(6) },
 ]
 
 export const MOCK_COST_SUMMARY: MockCostSummary = {

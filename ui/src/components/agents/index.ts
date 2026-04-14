@@ -1,5 +1,6 @@
 export { AgentCard } from './agent-card'
 export { AgentIcon, assignIconKey, getAgentLucideIcon } from './agent-icon'
 export { AgentDetailHeader } from './agent-detail-header'
+export { AgentDashboardBarChartCard } from './agent-dashboard-bar-chart-card'
 export { AgentDashboardTab } from './agent-dashboard-tab'
 export { AssignTaskDialog } from './assign-task-dialog'

@@ -1,8 +1,10 @@
 import { ArrowRight, Check, Clock, Loader2 } from 'lucide-react'
+import { AgentDashboardBarChartCard } from '@/components/agents/agent-dashboard-bar-chart-card'
 import { Button } from '@/components/ui/button'
+import type { ChartConfig } from '@/components/ui/chart'
+import type { DayBucket } from '@/components/ui/day-bucket-bar-chart'
 import { cn } from '@/lib/utils'
 import {
-  MOCK_CHART_SUCCESS_RATE,
   MOCK_COST_ROWS,
   MOCK_COST_SUMMARY,
   MOCK_ISSUE_ROWS,
@@ -59,22 +61,6 @@ function SectionBar({ title, action }: { title: string; action?: React.ReactNode
     <div className="flex items-center justify-between border-b border-dashed border-border/60 bg-muted/20 px-3 py-1.5">
       <span className="font-mono text-[10px] font-bold uppercase tracking-widest text-muted-foreground">{title}</span>
       {action}
-    </div>
-  )
-}
-
-function MiniBars({ values, barClassName }: { values: number[]; barClassName: string }) {
-  const max = Math.max(...values, 1)
-  return (
-    <div className="flex h-24 items-end gap-px">
-      {values.map((v, i) => (
-        <div key={i} className="flex min-w-0 flex-1 flex-col justify-end">
-          <div
-            className={cn('w-full min-h-[2px] rounded-[1px]', barClassName)}
-            style={{ height: `${(v / max) * 100}%` }}
-          />
-        </div>
-      ))}
     </div>
   )
 }
@@ -142,20 +128,14 @@ function RunRow({ run, onViewDetails }: { run: Run; onViewDetails?: () => void }
 
 // ─── daily aggregation helpers ──────────────────────────────────────────────
 
-interface DayGroup {
+interface DayGroup<T = Run> {
   label: string   // e.g. "14/Apr"
   dateKey: string // e.g. "2026-04-14"
-  runs: Run[]
+  items: T[]
 }
 
-interface DayBucket {
-  label: string
-  dateKey: string
-  value: number
-}
-
-function groupRunsByDay(runs: Run[], days = 7): DayGroup[] {
-  const groups: DayGroup[] = []
+function groupItemsByDay<T>(items: T[], getItemDateKey: (item: T) => string, days = 7): DayGroup<T>[] {
+  const groups: DayGroup<T>[] = []
   const nowMs = Date.now()
   for (let i = days - 1; i >= 0; i--) {
     const d = new Date(nowMs - i * 86_400_000)
@@ -163,18 +143,22 @@ function groupRunsByDay(runs: Run[], days = 7): DayGroup[] {
     const day = String(d.getUTCDate()).padStart(2, '0')
     const month = d.toLocaleDateString('en-US', { month: 'short', timeZone: 'UTC' })
     const label = `${day}/${month}`
-    groups.push({ label, dateKey, runs: [] })
+    groups.push({ label, dateKey, items: [] })
   }
-  for (const run of runs) {
-    const key = run.createdAt.slice(0, 10)
+  for (const item of items) {
+    const key = getItemDateKey(item)
     const group = groups.find((g) => g.dateKey === key)
-    if (group) group.runs.push(run)
+    if (group) group.items.push(item)
   }
   return groups
 }
 
-function toBuckets(groups: DayGroup[], reducer: (runs: Run[]) => number): DayBucket[] {
-  return groups.map((g) => ({ label: g.label, dateKey: g.dateKey, value: reducer(g.runs) }))
+function groupRunsByDay(runs: Run[], days = 7): DayGroup<Run>[] {
+  return groupItemsByDay(runs, (r) => r.createdAt.slice(0, 10), days)
+}
+
+function toBuckets<T>(groups: DayGroup<T>[], reducer: (items: T[]) => number): DayBucket[] {
+  return groups.map((g) => ({ label: g.label, dateKey: g.dateKey, value: reducer(g.items) }))
 }
 
 function getRunCostUsd(run: Run): number {
@@ -182,43 +166,33 @@ function getRunCostUsd(run: Run): number {
   return typeof cost === 'number' ? cost : 0
 }
 
-function DayBucketChart({
-  buckets,
-  barClassName,
-  emptyLabel,
-  formatValue,
-}: {
-  buckets: DayBucket[]
-  barClassName: string
-  emptyLabel: string
-  formatValue?: (v: number) => string
-}) {
-  const hasData = buckets.some((b) => b.value > 0)
-  if (!hasData) {
-    return (
-      <div className="flex h-24 flex-col items-center justify-center gap-1">
-        <span className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground/50">{emptyLabel}</span>
-      </div>
-    )
-  }
-  const max = Math.max(...buckets.map((b) => b.value), 1)
-  return (
-    <div className="flex h-24 items-end gap-1">
-      {buckets.map((b) => (
-        <div
-          key={b.dateKey}
-          title={formatValue ? `${b.label}: ${formatValue(b.value)}` : `${b.label}: ${b.value}`}
-          className="group relative flex h-full min-w-0 flex-1 flex-col items-center justify-end gap-px"
-        >
-          <div
-            className={cn('w-full min-h-[2px] rounded-[1px]', barClassName)}
-            style={{ height: `${(b.value / max) * 100}%` }}
-          />
-          <span className="absolute -bottom-4 font-mono text-[9px] text-muted-foreground/60">{b.label}</span>
-        </div>
-      ))}
-    </div>
-  )
+const CHART_CONFIG_RUNS: ChartConfig = {
+  value: {
+    label: 'Runs',
+    /** Near Tailwind `emerald-500` at ~80% fill — lighter than a deep forest green. */
+    color: 'oklch(0.78 0.14 158 / 0.78)',
+  },
+}
+
+const CHART_CONFIG_FAILURES: ChartConfig = {
+  value: {
+    label: 'Failed',
+    color: 'oklch(0.58 0.2 27 / 0.88)',
+  },
+}
+
+const CHART_CONFIG_COST: ChartConfig = {
+  value: {
+    label: 'Cost',
+    color: 'oklch(0.72 0.16 75 / 0.88)',
+  },
+}
+
+const CHART_CONFIG_ISSUES: ChartConfig = {
+  value: {
+    label: 'Issues',
+    color: 'oklch(0.62 0.14 240 / 0.88)',
+  },
 }
 
 function formatUsd(v: number): string {
@@ -243,6 +217,13 @@ export function AgentDashboardTab({
     { orgSlug, agentId },
     { skip: !orgSlug || !agentId },
   )
+
+  const dayGroups = groupRunsByDay(runs)
+  const runActivity = toBuckets(dayGroups, (rs) => rs.length)
+  const runFailures = toBuckets(dayGroups, (rs) => rs.filter((r) => r.status === 'failed' || r.status === 'timeout').length)
+  const runCost = toBuckets(dayGroups, (rs) => rs.reduce((sum, r) => sum + getRunCostUsd(r), 0))
+  const issueDayGroups = groupItemsByDay(MOCK_ISSUE_ROWS, (row) => row.createdAt.slice(0, 10))
+  const issueActivity = toBuckets(issueDayGroups, (rows) => rows.length)
 
   const renderRuns = () => (
     <section className="border border-border bg-card">
@@ -279,52 +260,37 @@ export function AgentDashboardTab({
     </section>
   )
 
-  const dayGroups = groupRunsByDay(runs)
-  const runActivity = toBuckets(dayGroups, (rs) => rs.length)
-  const runIssues = toBuckets(dayGroups, (rs) => rs.filter((r) => r.status === 'failed' || r.status === 'timeout').length)
-  const runCost = toBuckets(dayGroups, (rs) => rs.reduce((sum, r) => sum + getRunCostUsd(r), 0))
-  const hasRunActivity = runActivity.some((b) => b.value > 0)
-  const hasRunIssues = runIssues.some((b) => b.value > 0)
-  const hasRunCost = runCost.some((b) => b.value > 0)
-
   const renderCharts = () => (
     <div className="grid gap-3 md:grid-cols-2 2xl:grid-cols-4">
-      <div className="flex min-w-0 flex-col border border-border bg-card">
-        <div className="border-b border-border/60 px-2 py-1.5">
-          <p className="text-[12px] font-medium">Run activity</p>
-          <p className="text-[10px] text-muted-foreground">Last 7 days</p>
-        </div>
-        <div className={cn('p-2', hasRunActivity && 'pb-5')}>
-          <DayBucketChart buckets={runActivity} barClassName="bg-emerald-500/80" emptyLabel="No runs" />
-        </div>
-      </div>
-      <div className="flex min-w-0 flex-col border border-border bg-card">
-        <div className="border-b border-border/60 px-2 py-1.5">
-          <p className="text-[12px] font-medium">Run issues</p>
-          <p className="text-[10px] text-muted-foreground">Last 7 days</p>
-        </div>
-        <div className={cn('p-2', hasRunIssues && 'pb-5')}>
-          <DayBucketChart buckets={runIssues} barClassName="bg-red-500/80" emptyLabel="No issues" />
-        </div>
-      </div>
-      <div className="flex min-w-0 flex-col border border-border bg-card">
-        <div className="border-b border-border/60 px-2 py-1.5">
-          <p className="text-[12px] font-medium">Run cost</p>
-          <p className="text-[10px] text-muted-foreground">Last 7 days</p>
-        </div>
-        <div className={cn('p-2', hasRunCost && 'pb-5')}>
-          <DayBucketChart buckets={runCost} barClassName="bg-amber-500/80" emptyLabel="No cost" formatValue={formatUsd} />
-        </div>
-      </div>
-      <div className="flex min-w-0 flex-col border border-border bg-card">
-        <div className="border-b border-border/60 px-2 py-1.5">
-          <p className="text-[12px] font-medium">Success rate</p>
-          <p className="text-[10px] text-muted-foreground">Last 14 days</p>
-        </div>
-        <div className="p-2">
-          <MiniBars values={MOCK_CHART_SUCCESS_RATE} barClassName="bg-emerald-500/85" />
-        </div>
-      </div>
+      <AgentDashboardBarChartCard
+        title="Total runs"
+        subtitle="Last 7 days"
+        buckets={runActivity}
+        config={CHART_CONFIG_RUNS}
+        emptyLabel="No runs"
+      />
+      <AgentDashboardBarChartCard
+        title="Failed runs"
+        subtitle="Last 7 days"
+        buckets={runFailures}
+        config={CHART_CONFIG_FAILURES}
+        emptyLabel="No failures"
+      />
+      <AgentDashboardBarChartCard
+        title="Run cost"
+        subtitle="Last 7 days"
+        buckets={runCost}
+        config={CHART_CONFIG_COST}
+        emptyLabel="No cost"
+        formatTooltipValue={formatUsd}
+      />
+      <AgentDashboardBarChartCard
+        title="Issues created"
+        subtitle="Last 7 days"
+        buckets={issueActivity}
+        config={CHART_CONFIG_ISSUES}
+        emptyLabel="No issues"
+      />
     </div>
   )
 
@@ -344,7 +310,7 @@ export function AgentDashboardTab({
         }
       />
       <ul className="divide-y divide-border/60">
-        {MOCK_ISSUE_ROWS.map((row) => (
+        {[...MOCK_ISSUE_ROWS].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()).map((row) => (
           <li key={row.id} className="flex items-start gap-3 px-3 py-2">
             <span className="shrink-0 font-mono text-[10px] text-muted-foreground">{row.id}</span>
             <span className="min-w-0 flex-1 text-[12px] leading-snug">{row.title}</span>
