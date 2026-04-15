@@ -27,6 +27,10 @@ class Settings(BaseSettings):
     # Optional token to protect the org bootstrap endpoint
     setup_token: str | None = None
 
+    # Redis URL for Celery broker and pub/sub event streaming
+    redis_url: str | None = None
+    redis_password: str | None = None
+
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
 
 

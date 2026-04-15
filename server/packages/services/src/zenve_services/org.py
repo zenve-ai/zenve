@@ -30,7 +30,12 @@ class OrgService:
     def __init__(self, db: Session):
         self.db = db
 
-    def create(self, data: OrgCreate, owner_user_id: str) -> Organization:
+    def create_draft(self, data: OrgCreate, owner_user_id: str) -> Organization:
+        """Flush a new org + membership to the DB without committing.
+
+        Call commit_create() to finalize (with optional Redis credentials),
+        or rollback() to abort if a post-flush step (e.g. Redis ACL) fails.
+        """
         slug = data.slug or slugify(data.name)
         base_path = str(Path(get_settings().data_dir) / "orgs" / slug)
 
@@ -51,6 +56,28 @@ class OrgService:
         self.db.add(membership)
 
         try:
+            self.db.flush()
+        except IntegrityError as exc:
+            self.db.rollback()
+            raise HTTPException(
+                status_code=409,
+                detail=conflict_detail(exc),
+            ) from exc
+
+        return org
+
+    def commit_create(
+        self,
+        org: Organization,
+        redis_username: str | None = None,
+        redis_password_hash: str | None = None,
+    ) -> Organization:
+        """Commit the pending org creation. Sets Redis credentials if provided."""
+        if redis_username is not None:
+            org.redis_username = redis_username
+        if redis_password_hash is not None:
+            org.redis_password_hash = redis_password_hash
+        try:
             self.db.commit()
         except IntegrityError as exc:
             self.db.rollback()
@@ -59,10 +86,19 @@ class OrgService:
                 detail=conflict_detail(exc),
             ) from exc
         self.db.refresh(org)
-
-        Path(base_path).mkdir(parents=True, exist_ok=True)
-
+        Path(org.base_path).mkdir(parents=True, exist_ok=True)
         return org
+
+    def rollback(self) -> None:
+        """Discard any pending (unflushed or flushed) changes."""
+        self.db.rollback()
+
+    def delete(self, org_id: str) -> None:
+        """Hard-delete an org record. Caller is responsible for Redis ACL cleanup."""
+        org = self.db.get(Organization, org_id)
+        if org:
+            self.db.delete(org)
+            self.db.commit()
 
     def get_by_id(self, org_id: str) -> Organization:
         org = self.db.query(Organization).filter(Organization.id == org_id).first()

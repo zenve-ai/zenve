@@ -1,7 +1,19 @@
-# Application
-
 dev:
     API_RELOAD=true uv run --package zenve-api api-start
+
+# Database migrations (Alembic)
+
+migrate:
+    uv run alembic upgrade head
+
+migrate-down:
+    uv run alembic downgrade -1
+
+migrate-gen msg="migration":
+    uv run alembic revision --autogenerate -m "{{msg}}"
+
+cli *args:
+    uv run --package zenve-cli zenve {{args}}
 
 start:
     uv run --package zenve-api api-start

@@ -11,6 +11,7 @@ from zenve_services.auth import AuthService
 from zenve_services.filesystem import FilesystemService
 from zenve_services.membership import MembershipService
 from zenve_services.org import OrgService
+from zenve_services.redis_acl import RedisACLService
 from zenve_services.run import RunService
 from zenve_services.run_event import RunEventService
 from zenve_services.run_executor import RunExecutor
@@ -90,3 +91,12 @@ def get_run_executor(
     ws_manager: WebSocketManager = Depends(get_ws_manager),
 ) -> RunExecutor:
     return RunExecutor(adapter_registry, ws_manager)
+
+
+def get_redis_acl_service(
+    settings: Settings = Depends(get_settings),
+) -> RedisACLService | None:
+    """Return a RedisACLService if Redis is configured, else None."""
+    if not settings.redis_url:
+        return None
+    return RedisACLService(settings.redis_url, settings.redis_password)

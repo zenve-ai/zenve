@@ -15,6 +15,7 @@ only-include = ["README.md"]
 [tool.uv.workspace]
 members = [
     "apps/api",
+    "apps/cli",
     "packages/*",
 ]
 
@@ -26,9 +27,11 @@ zenve-utils = { workspace = true }
 zenve-services = { workspace = true }
 zenve-adapters = { workspace = true }
 zenve-scaffolding = { workspace = true }
+zenve-cli = { workspace = true }
 
 [dependency-groups]
 dev = [
+    "alembic>=1.13",
     "pyright>=1.1.407",
     "pytest>=8.0",
     "pytest-asyncio>=0.25",

@@ -1,0 +1,24 @@
+[project]
+name = "zenve-cli"
+version = "0.1.0"
+description = "Zenve CLI — auth and local daemon"
+requires-python = ">=3.11"
+dependencies = [
+    "typer[all]>=0.12",
+    "httpx>=0.27",
+    "celery[redis]>=5.3",
+    "redis>=5.0",
+    "python-dotenv>=1.0",
+    "zenve-adapters",
+    "zenve-models",
+]
+
+[project.scripts]
+zenve = "zenve_cli.cli:app"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/zenve_cli"]

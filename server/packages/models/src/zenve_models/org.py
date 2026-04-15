@@ -33,3 +33,12 @@ class OrgWithRoleResponse(OrgResponse):
 class OrgCreatedResponse(OrgResponse):
     api_key: ApiKeyCreated
     role: str = "owner"
+    # Shown once at creation time. None if Redis is not configured on this gateway.
+    # Must be saved by the caller immediately — the plain password is never stored.
+    redis_worker_url: str | None = None
+
+
+class OrgMeResponse(OrgResponse):
+    # Redis ACL username for this org's worker queue (e.g. "worker.acme").
+    # The password is not stored — it was returned once at org creation time.
+    redis_username: str | None = None
