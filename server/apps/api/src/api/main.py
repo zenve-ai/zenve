@@ -16,6 +16,7 @@ from api.routes import (
     run_router,
     sessions_router,
     template_router,
+    worker_router,
     ws_router,
 )
 
@@ -45,6 +46,7 @@ app.include_router(run_router)
 app.include_router(sessions_router)
 app.include_router(preset_router)
 app.include_router(template_router)
+app.include_router(worker_router)
 app.include_router(ws_router)
 
 logging.basicConfig(

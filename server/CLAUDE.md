@@ -25,6 +25,7 @@ server/
 - Thin wrappers only — no business logic, no db queries
 - Only call services via `Depends()`
 - Import from `zenve_services`, never from `zenve_db` directly
+- No helper functions — move any utility logic to `zenve_utils`
 
 ### Services (`packages/services/`)
 - All business logic lives here
@@ -72,7 +73,7 @@ Two auth systems coexist — use the right one for each context:
 - **Used for:** Agent routes (`/api/v1/agents`), API key management (`/api/v1/api-keys`)
 
 ### User–Org Membership
-- `UserOrgMembership` join table links users to orgs with roles: `owner`, `admin`, `member`
+- `Membership` join table links users to orgs with roles: `owner`, `admin`, `member`
 - Org creation requires a logged-in user who becomes the `owner`
 - `MembershipService.require_membership()` — verifies user belongs to org (403 if not)
 - `MembershipService.require_role()` — verifies user has specific role(s) (403 if not)
@@ -95,6 +96,7 @@ Two auth systems coexist — use the right one for each context:
 - `get_db` used directly in a route handler
 - Pydantic models defined inside `apps/api/`
 - Business logic (db queries, conditionals) inside route handlers
+- Helper functions defined inside `apps/api/routes/` — move to `zenve_utils`
 
 ## Development Commands
 

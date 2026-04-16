@@ -61,7 +61,10 @@ async def trigger_run(
         session_id=body.session_id,
     )
 
-    await ws_manager.broadcast(org.id, {"type": "run.created", "data": RunResponse.model_validate(run).model_dump(mode="json")})
+    await ws_manager.broadcast(
+        org.id,
+        {"type": "run.created", "data": RunResponse.model_validate(run).model_dump(mode="json")},
+    )
     asyncio.ensure_future(run_executor.execute(run.id, ctx))
 
     return run
@@ -83,8 +86,12 @@ def list_runs(
     org = org_service.get_by_id_or_slug(org_id)
     membership_service.require_membership(user.id, org.id)
     return run_service.list_runs(
-        org.id, agent_id=agent_id, status=run_status, trigger=trigger,
-        session_id=session_id, limit=limit,
+        org.id,
+        agent_id=agent_id,
+        status=run_status,
+        trigger=trigger,
+        session_id=session_id,
+        limit=limit,
     )
 
 
@@ -137,7 +144,7 @@ async def stream_run_events(
     membership_service.require_membership(user.id, org.id)
     run_service.get_by_id(org.id, run_id)  # 404 if not found
 
-    TERMINAL = {"completed", "failed", "cancelled", "timeout"}
+    terminal = {"completed", "failed", "cancelled", "timeout"}
 
     async def event_generator():
         cursor = after
@@ -151,7 +158,7 @@ async def stream_run_events(
                 cursor = event.id
 
             run = run_service.get_by_id(org.id, run_id)
-            if run.status in TERMINAL and not events:
+            if run.status in terminal and not events:
                 break
 
             await asyncio.sleep(poll_interval)

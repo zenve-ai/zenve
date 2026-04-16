@@ -31,14 +31,21 @@ class RedisACLService:
         r = aioredis.from_url(self._url, password=self._password, decode_responses=True)
         try:
             await r.execute_command(
-                "ACL", "SETUSER", username,
+                "ACL",
+                "SETUSER",
+                username,
                 "on",
                 f">{password}",
                 f"~celery.worker.{slug}*",
                 f"~_kombu.binding.worker.{slug}*",
                 "&*",
-                "+LPUSH", "+RPOP", "+BRPOP", "+LLEN",
-                "+SUBSCRIBE", "+UNSUBSCRIBE", "+PUBLISH",
+                "+LPUSH",
+                "+RPOP",
+                "+BRPOP",
+                "+LLEN",
+                "+SUBSCRIBE",
+                "+UNSUBSCRIBE",
+                "+PUBLISH",
             )
             logger.info("Created Redis ACL user: %s", username)
         finally:

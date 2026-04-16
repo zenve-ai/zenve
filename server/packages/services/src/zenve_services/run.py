@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import uuid
+from datetime import UTC, datetime
 from pathlib import Path
 
 from fastapi import HTTPException
@@ -121,6 +122,34 @@ class RunService:
             .first()
             is not None
         )
+
+    def get_for_worker(self, run_id: str, org_id: str) -> Run:
+        """Fetch a run and verify org ownership. Used by daemon endpoints."""
+        run = self.db.get(Run, run_id)
+        if not run or run.org_id != org_id:
+            raise HTTPException(status_code=404, detail="Run not found")
+        return run
+
+    def complete_from_worker(
+        self,
+        run: Run,
+        exit_code: int,
+        stderr: str | None,
+        token_usage: dict | None,
+    ) -> Run:
+        if run.status not in ("queued", "running"):
+            raise HTTPException(
+                status_code=409, detail=f"Run already in terminal state: {run.status}"
+            )
+        run.status = "completed" if exit_code == 0 else "failed"
+        run.exit_code = exit_code
+        run.token_usage = token_usage
+        run.finished_at = datetime.now(UTC)
+        if stderr:
+            run.error_summary = stderr[:500]
+        self.db.commit()
+        self.db.refresh(run)
+        return run
 
     def cancel_run(self, run: Run) -> Run:
         if run.status not in ("queued", "running"):

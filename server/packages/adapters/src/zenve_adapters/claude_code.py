@@ -91,7 +91,9 @@ class ClaudeCodeAdapter(BaseAdapter):
             **ctx.env_vars,
         }
 
-        args = self.build_cli_args(config, message, system_prompt, ctx.tools, session_id=ctx.session_id)
+        args = self.build_cli_args(
+            config, message, system_prompt, ctx.tools, session_id=ctx.session_id
+        )
 
         proc = await asyncio.create_subprocess_exec(
             *args,
@@ -134,7 +136,11 @@ class ClaudeCodeAdapter(BaseAdapter):
                 captured_session = parsed.get("session_id", "unknown")
                 if session_id is None:
                     session_id = captured_session
-                event = ("output", f"Session started: {captured_session}", {"session_id": captured_session})
+                event = (
+                    "output",
+                    f"Session started: {captured_session}",
+                    {"session_id": captured_session},
+                )
 
             elif event_type == "assistant":
                 blocks = parsed.get("message", {}).get("content", "")
@@ -168,7 +174,11 @@ class ClaudeCodeAdapter(BaseAdapter):
                     for block in content_blocks:
                         if block.get("type") == "tool_result":
                             result_content = str(block.get("content", ""))
-                            summary = result_content[:500] + "..." if len(result_content) > 500 else result_content
+                            summary = (
+                                result_content[:500] + "..."
+                                if len(result_content) > 500
+                                else result_content
+                            )
                             event = (
                                 "tool_result",
                                 summary,

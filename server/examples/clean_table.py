@@ -1,6 +1,7 @@
 import sys
 
 from sqlalchemy import text
+
 from zenve_db.database import Session
 
 
@@ -19,9 +20,10 @@ def clean_table(table_name: str) -> None:
         print(f"Deleted {result.rowcount} rows from {table_name}")
     except Exception as e:
         db.rollback()
-        raise RuntimeError(f"Failed to clean table {table_name}: {e}")
+        raise RuntimeError(f"Failed to clean table {table_name}: {e}") from e
     finally:
         db.close()
+
 
 if __name__ == "__main__":
     if len(sys.argv) < 2:

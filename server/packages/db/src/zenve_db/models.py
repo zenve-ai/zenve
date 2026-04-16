@@ -18,7 +18,7 @@ class UserRecord(Base):
     password_hash: Mapped[str | None] = mapped_column(nullable=True)
     created_at: Mapped[datetime] = mapped_column(default=func.now())
 
-    memberships: Mapped[list["UserOrgMembership"]] = relationship(
+    memberships: Mapped[list["Membership"]] = relationship(
         back_populates="user", cascade="all, delete-orphan"
     )
 
@@ -30,9 +30,7 @@ class Organization(Base):
     name: Mapped[str] = mapped_column(unique=True, nullable=False)
     slug: Mapped[str] = mapped_column(unique=True, nullable=False)
     base_path: Mapped[str] = mapped_column(nullable=False)
-    # Redis ACL worker user — provisioned on org create, shown once in creation response
-    redis_username: Mapped[str | None] = mapped_column(String(128), nullable=True)
-    redis_password_hash: Mapped[str | None] = mapped_column(nullable=True)
+    redis_worker_url: Mapped[str | None] = mapped_column(nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(default=func.now())
     updated_at: Mapped[datetime] = mapped_column(default=func.now(), onupdate=func.now())
@@ -43,7 +41,7 @@ class Organization(Base):
     agents: Mapped[list["Agent"]] = relationship(
         back_populates="organization", cascade="all, delete-orphan"
     )
-    memberships: Mapped[list["UserOrgMembership"]] = relationship(
+    memberships: Mapped[list["Membership"]] = relationship(
         back_populates="organization", cascade="all, delete-orphan"
     )
     runs: Mapped[list["Run"]] = relationship(
@@ -51,8 +49,8 @@ class Organization(Base):
     )
 
 
-class UserOrgMembership(Base):
-    __tablename__ = "user_org_memberships"
+class Membership(Base):
+    __tablename__ = "memberships"
     __table_args__ = (UniqueConstraint("user_id", "org_id"),)
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))

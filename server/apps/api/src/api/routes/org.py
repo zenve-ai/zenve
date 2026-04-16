@@ -1,5 +1,4 @@
 import secrets
-from urllib.parse import urlparse, urlunparse
 
 from fastapi import APIRouter, Depends, HTTPException, status
 
@@ -9,7 +8,6 @@ from zenve_models.api_key import ApiKeyCreate, ApiKeyCreated, ApiKeyResponse
 from zenve_models.org import (
     OrgCreate,
     OrgCreatedResponse,
-    OrgMeResponse,
     OrgResponse,
     OrgUpdate,
     OrgWithRoleResponse,
@@ -21,36 +19,13 @@ from zenve_services import (
     get_redis_acl_service,
 )
 from zenve_services.api_key import ApiKeyService
-from zenve_services.api_key_auth import get_current_org
 from zenve_services.membership import MembershipService
 from zenve_services.org import OrgService
 from zenve_services.redis_acl import RedisACLService
-from zenve_utils.api_key import hash_api_key
 from zenve_utils.auth import get_current_user
+from zenve_utils.redis import build_redis_worker_url
 
 router = APIRouter(prefix="/api/v1/orgs", tags=["organizations"])
-
-
-def build_redis_worker_url(base_url: str, username: str, password: str) -> str:
-    """Embed org worker credentials into the gateway's Redis URL."""
-    p = urlparse(base_url)
-    netloc = f"{username}:{password}@{p.hostname}"
-    if p.port:
-        netloc += f":{p.port}"
-    return urlunparse(p._replace(netloc=netloc))
-
-
-@router.get("/me", response_model=OrgMeResponse)
-def get_org_me(
-    auth: tuple[Organization, ApiKeyRecord] = Depends(get_current_org),
-):
-    """Return the org identified by the API key.
-
-    Includes redis_username for the org's worker queue.
-    The Redis password is never returned here — it was shown once at org creation.
-    """
-    org, _ = auth
-    return OrgMeResponse.model_validate(org, from_attributes=True)
 
 
 @router.post("", response_model=OrgCreatedResponse, status_code=status.HTTP_201_CREATED)
@@ -66,8 +41,6 @@ async def create_org(
     org = org_service.create_draft(body, owner_user_id=user.id)
 
     redis_worker_url = None
-    redis_username = None
-    redis_password_hash = None
 
     if redis_acl:
         plain_password = secrets.token_urlsafe(32)
@@ -80,15 +53,12 @@ async def create_org(
                 detail=f"Org created but Redis worker user failed: {exc}",
             ) from exc
 
-        redis_username = f"worker.{org.slug}"
-        redis_password_hash = hash_api_key(plain_password)
-        redis_worker_url = build_redis_worker_url(settings.redis_url, redis_username, plain_password)
+        assert settings.redis_url is not None
+        redis_worker_url = build_redis_worker_url(
+            settings.redis_url, f"worker.{org.slug}", plain_password
+        )
 
-    org = org_service.commit_create(
-        org,
-        redis_username=redis_username,
-        redis_password_hash=redis_password_hash,
-    )
+    org = org_service.commit_create(org, redis_worker_url=redis_worker_url)
 
     key_data = ApiKeyCreate(name="Default API Key")
     record, raw_key = api_key_service.create(org.id, key_data)
@@ -114,7 +84,7 @@ async def delete_org(
     org = org_service.get_by_id_or_slug(org_id)
     membership_service.require_role(user.id, org.id, ["owner"])
 
-    if redis_acl and org.redis_username:
+    if redis_acl and org.redis_worker_url:
         # Failure is logged inside delete_org_user but does not block deletion.
         await redis_acl.delete_org_user(org.slug)
 

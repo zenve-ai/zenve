@@ -47,7 +47,9 @@ def setup_adapters(app: FastAPI):
     logger.info(f"Adapters initialized: {registry.known_types()}")
 
 
-async def run_redis_subscriber(ws_manager: WebSocketManager, redis_url: str, redis_password: str | None = None) -> None:
+async def run_redis_subscriber(
+    ws_manager: WebSocketManager, redis_url: str, redis_password: str | None = None
+) -> None:
     """Background task: subscribe to run:*:events pub/sub and push to WebSocket clients."""
     try:
         import redis.asyncio as aioredis
@@ -116,7 +118,9 @@ async def setup_redis(ws_manager: WebSocketManager) -> asyncio.Task | None:
     settings = get_settings()
     redis_url = settings.redis_url
     if redis_url:
-        task = asyncio.create_task(run_redis_subscriber(ws_manager, redis_url, settings.redis_password))
+        task = asyncio.create_task(
+            run_redis_subscriber(ws_manager, redis_url, settings.redis_password)
+        )
         logger.info("Redis event subscriber started")
         return task
     logger.info("No REDIS_URL configured — Redis event subscriber disabled")

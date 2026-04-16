@@ -39,6 +39,4 @@ class OrgCreatedResponse(OrgResponse):
 
 
 class OrgMeResponse(OrgResponse):
-    # Redis ACL username for this org's worker queue (e.g. "worker.acme").
-    # The password is not stored — it was returned once at org creation time.
-    redis_username: str | None = None
+    redis_worker_url: str | None = None

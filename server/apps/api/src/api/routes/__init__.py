@@ -7,6 +7,7 @@ from .preset import router as preset_router
 from .run import router as run_router
 from .run import sessions_router
 from .template import router as template_router
+from .worker import router as worker_router
 from .ws import router as ws_router
 
 __all__ = [
@@ -19,5 +20,6 @@ __all__ = [
     "run_router",
     "sessions_router",
     "template_router",
+    "worker_router",
     "ws_router",
 ]

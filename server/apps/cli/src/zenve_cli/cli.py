@@ -25,24 +25,22 @@ def login() -> None:
         org_data = client.verify_credentials()
     except GatewayError as exc:
         typer.echo(f"✗ Authentication failed: {exc.body}")
-        raise typer.Exit(1)
+        raise typer.Exit(1) from exc
     except Exception as exc:
         typer.echo(f"✗ Could not reach gateway: {exc}")
-        raise typer.Exit(1)
+        raise typer.Exit(1) from exc
     finally:
         client.close()
 
     org_slug = org_data.get("slug", "unknown")
-    redis_url = org_data.get("redis_url", "redis://localhost:6379/0")
-    redis_password = org_data.get("redis_password")
+    redis_worker_url = org_data.get("redis_worker_url")
 
     save_credentials(
         {
             "gateway_url": gateway_url,
             "api_key": api_key,
             "org_slug": org_slug,
-            "redis_url": redis_url,
-            "redis_password": redis_password,
+            "redis_worker_url": redis_worker_url,
             "connected_at": datetime.now(UTC).isoformat(),
         }
     )
@@ -79,7 +77,7 @@ def daemon_start() -> None:
         client.register_worker(org_slug, queue, runtimes)
     except GatewayError as exc:
         typer.echo(f"✗ Worker registration failed: {exc.body}")
-        raise typer.Exit(1)
+        raise typer.Exit(1) from exc
     finally:
         client.close()
 

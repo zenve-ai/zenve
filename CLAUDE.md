@@ -14,7 +14,7 @@ agents/   # Agent definitions
 
 - **JWT auth** — user login/signup, used for org CRUD (`/api/v1/orgs`)
 - **API key auth** — programmatic access, used for agent/api-key routes
-- **User–Org membership** — `UserOrgMembership` table with roles (`owner`, `admin`, `member`)
+- **User–Org membership** — `Membership` table with roles (`owner`, `admin`, `member`)
 - See [server/CLAUDE.md](server/CLAUDE.md) for full auth details
 
 ## Sub-project docs

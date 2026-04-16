@@ -28,26 +28,26 @@ class GatewayClient:
             raise GatewayError(response.status_code, response.text)
 
     def verify_credentials(self) -> dict:
-        resp = self.client.get(f"{self.gateway_url}/orgs/me")
+        resp = self.client.get(f"{self.gateway_url}/worker/org")
         self._raise_for_status(resp)
         return resp.json()
 
     def register_worker(self, org_slug: str, queue: str, runtimes: list[str]) -> dict:
         resp = self.client.post(
-            f"{self.gateway_url}/internal/worker/register",
+            f"{self.gateway_url}/worker/register",
             json={"org_slug": org_slug, "queue": queue, "runtimes": runtimes},
         )
         self._raise_for_status(resp)
         return resp.json()
 
     def get_run_context(self, run_id: str) -> dict:
-        resp = self.client.get(f"{self.gateway_url}/internal/runs/{run_id}/context")
+        resp = self.client.get(f"{self.gateway_url}/worker/runs/{run_id}/context")
         self._raise_for_status(resp)
         return resp.json()
 
     def complete_run(self, run_id: str, payload: dict) -> dict:
         resp = self.client.post(
-            f"{self.gateway_url}/internal/runs/{run_id}/complete",
+            f"{self.gateway_url}/worker/runs/{run_id}/complete",
             json=payload,
         )
         self._raise_for_status(resp)

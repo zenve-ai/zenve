@@ -7,7 +7,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from zenve_config.settings import get_settings
-from zenve_db.models import Organization, UserOrgMembership
+from zenve_db.models import Membership, Organization
 from zenve_models.org import OrgCreate, OrgUpdate
 
 
@@ -47,7 +47,7 @@ class OrgService:
         )
         self.db.add(org)
 
-        membership = UserOrgMembership(
+        membership = Membership(
             id=str(uuid.uuid4()),
             user_id=owner_user_id,
             org_id=org.id,
@@ -69,14 +69,11 @@ class OrgService:
     def commit_create(
         self,
         org: Organization,
-        redis_username: str | None = None,
-        redis_password_hash: str | None = None,
+        redis_worker_url: str | None = None,
     ) -> Organization:
-        """Commit the pending org creation. Sets Redis credentials if provided."""
-        if redis_username is not None:
-            org.redis_username = redis_username
-        if redis_password_hash is not None:
-            org.redis_password_hash = redis_password_hash
+        """Commit the pending org creation. Sets Redis worker URL if provided."""
+        if redis_worker_url is not None:
+            org.redis_worker_url = redis_worker_url
         try:
             self.db.commit()
         except IntegrityError as exc:
@@ -124,9 +121,9 @@ class OrgService:
 
     def list_for_user(self, user_id: str) -> list[tuple[Organization, str]]:
         return (
-            self.db.query(Organization, UserOrgMembership.role)
-            .join(UserOrgMembership, UserOrgMembership.org_id == Organization.id)
-            .filter(UserOrgMembership.user_id == user_id)
+            self.db.query(Organization, Membership.role)
+            .join(Membership, Membership.org_id == Organization.id)
+            .filter(Membership.user_id == user_id)
             .all()
         )
 

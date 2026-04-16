@@ -12,7 +12,6 @@ from zenve_config.settings import get_settings
 from zenve_db.database import Session
 from zenve_db.models import Agent, Run
 from zenve_models.adapter import RunContext, RunResult
-from zenve_models.run import RunResponse
 from zenve_models.run_event import RunEventResponse
 from zenve_services.run_event import RunEventService
 
@@ -23,7 +22,9 @@ logger = logging.getLogger(__name__)
 
 
 class RunExecutor:
-    def __init__(self, adapter_registry: AdapterRegistry, ws_manager: WebSocketManager | None = None):
+    def __init__(
+        self, adapter_registry: AdapterRegistry, ws_manager: WebSocketManager | None = None
+    ):
         self.adapter_registry = adapter_registry
         self.ws_manager = ws_manager
 
@@ -72,13 +73,20 @@ class RunExecutor:
         ws = self.ws_manager
         org_id = ctx.org_id
 
-        def on_event(event_type: str, content: str | None = None, metadata: dict | None = None) -> None:
+        def on_event(
+            event_type: str, content: str | None = None, metadata: dict | None = None
+        ) -> None:
             ev_db = Session()
             try:
-                event = RunEventService(ev_db).create(run_id=run_id, event_type=event_type, content=content, meta=metadata)
+                event = RunEventService(ev_db).create(
+                    run_id=run_id, event_type=event_type, content=content, meta=metadata
+                )
                 logger.info("[RUN] (%s, %s, %s)", event_type, content, metadata)
                 if ws:
-                    payload = {"type": "run.event", "data": RunEventResponse.model_validate(event).model_dump(mode="json")}
+                    payload = {
+                        "type": "run.event",
+                        "data": RunEventResponse.model_validate(event).model_dump(mode="json"),
+                    }
                     asyncio.ensure_future(ws.broadcast(org_id, payload))
             except Exception:
                 logger.exception("Failed to persist run event for run %s", run_id)
@@ -101,10 +109,17 @@ class RunExecutor:
             logger.info(f"Run started: {run_id}")
 
             if ws:
-                await ws.broadcast(org_id, {
-                    "type": "run.status_changed",
-                    "data": {"run_id": run_id, "status": "running", "started_at": run.started_at.isoformat()},
-                })
+                await ws.broadcast(
+                    org_id,
+                    {
+                        "type": "run.status_changed",
+                        "data": {
+                            "run_id": run_id,
+                            "status": "running",
+                            "started_at": run.started_at.isoformat(),
+                        },
+                    },
+                )
 
             adapter = self.adapter_registry.get(ctx.adapter_type)
             result: RunResult = await adapter.execute(ctx)
@@ -133,15 +148,18 @@ class RunExecutor:
             db.refresh(run)
 
             if ws:
-                await ws.broadcast(org_id, {
-                    "type": "run.finished",
-                    "data": {
-                        "run_id": run_id,
-                        "status": run.status,
-                        "outcome": run.outcome,
-                        "finished_at": run.finished_at.isoformat(),
+                await ws.broadcast(
+                    org_id,
+                    {
+                        "type": "run.finished",
+                        "data": {
+                            "run_id": run_id,
+                            "status": run.status,
+                            "outcome": run.outcome,
+                            "finished_at": run.finished_at.isoformat(),
+                        },
                     },
-                })
+                )
 
         except Exception as exc:
             logger.exception("Run %s raised an unexpected error", run_id)
@@ -154,15 +172,18 @@ class RunExecutor:
                     run.error_summary = str(exc)
                     db.commit()
                     if ws and run:
-                        await ws.broadcast(org_id, {
-                            "type": "run.finished",
-                            "data": {
-                                "run_id": run_id,
-                                "status": "failed",
-                                "outcome": None,
-                                "finished_at": run.finished_at.isoformat(),
+                        await ws.broadcast(
+                            org_id,
+                            {
+                                "type": "run.finished",
+                                "data": {
+                                    "run_id": run_id,
+                                    "status": "failed",
+                                    "outcome": None,
+                                    "finished_at": run.finished_at.isoformat(),
+                                },
                             },
-                        })
+                        )
             except Exception:
                 logger.exception("Failed to mark run %s as failed after error", run_id)
         finally:
