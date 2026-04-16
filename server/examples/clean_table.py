@@ -1,4 +1,5 @@
 import sys
+from typing import Any
 
 from sqlalchemy import text
 
@@ -14,7 +15,7 @@ def clean_table(table_name: str) -> None:
     db = Session()
     try:
         query = text(f"DELETE FROM {table_name}")
-        result = db.execute(query)
+        result: Any = db.execute(query)
         db.commit()
 
         print(f"Deleted {result.rowcount} rows from {table_name}")

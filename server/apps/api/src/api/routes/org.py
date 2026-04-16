@@ -3,7 +3,7 @@ import secrets
 from fastapi import APIRouter, Depends, HTTPException, status
 
 from zenve_config.settings import Settings, get_settings
-from zenve_db.models import ApiKeyRecord, Organization, UserRecord
+from zenve_db.models import UserRecord
 from zenve_models.api_key import ApiKeyCreate, ApiKeyCreated, ApiKeyResponse
 from zenve_models.org import (
     OrgCreate,

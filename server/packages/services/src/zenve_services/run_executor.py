@@ -109,6 +109,7 @@ class RunExecutor:
             logger.info(f"Run started: {run_id}")
 
             if ws:
+                started_at = run.started_at
                 await ws.broadcast(
                     org_id,
                     {
@@ -116,7 +117,7 @@ class RunExecutor:
                         "data": {
                             "run_id": run_id,
                             "status": "running",
-                            "started_at": run.started_at.isoformat(),
+                            "started_at": started_at.isoformat() if started_at else None,
                         },
                     },
                 )
@@ -148,6 +149,7 @@ class RunExecutor:
             db.refresh(run)
 
             if ws:
+                finished_at = run.finished_at
                 await ws.broadcast(
                     org_id,
                     {
@@ -156,7 +158,7 @@ class RunExecutor:
                             "run_id": run_id,
                             "status": run.status,
                             "outcome": run.outcome,
-                            "finished_at": run.finished_at.isoformat(),
+                            "finished_at": finished_at.isoformat() if finished_at else None,
                         },
                     },
                 )
@@ -172,6 +174,7 @@ class RunExecutor:
                     run.error_summary = str(exc)
                     db.commit()
                     if ws and run:
+                        err_finished_at = run.finished_at
                         await ws.broadcast(
                             org_id,
                             {
@@ -180,7 +183,7 @@ class RunExecutor:
                                     "run_id": run_id,
                                     "status": "failed",
                                     "outcome": None,
-                                    "finished_at": run.finished_at.isoformat(),
+                                    "finished_at": err_finished_at.isoformat() if err_finished_at else None,
                                 },
                             },
                         )

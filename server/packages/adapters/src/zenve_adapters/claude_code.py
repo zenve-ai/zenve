@@ -114,6 +114,7 @@ class ClaudeCodeAdapter(BaseAdapter):
         outcome: str | None = None
         session_id: str | None = ctx.session_id
 
+        assert proc.stdout is not None
         async for raw_line in proc.stdout:
             line = raw_line.decode(errors="replace").strip()
             if not line:

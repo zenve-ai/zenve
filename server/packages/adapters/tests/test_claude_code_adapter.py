@@ -310,7 +310,7 @@ async def test_on_event_result_usage():
     assert len(events) == 1
     event_type, content, meta = events[0]
     assert event_type == "usage"
-    assert content is None
+    assert content == "Cost: 0.05"
     assert meta == {
         "input_tokens": 100,
         "output_tokens": 50,

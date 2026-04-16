@@ -49,7 +49,7 @@ docker-logs:
 
 # Testing
 
-test path="packages/adapters/tests":
+test path="packages":
     uv run pytest {{path}} -v
 
 test-file file:

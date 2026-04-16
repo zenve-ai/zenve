@@ -120,12 +120,13 @@ class OrgService:
         return self.db.query(Organization).all()
 
     def list_for_user(self, user_id: str) -> list[tuple[Organization, str]]:
-        return (
+        rows = (
             self.db.query(Organization, Membership.role)
             .join(Membership, Membership.org_id == Organization.id)
             .filter(Membership.user_id == user_id)
             .all()
         )
+        return [(org, role) for org, role in rows]
 
     def update(self, org_id: str, data: OrgUpdate) -> Organization:
         org = self.get_by_id(org_id)
