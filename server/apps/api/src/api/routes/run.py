@@ -9,11 +9,13 @@ from zenve_models.run_event import RunEventResponse
 from zenve_services import (
     get_membership_service,
     get_org_service,
+    get_run_dispatch_service,
     get_run_event_service,
     get_run_executor,
     get_run_service,
     get_ws_manager,
 )
+from zenve_services.run_dispatch import RunDispatchService
 from zenve_services.membership import MembershipService
 from zenve_services.org import OrgService
 from zenve_services.run import RunService
@@ -67,6 +69,45 @@ async def trigger_run(
     )
     asyncio.ensure_future(run_executor.execute(run.id, ctx))
 
+    return run
+
+
+@router.post("/queue", response_model=RunResponse, status_code=status.HTTP_202_ACCEPTED)
+async def queue_run(
+    org_id: str,
+    body: RunCreate,
+    user: UserRecord = Depends(get_current_user),
+    org_service: OrgService = Depends(get_org_service),
+    membership_service: MembershipService = Depends(get_membership_service),
+    run_service: RunService = Depends(get_run_service),
+    dispatch_service: RunDispatchService | None = Depends(get_run_dispatch_service),
+    ws_manager: WebSocketManager = Depends(get_ws_manager),
+):
+    from fastapi import HTTPException
+
+    if dispatch_service is None:
+        raise HTTPException(status_code=503, detail="Redis not configured")
+
+    org = org_service.get_by_id_or_slug(org_id)
+    membership_service.require_membership(user.id, org.id)
+
+    agent = run_service.get_agent_for_run(org.id, body.agent)
+    agent.organization = org
+
+    run = run_service.create_run(
+        org_id=org.id,
+        agent_id=agent.id,
+        trigger="manual",
+        adapter_type=body.adapter_type or agent.adapter_type,
+        message=body.message,
+        session_id=body.session_id,
+    )
+
+    await ws_manager.broadcast(
+        org.id,
+        {"type": "run.created", "data": RunResponse.model_validate(run).model_dump(mode="json")},
+    )
+    dispatch_service.publish_run(org.slug, run.id)
     return run
 
 

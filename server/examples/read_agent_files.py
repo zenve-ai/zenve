@@ -30,8 +30,8 @@ def main() -> None:
 
     for item in result:
         print(f"─── {item['path']}")
-        print(item["content"])
-        print()
+        # print(item["content"])
+        # print()
 
 
 if __name__ == "__main__":

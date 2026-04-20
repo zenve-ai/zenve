@@ -13,6 +13,7 @@ from zenve_services.membership import MembershipService
 from zenve_services.org import OrgService
 from zenve_services.redis_acl import RedisACLService
 from zenve_services.run import RunService
+from zenve_services.run_dispatch import RunDispatchService
 from zenve_services.run_event import RunEventService
 from zenve_services.run_executor import RunExecutor
 from zenve_services.template import TemplateService
@@ -100,3 +101,12 @@ def get_redis_acl_service(
     if not settings.redis_url:
         return None
     return RedisACLService(settings.redis_url, settings.redis_password)
+
+
+def get_run_dispatch_service(
+    settings: Settings = Depends(get_settings),
+) -> RunDispatchService | None:
+    """Return a RunDispatchService if Redis is configured, else None."""
+    if not settings.redis_url:
+        return None
+    return RunDispatchService(settings.redis_url, settings.redis_password)
