@@ -13,7 +13,7 @@ function buildWsUrl(projectId: string, token: string): string {
   const base = config.apiUrl
     .replace(/^https:\/\//, 'wss://')
     .replace(/^http:\/\//, 'ws://')
-  return `${base}/v1/projects/${projectId}/ws?token=${encodeURIComponent(token)}`
+  return `${base}/projects/${projectId}/ws?token=${encodeURIComponent(token)}`
 }
 
 export function useProjectWebSocket(projectId: string): void {
