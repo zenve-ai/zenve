@@ -23,14 +23,10 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { SidebarMenu, SidebarMenuButton, SidebarMenuItem } from '@/components/ui/sidebar'
 import { useAppDispatch, useAppSelector } from '@/store/hooks'
-import {
-  selectCurrentOrganization,
-  selectOrganizations,
-  setCurrentOrganization,
-} from '@/store/organization'
-import type { OrganizationIconKey } from '@/types'
+import { selectCurrentProject, selectProjects, setCurrentProject } from '@/store/project'
+import type { ProjectIconKey } from '@/types'
 
-const ORG_ICONS: Record<OrganizationIconKey, LucideIcon> = {
+const PROJECT_ICONS: Record<ProjectIconKey, LucideIcon> = {
   zap: Zap,
   triangle: Triangle,
   box: Box,
@@ -52,11 +48,11 @@ const MOD_SYMBOL =
     ? '⌘'
     : 'Ctrl+'
 
-export function OrganizationSwitcher() {
+export function ProjectSwitcher() {
   const dispatch = useAppDispatch()
   const navigate = useNavigate()
-  const organizations = useAppSelector(selectOrganizations)
-  const current = useAppSelector(selectCurrentOrganization)
+  const projects = useAppSelector(selectProjects)
+  const current = useAppSelector(selectCurrentProject)
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
@@ -66,19 +62,19 @@ export function OrganizationSwitcher() {
       const match = /^Digit([1-9])$/.exec(e.code)
       if (!match) return
       const index = Number(match[1]) - 1
-      const org = organizations[index]
-      if (!org) return
+      const project = projects[index]
+      if (!project) return
       e.preventDefault()
-      dispatch(setCurrentOrganization(org.id))
-      navigate(`/${org.slug}`)
+      dispatch(setCurrentProject(project.id))
+      navigate(`/${project.slug}`)
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [dispatch, navigate, organizations])
+  }, [dispatch, navigate, projects])
 
   if (!current) return null
 
-  const CurrentIcon = ORG_ICONS[current.iconKey] ?? Box
+  const CurrentIcon = PROJECT_ICONS[current.iconKey] ?? Box
 
   return (
     <SidebarMenu>
@@ -101,36 +97,36 @@ export function OrganizationSwitcher() {
           </DropdownMenuTrigger>
           <DropdownMenuContent className="w-[--radix-dropdown-menu-trigger-width] min-w-56" align="start">
             <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">
-              Organizations
+              Projects
             </DropdownMenuLabel>
             <DropdownMenuGroup>
-              {organizations.map((org, i) => {
-                const Icon = ORG_ICONS[org.iconKey] ?? Box
+              {projects.map((project, i) => {
+                const Icon = PROJECT_ICONS[project.iconKey] ?? Box
                 const shortcut = i < 9 ? `${MOD_SYMBOL}${i + 1}` : undefined
                 return (
                   <DropdownMenuItem
-                    key={org.id}
+                    key={project.id}
                     className="gap-2"
                     onSelect={() => {
-                      dispatch(setCurrentOrganization(org.id))
-                      navigate(`/${org.slug}`)
+                      dispatch(setCurrentProject(project.id))
+                      navigate(`/${project.slug}`)
                     }}
                   >
                     <div className="flex size-8 shrink-0 items-center justify-center rounded-md border bg-muted/40">
                       <Icon className="size-4 text-muted-foreground" />
                     </div>
-                    <span className="min-w-0 flex-1 truncate">{org.name}</span>
+                    <span className="min-w-0 flex-1 truncate">{project.name}</span>
                     {shortcut ? <DropdownMenuShortcut>{shortcut}</DropdownMenuShortcut> : null}
                   </DropdownMenuItem>
                 )
               })}
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
-            <DropdownMenuItem className="gap-2" onSelect={() => navigate('/create-organization')}>
+            <DropdownMenuItem className="gap-2" onSelect={() => navigate('/onboarding')}>
               <div className="flex size-8 shrink-0 items-center justify-center rounded-md border bg-muted/40">
                 <Plus className="size-4 text-muted-foreground" />
               </div>
-              <span>Create organization</span>
+              <span>Create project</span>
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>

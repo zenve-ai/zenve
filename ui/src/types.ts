@@ -17,7 +17,7 @@ export interface SignupData {
 }
 
 /** Discriminator for Lucide icon mapping in the UI (Redux stays serializable). */
-export type OrganizationIconKey =
+export type ProjectIconKey =
   | 'zap'
   | 'triangle'
   | 'box'
@@ -25,12 +25,12 @@ export type OrganizationIconKey =
   | 'building'
   | 'layers'
 
-/** Agent list / detail icon (same pattern as `OrganizationIconKey`). */
+/** Agent list / detail icon (same pattern as `ProjectIconKey`). */
 export type AgentIconKey = 'crown' | 'compass' | 'code'
 
 export interface Agent {
   id: string
-  orgId: string
+  projectId: string
   name: string
   slug: string
   adapterType: string
@@ -46,7 +46,7 @@ export interface Agent {
 
 export interface Run {
   id: string
-  orgId: string
+  projectId: string
   agentId: string
   trigger: string
   status: string
@@ -91,10 +91,11 @@ export interface RunCreateBody {
   adapterConfig?: Record<string, unknown> | null
 }
 
-export interface OrganizationSummary {
+export interface ProjectSummary {
   id: string
   name: string
   slug: string
   role: string
-  iconKey: OrganizationIconKey
+  iconKey: ProjectIconKey
+  githubRepo: string | null
 }

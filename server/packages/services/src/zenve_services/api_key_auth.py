@@ -4,16 +4,16 @@ from fastapi import Depends, Header, HTTPException, status
 from sqlalchemy.orm import Session
 
 from zenve_db.database import get_db
-from zenve_db.models import ApiKeyRecord, Organization
+from zenve_db.models import ApiKeyRecord, Project
 from zenve_services.api_key import ApiKeyService
-from zenve_services.org import OrgService
+from zenve_services.project import ProjectService
 
 
-async def get_current_org(
+async def get_current_project(
     authorization: str = Header(..., alias="Authorization"),
     db: Session = Depends(get_db),
-) -> tuple[Organization, ApiKeyRecord]:
-    """Extract Bearer token, verify API key, return (org, key_record)."""
+) -> tuple[Project, ApiKeyRecord]:
+    """Extract Bearer token, verify API key, return (project, key_record)."""
     if not authorization.startswith("Bearer "):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -29,9 +29,9 @@ async def get_current_org(
             detail="Invalid or expired API key",
         )
 
-    org_service = OrgService(db)
-    org = org_service.get_by_id(record.org_id)
-    return org, record
+    project_service = ProjectService(db)
+    project = project_service.get_by_id(record.project_id)
+    return project, record
 
 
 def match_scope(granted: str, required: str) -> bool:
@@ -52,8 +52,8 @@ def require_scope(scope: str) -> Callable:
     """Returns a dependency that checks if the current API key has the given scope."""
 
     async def _check(
-        auth: tuple[Organization, ApiKeyRecord] = Depends(get_current_org),
-    ) -> tuple[Organization, ApiKeyRecord]:
+        auth: tuple[Project, ApiKeyRecord] = Depends(get_current_project),
+    ) -> tuple[Project, ApiKeyRecord]:
         _, key_record = auth
         granted_scopes = [s.strip() for s in key_record.scopes.split(",")]
         if not any(match_scope(g, scope) for g in granted_scopes):

@@ -15,23 +15,19 @@ class Settings(BaseSettings):
     # Full PostgreSQL connection string
     pg_database_url: str | None = None
 
-    # Base directory for org/agent data on disk
+    # Base directory for agent data on disk
     data_dir: str = "/data"
 
     # Directory containing Jinja2 template sets (e.g. default/)
     templates_dir: str = "/data/templates"
 
-    # Base URL agents use to call back to the gateway
-    gateway_url: str = "http://localhost:8000/api/v1"
+    # GitHub App credentials
+    github_app_id: int | None = None
+    github_app_private_key: str | None = None  # PEM string
+    github_webhook_secret: str | None = None
+    zenve_webhook_secret: str | None = None
 
-    # Optional token to protect the org bootstrap endpoint
-    setup_token: str | None = None
-
-    # Redis URL for Celery broker and pub/sub event streaming
-    redis_url: str | None = None
-    redis_password: str | None = None
-
-    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
+    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
 
 @lru_cache(maxsize=1)

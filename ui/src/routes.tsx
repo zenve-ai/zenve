@@ -2,9 +2,12 @@ import { Route, Routes, Navigate } from 'react-router'
 import AgentDetail from './pages/agent-detail'
 import AgentsList from './pages/agents-list'
 import Dashboard from './pages/dashboard'
+import GitHubSetup from './pages/github-setup'
+import GitHubCallback from './pages/github-callback'
 import Login from './pages/login'
-import NoOrganizationPage from './pages/no-organization'
-import OrgLayout from './pages/org-layout'
+import NoProjectPage from './pages/no-project'
+import OnboardingPage from './pages/onboarding'
+import ProjectLayout from './pages/project-layout'
 import { RootPathRedirect } from './pages/root-path-redirect'
 import { PrivateRoute, PublicRoute } from './components/auth'
 
@@ -13,21 +16,28 @@ export default function AppRoutes() {
     <Routes>
       <Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />
 
-      {/* `/` is not a public page — redirect only (to /:orgSlug or /no-organization). Guests are sent to /login by PrivateRoute. */}
+      {/* `/` is not a public page — redirect only (to /:projectSlug or /no-project). Guests are sent to /login by PrivateRoute. */}
       <Route path="/" element={<PrivateRoute><RootPathRedirect /></PrivateRoute>} />
 
-      <Route path="/no-organization" element={<PrivateRoute><NoOrganizationPage /></PrivateRoute>} />
+      <Route path="/no-project" element={<PrivateRoute><NoProjectPage /></PrivateRoute>} />
+      <Route path="/onboarding" element={<PrivateRoute><OnboardingPage /></PrivateRoute>} />
       <Route
-        path="/:orgSlug"
+        path="/no-organization"
+        element={<PrivateRoute><Navigate to="/no-project" replace /></PrivateRoute>}
+      />
+      <Route
+        path="/:projectSlug"
         element={(
           <PrivateRoute>
-            <OrgLayout />
+            <ProjectLayout />
           </PrivateRoute>
         )}
       >
         <Route index element={<Dashboard />} />
         <Route path="agents" element={<AgentsList />} />
         <Route path="agents/:agentSlug" element={<AgentDetail />} />
+        <Route path="github/setup" element={<GitHubSetup />} />
+        <Route path="github/callback" element={<GitHubCallback />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

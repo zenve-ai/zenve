@@ -1,15 +1,16 @@
 import re
 import uuid
+from pathlib import Path
 
 from fastapi import HTTPException
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from zenve_adapters.registry import AdapterRegistry
-from zenve_db.models import Agent, Organization
+from zenve_config.settings import get_settings
+from zenve_db.models import Agent, Project
 from zenve_models.agent import AgentCreate, AgentCreateFromPreset, AgentUpdate
 from zenve_scaffolding import PresetService, ScaffoldingService
-from zenve_services.filesystem import FilesystemService
 from zenve_services.template import TemplateService
 
 
@@ -23,20 +24,18 @@ class AgentService:
     def __init__(
         self,
         db: Session,
-        filesystem: FilesystemService,
         adapter_registry: AdapterRegistry,
         template_service: TemplateService,
         scaffolding: ScaffoldingService,
         preset_service: PresetService,
     ):
         self.db = db
-        self.filesystem = filesystem
         self.adapter_registry = adapter_registry
         self.template_service = template_service
         self.scaffolding = scaffolding
         self.preset_service = preset_service
 
-    def create_from_preset(self, org: Organization, data: AgentCreateFromPreset) -> Agent:
+    def create_from_preset(self, org: Project, data: AgentCreateFromPreset) -> Agent:
         preset = self.preset_service.load_preset(data.preset)
         create_data = AgentCreate(
             name=data.name or preset.name,
@@ -50,7 +49,7 @@ class AgentService:
         )
         return self.create(org, create_data)
 
-    def create(self, org: Organization, data: AgentCreate) -> Agent:
+    def create(self, org: Project, data: AgentCreate) -> Agent:
         if not self.adapter_registry.has(data.adapter_type):
             raise HTTPException(
                 status_code=422,
@@ -69,10 +68,11 @@ class AgentService:
 
         template_vars = {k: v for k, v in data.template_vars.items() if v is not None}
 
+        base_path = str(Path(get_settings().data_dir) / "orgs" / org.slug)
         dir_path = self.scaffolding.scaffold_agent_dir(
             org_slug=org.slug,
             agent_slug=slug,
-            base_path=org.base_path,
+            base_path=base_path,
             template_vars=template_vars,
             template_name=data.template,
         )
@@ -164,10 +164,22 @@ class AgentService:
         return agent
 
     def get_agent_files(self, agent: Agent) -> list[str]:
-        return self.filesystem.list_agent_files(agent.dir_path)
+        root = Path(agent.dir_path)
+        return [str(path.relative_to(root)) for path in root.rglob("*") if path.is_file()]
 
     def read_agent_file(self, agent: Agent, path: str) -> str:
-        return self.filesystem.read_agent_file(agent.dir_path, path)
+        full_path = self._validate_path(agent.dir_path, path)
+        return Path(full_path).read_text(encoding="utf-8")
 
     def write_agent_file(self, agent: Agent, path: str, content: str) -> None:
-        self.filesystem.write_agent_file(agent.dir_path, path, content)
+        full_path = self._validate_path(agent.dir_path, path)
+        file_path = Path(full_path)
+        file_path.parent.mkdir(parents=True, exist_ok=True)
+        file_path.write_text(content, encoding="utf-8")
+
+    def _validate_path(self, agent_dir: str, file_path: str) -> str:
+        root = Path(agent_dir).resolve()
+        resolved = (root / file_path).resolve()
+        if not str(resolved).startswith(f"{root}/") and resolved != root:
+            raise ValueError(f"Path traversal detected: {file_path!r}")
+        return str(resolved)

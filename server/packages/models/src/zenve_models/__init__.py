@@ -18,9 +18,15 @@ from .agent import (
 from .api_key import ApiKeyCreate, ApiKeyCreated, ApiKeyResponse
 from .auth import LoginRequest, SignupRequest, TokenResponse, UserResponse
 from .membership import MembershipResponse
-from .org import OrgCreate, OrgCreatedResponse, OrgResponse, OrgUpdate, OrgWithRoleResponse
 from .preset import Preset, PresetSummary
-from .run_event import RunEventResponse, RunEventType
+from .project import (
+    ProjectCreate,
+    ProjectCreatedResponse,
+    ProjectGitHubConnect,
+    ProjectResponse,
+    ProjectUpdate,
+    ProjectWithRoleResponse,
+)
 
 __all__ = [
     "AdapterConfigBase",
@@ -39,16 +45,15 @@ __all__ = [
     "OpenCodeConfig",
     "LoginRequest",
     "MembershipResponse",
-    "OrgCreate",
-    "OrgCreatedResponse",
-    "OrgResponse",
-    "OrgUpdate",
-    "OrgWithRoleResponse",
     "Preset",
     "PresetSummary",
+    "ProjectCreate",
+    "ProjectCreatedResponse",
+    "ProjectGitHubConnect",
+    "ProjectResponse",
+    "ProjectUpdate",
+    "ProjectWithRoleResponse",
     "RunContext",
-    "RunEventResponse",
-    "RunEventType",
     "RunResult",
     "SignupRequest",
     "TokenResponse",

@@ -23,51 +23,49 @@ class UserRecord(Base):
     )
 
 
-class Organization(Base):
-    __tablename__ = "organizations"
+class Project(Base):
+    __tablename__ = "projects"
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     name: Mapped[str] = mapped_column(unique=True, nullable=False)
     slug: Mapped[str] = mapped_column(unique=True, nullable=False)
-    base_path: Mapped[str] = mapped_column(nullable=False)
-    redis_worker_url: Mapped[str | None] = mapped_column(nullable=True)
+    github_installation_id: Mapped[int | None] = mapped_column(nullable=True)
+    github_repo: Mapped[str | None] = mapped_column(nullable=True)  # format: owner/name
+    github_default_branch: Mapped[str | None] = mapped_column(nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(default=func.now())
     updated_at: Mapped[datetime] = mapped_column(default=func.now(), onupdate=func.now())
 
     api_keys: Mapped[list["ApiKeyRecord"]] = relationship(
-        back_populates="organization", cascade="all, delete-orphan"
+        back_populates="project", cascade="all, delete-orphan"
     )
     agents: Mapped[list["Agent"]] = relationship(
-        back_populates="organization", cascade="all, delete-orphan"
+        back_populates="project", cascade="all, delete-orphan"
     )
     memberships: Mapped[list["Membership"]] = relationship(
-        back_populates="organization", cascade="all, delete-orphan"
-    )
-    runs: Mapped[list["Run"]] = relationship(
-        back_populates="organization", cascade="all, delete-orphan"
+        back_populates="project", cascade="all, delete-orphan"
     )
 
 
 class Membership(Base):
     __tablename__ = "memberships"
-    __table_args__ = (UniqueConstraint("user_id", "org_id"),)
+    __table_args__ = (UniqueConstraint("user_id", "project_id"),)
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     user_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id"), nullable=False)
-    org_id: Mapped[str] = mapped_column(String(36), ForeignKey("organizations.id"), nullable=False)
+    project_id: Mapped[str] = mapped_column(String(36), ForeignKey("projects.id"), nullable=False)
     role: Mapped[str] = mapped_column(String(20), nullable=False, default="member")
     created_at: Mapped[datetime] = mapped_column(default=func.now())
 
     user: Mapped["UserRecord"] = relationship(back_populates="memberships")
-    organization: Mapped["Organization"] = relationship(back_populates="memberships")
+    project: Mapped["Project"] = relationship(back_populates="memberships")
 
 
 class ApiKeyRecord(Base):
     __tablename__ = "api_keys"
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
-    org_id: Mapped[str] = mapped_column(String(36), ForeignKey("organizations.id"), nullable=False)
+    project_id: Mapped[str] = mapped_column(String(36), ForeignKey("projects.id"), nullable=False)
     key_hash: Mapped[str] = mapped_column(nullable=False)
     key_prefix: Mapped[str] = mapped_column(String(16), nullable=False, index=True)
     name: Mapped[str] = mapped_column(nullable=False)
@@ -76,7 +74,7 @@ class ApiKeyRecord(Base):
     created_at: Mapped[datetime] = mapped_column(default=func.now())
     expires_at: Mapped[datetime | None] = mapped_column(nullable=True)
 
-    organization: Mapped["Organization"] = relationship(back_populates="api_keys")
+    project: Mapped["Project"] = relationship(back_populates="api_keys")
 
 
 class Agent(Base):
@@ -87,7 +85,7 @@ class Agent(Base):
     )
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
-    org_id: Mapped[str] = mapped_column(String(36), ForeignKey("organizations.id"), nullable=False)
+    org_id: Mapped[str] = mapped_column(String(36), ForeignKey("projects.id"), nullable=False)
     name: Mapped[str] = mapped_column(nullable=False)
     slug: Mapped[str] = mapped_column(nullable=False)
     dir_path: Mapped[str] = mapped_column(nullable=False)
@@ -101,49 +99,4 @@ class Agent(Base):
     created_at: Mapped[datetime] = mapped_column(default=func.now())
     updated_at: Mapped[datetime] = mapped_column(default=func.now(), onupdate=func.now())
 
-    organization: Mapped["Organization"] = relationship(back_populates="agents")
-    runs: Mapped[list["Run"]] = relationship(back_populates="agent", cascade="all, delete-orphan")
-
-
-class Run(Base):
-    __tablename__ = "runs"
-
-    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
-    org_id: Mapped[str] = mapped_column(String(36), ForeignKey("organizations.id"), nullable=False)
-    agent_id: Mapped[str] = mapped_column(String(36), ForeignKey("agents.id"), nullable=False)
-    trigger: Mapped[str] = mapped_column(
-        nullable=False
-    )  # manual, heartbeat, webhook, collaboration
-    status: Mapped[str] = mapped_column(
-        nullable=False, default="queued"
-    )  # queued, running, completed, failed, cancelled, needs_input
-    adapter_type: Mapped[str] = mapped_column(nullable=False)
-    message: Mapped[str | None] = mapped_column(nullable=True)
-    session_id: Mapped[str | None] = mapped_column(String(256), nullable=True)
-    started_at: Mapped[datetime | None] = mapped_column(nullable=True)
-    finished_at: Mapped[datetime | None] = mapped_column(nullable=True)
-    exit_code: Mapped[int | None] = mapped_column(nullable=True)
-    error_summary: Mapped[str | None] = mapped_column(nullable=True)
-    token_usage: Mapped[dict | None] = mapped_column(JSON, nullable=True)
-    transcript_path: Mapped[str | None] = mapped_column(nullable=True)
-    outcome: Mapped[str | None] = mapped_column(nullable=True)
-    created_at: Mapped[datetime] = mapped_column(default=func.now())
-
-    organization: Mapped["Organization"] = relationship(back_populates="runs")
-    agent: Mapped["Agent"] = relationship(back_populates="runs")
-    events: Mapped[list["RunEvent"]] = relationship(
-        back_populates="run", order_by="RunEvent.created_at"
-    )
-
-
-class RunEvent(Base):
-    __tablename__ = "run_events"
-
-    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
-    run_id: Mapped[str] = mapped_column(String(36), ForeignKey("runs.id"), nullable=False)
-    event_type: Mapped[str] = mapped_column(nullable=False)
-    content: Mapped[str | None] = mapped_column(nullable=True)
-    meta: Mapped[dict | None] = mapped_column(JSON, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(default=func.now())
-
-    run: Mapped["Run"] = relationship(back_populates="events")
+    project: Mapped["Project"] = relationship(back_populates="agents")

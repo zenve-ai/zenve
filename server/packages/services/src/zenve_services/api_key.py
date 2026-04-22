@@ -18,12 +18,12 @@ class ApiKeyService:
     def __init__(self, db: Session):
         self.db = db
 
-    def create(self, org_id: str, data: ApiKeyCreate) -> tuple[ApiKeyRecord, str]:
+    def create(self, project_id: str, data: ApiKeyCreate) -> tuple[ApiKeyRecord, str]:
         """Create a new API key. Returns (record, raw_key)."""
         raw_key = generate_api_key()
         record = ApiKeyRecord(
             id=str(uuid.uuid4()),
-            org_id=org_id,
+            project_id=project_id,
             key_hash=hash_api_key(raw_key),
             key_prefix=extract_prefix(raw_key),
             name=data.name,
@@ -49,8 +49,8 @@ class ApiKeyService:
             return None
         return record
 
-    def list_by_org(self, org_id: str) -> list[ApiKeyRecord]:
-        return self.db.query(ApiKeyRecord).filter(ApiKeyRecord.org_id == org_id).all()
+    def list_by_org(self, project_id: str) -> list[ApiKeyRecord]:
+        return self.db.query(ApiKeyRecord).filter(ApiKeyRecord.project_id == project_id).all()
 
     def revoke(self, key_id: str) -> ApiKeyRecord:
         record = self.db.query(ApiKeyRecord).filter(ApiKeyRecord.id == key_id).first()

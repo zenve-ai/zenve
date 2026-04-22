@@ -9,21 +9,21 @@ import type { Run, RunEvent } from '@/types'
 const MAX_RETRIES = 5
 const BASE_DELAY_MS = 1000
 
-function buildWsUrl(orgId: string, token: string): string {
+function buildWsUrl(projectId: string, token: string): string {
   const base = config.apiUrl
     .replace(/^https:\/\//, 'wss://')
     .replace(/^http:\/\//, 'ws://')
-  return `${base}/orgs/${orgId}/ws?token=${encodeURIComponent(token)}`
+  return `${base}/v1/projects/${projectId}/ws?token=${encodeURIComponent(token)}`
 }
 
-export function useOrgWebSocket(orgId: string): void {
+export function useProjectWebSocket(projectId: string): void {
   const dispatch = useAppDispatch()
   const retryCount = useRef(0)
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const wsRef = useRef<WebSocket | null>(null)
 
   useEffect(() => {
-    if (!orgId) return
+    if (!projectId) return
 
     let cancelled = false
 
@@ -32,7 +32,7 @@ export function useOrgWebSocket(orgId: string): void {
       if (!token) return
 
       dispatch(wsConnecting())
-      const ws = new WebSocket(buildWsUrl(orgId, token))
+      const ws = new WebSocket(buildWsUrl(projectId, token))
       wsRef.current = ws
 
       ws.onopen = () => {
@@ -94,5 +94,5 @@ export function useOrgWebSocket(orgId: string): void {
       if (wsRef.current) wsRef.current.close()
       dispatch(wsDisconnected())
     }
-  }, [orgId, dispatch])
+  }, [projectId, dispatch])
 }

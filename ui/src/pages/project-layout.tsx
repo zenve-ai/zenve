@@ -13,52 +13,52 @@ import { SidebarInset, SidebarProvider, SidebarTrigger } from '@/components/ui/s
 import { AppSidebar } from '@/components/layout'
 import { useAppDispatch, useAppSelector } from '@/store/hooks'
 import {
-  useListOrganizationsQuery,
-  resolveOrgFromSlug,
-  selectCurrentOrgId,
-  selectOrganizations,
-  setCurrentOrganization,
-} from '@/store/organization'
+  useListProjectsQuery,
+  resolveProjectFromSlug,
+  selectCurrentProjectId,
+  selectProjects,
+  setCurrentProject,
+} from '@/store/project'
 import { useListAgentsQuery } from '@/store/agents'
 import { selectWsStatus } from '@/store/ws'
-import { useOrgWebSocket } from '@/hooks/use-org-websocket'
-import { OrgLoading } from './org-loading'
+import { useProjectWebSocket } from '@/hooks/use-project-websocket'
+import { ProjectLoading } from './project-loading'
 
-export default function OrgLayout() {
+export default function ProjectLayout() {
   // --- declarations ---
-  const { orgSlug } = useParams<{ orgSlug: string }>()
+  const { projectSlug } = useParams<{ projectSlug: string }>()
   const location = useLocation()
   const navigate = useNavigate()
   const dispatch = useAppDispatch()
-  const { isLoading, isFetching, isSuccess, isError, data } = useListOrganizationsQuery()
-  const organizations = useAppSelector(selectOrganizations)
-  const currentOrgId = useAppSelector(selectCurrentOrgId)
+  const { isLoading, isFetching, isSuccess, isError, data } = useListProjectsQuery()
+  const projects = useAppSelector(selectProjects)
+  const currentProjectId = useAppSelector(selectCurrentProjectId)
   const { data: agents = [] } = useListAgentsQuery(
-    { orgSlug: orgSlug! },
-    { skip: !orgSlug },
+    { projectSlug: projectSlug! },
+    { skip: !projectSlug },
   )
   const waiting = isLoading || isFetching
   const empty = isError || (isSuccess && (!data || data.length === 0))
-  const base = orgSlug ? `/${orgSlug}` : ''
-  const detailMatch = matchPath({ path: '/:orgSlug/agents/:agentSlug', end: true }, location.pathname)
-  const listMatch = matchPath({ path: '/:orgSlug/agents', end: true }, location.pathname)
+  const base = projectSlug ? `/${projectSlug}` : ''
+  const detailMatch = matchPath({ path: '/:projectSlug/agents/:agentSlug', end: true }, location.pathname)
+  const listMatch = matchPath({ path: '/:projectSlug/agents', end: true }, location.pathname)
   const agent = detailMatch?.params.agentSlug
     ? agents.find((a) => a.slug === detailMatch.params.agentSlug)
     : undefined
   const wsStatus = useAppSelector(selectWsStatus)
 
-  useOrgWebSocket(currentOrgId ?? '')
+  useProjectWebSocket(currentProjectId ?? '')
 
   // --- effects ---
   useEffect(() => {
-    if (!isSuccess || !organizations.length || !orgSlug) return
-    const match = resolveOrgFromSlug(organizations, orgSlug)
+    if (!isSuccess || !projects.length || !projectSlug) return
+    const match = resolveProjectFromSlug(projects, projectSlug)
     if (match) {
-      if (match.id !== currentOrgId) dispatch(setCurrentOrganization(match.id))
+      if (match.id !== currentProjectId) dispatch(setCurrentProject(match.id))
     } else {
-      navigate(`/${organizations[0].slug}`, { replace: true })
+      navigate(`/${projects[0].slug}`, { replace: true })
     }
-  }, [orgSlug, organizations, isSuccess, currentOrgId, dispatch, navigate])
+  }, [projectSlug, projects, isSuccess, currentProjectId, dispatch, navigate])
 
   // --- render helpers ---
   const renderBreadcrumbTrail = () => {
@@ -147,8 +147,13 @@ export default function OrgLayout() {
   )
 
   const renderMain = () => {
-    if (waiting) return <OrgLoading />
-    if (empty) return <Navigate to="/no-organization" replace />
+    if (waiting) return <ProjectLoading />
+    if (empty) return <Navigate to="/no-project" replace />
+    const project = projectSlug ? resolveProjectFromSlug(projects, projectSlug) : undefined
+    const isGithubRoute = location.pathname.includes('/github/')
+    if (project && !project.githubRepo && !isGithubRoute) {
+      return <Navigate to={`/${projectSlug}/github/setup`} replace />
+    }
     return renderContent()
   }
 
