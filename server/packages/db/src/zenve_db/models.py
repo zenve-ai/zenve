@@ -16,6 +16,7 @@ class UserRecord(Base):
     phone: Mapped[str | None] = mapped_column(nullable=True)
     avatar_url: Mapped[str | None] = mapped_column(nullable=True)
     password_hash: Mapped[str | None] = mapped_column(nullable=True)
+    github_installation_id: Mapped[int | None] = mapped_column(nullable=True)
     created_at: Mapped[datetime] = mapped_column(default=func.now())
 
     memberships: Mapped[list["Membership"]] = relationship(

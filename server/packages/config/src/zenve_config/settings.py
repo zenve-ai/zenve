@@ -1,4 +1,5 @@
 from functools import lru_cache
+from pathlib import Path
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -23,11 +24,21 @@ class Settings(BaseSettings):
 
     # GitHub App credentials
     github_app_id: int | None = None
-    github_app_private_key: str | None = None  # PEM string
+    github_app_private_key: str | None = None  # PEM string or path to .pem file
     github_webhook_secret: str | None = None
     zenve_webhook_secret: str | None = None
 
-    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
+    model_config = SettingsConfigDict(env_file=(".env", ".env.local"), env_file_encoding="utf-8", extra="ignore")
+
+    @property
+    def github_private_key(self) -> str | None:
+        """Return the PEM key, reading from file if the value is a .pem path."""
+        val = self.github_app_private_key
+        if not val:
+            return None
+        if val.strip().endswith(".pem") and Path(val.strip()).exists():
+            return Path(val.strip()).read_text()
+        return val
 
 
 @lru_cache(maxsize=1)

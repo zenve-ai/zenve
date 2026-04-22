@@ -2,8 +2,9 @@ import httpx
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
-from zenve_db.models import Project
-from zenve_utils.github import get_repo_info
+from zenve_db.models import Project, UserRecord
+from zenve_models.project import GitHubRepo
+from zenve_utils.github import get_repo_info, list_installation_repos
 
 
 class GitHubService:
@@ -30,6 +31,35 @@ class GitHubService:
         self.db.commit()
         self.db.refresh(project)
         return project
+
+    def save_installation(self, user: UserRecord, installation_id: int) -> UserRecord:
+        """Persist the GitHub App installation_id on the user record."""
+        user.github_installation_id = installation_id
+        self.db.commit()
+        self.db.refresh(user)
+        return user
+
+    def list_repos(self, installation_id: int) -> list[GitHubRepo]:
+        try:
+            raw = list_installation_repos(installation_id)
+        except httpx.HTTPStatusError as exc:
+            if exc.response.status_code in (401, 403, 404):
+                raise HTTPException(status_code=422, detail="GitHub App installation not found or access denied.") from exc
+            raise HTTPException(status_code=502, detail="GitHub API error") from exc
+        except RuntimeError as exc:
+            raise HTTPException(status_code=500, detail=str(exc)) from exc
+        except Exception as exc:
+            raise HTTPException(status_code=502, detail="GitHub API unreachable") from exc
+        return [
+            GitHubRepo(
+                id=r["id"],
+                full_name=r["full_name"],
+                name=r["name"],
+                private=r["private"],
+                default_branch=r["default_branch"],
+            )
+            for r in raw
+        ]
 
     def disconnect(self, project: Project) -> Project:
         """Clear the GitHub connection fields from the project."""

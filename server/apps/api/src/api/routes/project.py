@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, HTTPException, status
 
 from zenve_db.models import UserRecord
 from zenve_models.api_key import ApiKeyCreate, ApiKeyCreated, ApiKeyResponse
@@ -16,6 +16,7 @@ from zenve_services import (
     get_membership_service,
     get_project_service,
 )
+
 from zenve_services.api_key import ApiKeyService
 from zenve_services.github import GitHubService
 from zenve_services.membership import MembershipService
@@ -99,8 +100,12 @@ def github_connect(
 ):
     project = project_service.get_by_id_or_slug(project_id)
     membership_service.require_role(user.id, project.id, ["owner", "admin"])
-    updated = github_service.connect_project(project, body.installation_id, body.repo)
+    installation_id = body.installation_id or user.github_installation_id
+    if not installation_id:
+        raise HTTPException(status_code=422, detail="No GitHub installation found.")
+    updated = github_service.connect_project(project, installation_id, body.repo)
     return ProjectResponse.model_validate(updated, from_attributes=True)
+
 
 
 @router.delete("/{project_id}/github/disconnect", status_code=status.HTTP_204_NO_CONTENT)

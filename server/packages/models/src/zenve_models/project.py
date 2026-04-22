@@ -38,5 +38,17 @@ class ProjectCreatedResponse(ProjectResponse):
 
 
 class ProjectGitHubConnect(BaseModel):
-    installation_id: int
+    installation_id: int | None = None
     repo: str  # format: owner/name
+
+
+class GitHubRepo(BaseModel):
+    id: int
+    full_name: str  # "owner/name"
+    name: str
+    private: bool
+    default_branch: str
+
+
+class GitHubInstallationResponse(BaseModel):
+    installation_id: int

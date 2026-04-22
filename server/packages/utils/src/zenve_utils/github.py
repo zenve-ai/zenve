@@ -24,7 +24,8 @@ def mint_installation_token(installation_id: int) -> str:
         return cached[0]
 
     settings = get_settings()
-    if not settings.github_app_id or not settings.github_app_private_key:
+    private_key = settings.github_private_key
+    if not settings.github_app_id or not private_key:
         raise RuntimeError("GitHub App credentials not configured")
 
     # GitHub App JWT: issued 60s in the past to tolerate clock drift
@@ -32,7 +33,7 @@ def mint_installation_token(installation_id: int) -> str:
     exp = datetime.now(UTC) + timedelta(minutes=9)
     app_jwt = jwt.encode(
         {"iss": str(settings.github_app_id), "iat": iat, "exp": exp},
-        settings.github_app_private_key,
+        private_key,
         algorithm="RS256",
     )
 
@@ -90,7 +91,9 @@ def list_repo_dir(installation_id: int, repo: str, path: str, ref: str | None = 
     return resp.json()
 
 
-def list_tree_paths(installation_id: int, repo: str, prefix: str, ref: str | None = None) -> list[str]:
+def list_tree_paths(
+    installation_id: int, repo: str, prefix: str, ref: str | None = None
+) -> list[str]:
     """Return all blob paths in the repo that start with prefix."""
     # Resolve the ref to a tree SHA
     ref_name = ref or "HEAD"
@@ -102,9 +105,7 @@ def list_tree_paths(installation_id: int, repo: str, prefix: str, ref: str | Non
     resp.raise_for_status()
     tree = resp.json().get("tree", [])
     return [
-        item["path"]
-        for item in tree
-        if item["type"] == "blob" and item["path"].startswith(prefix)
+        item["path"] for item in tree if item["type"] == "blob" and item["path"].startswith(prefix)
     ]
 
 
@@ -173,6 +174,25 @@ def commit_tree(
     ).raise_for_status()
 
     return new_commit_sha
+
+
+def list_installation_repos(installation_id: int) -> list[dict]:
+    """Return all repos accessible to the given GitHub App installation."""
+    repos = []
+    page = 1
+    while True:
+        r = httpx.get(
+            f"{GITHUB_API}/installation/repositories",
+            headers=_auth_headers(installation_id),
+            params={"per_page": 100, "page": page},
+        )
+        r.raise_for_status()
+        data = r.json()
+        repos.extend(data["repositories"])
+        if len(repos) >= data["total_count"]:
+            break
+        page += 1
+    return repos
 
 
 def verify_hmac_sha256(body: bytes, signature: str, secret: str) -> bool:

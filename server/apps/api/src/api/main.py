@@ -11,6 +11,7 @@ from api.routes import (
     api_key_router,
     auth_router,
     core_router,
+    github_router,
     preset_router,
     project_router,
     template_router,
@@ -36,6 +37,7 @@ app.add_middleware(
 
 app.include_router(core_router)
 app.include_router(auth_router)
+app.include_router(github_router)
 app.include_router(project_router)
 app.include_router(api_key_router)
 app.include_router(agent_router)
