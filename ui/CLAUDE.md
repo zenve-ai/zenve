@@ -89,7 +89,67 @@ The Zenve UI uses an **industrial control panel / operator dashboard** aesthetic
 - **Button size** — all action buttons across pages use `size="xs" className="rounded-none"`; never mix `xs` and `sm` in the same UI context
 - **No rounded corners** — all cards, panels, and buttons use sharp edges (`rounded-none`); never use `rounded-md` or any border-radius on structural elements
 
-## 6. Skills
+## 6. Decorative Panel Pattern (Dark Hero / Auth / Onboarding)
+
+Use this pattern for full-height decorative right-panels on split-layout pages (onboarding, auth, landing).
+
+**Structure:**
+```
+bg-black relative overflow-hidden
+  ├── grid line background (CSS background-image)
+  ├── decorative SVG boxes with plus-sign corners (top-left, bottom-right)
+  ├── radial vignette overlay
+  └── centered content (z-10): badge → headline → description → cards
+```
+
+**Background grid:**
+```tsx
+<div className="absolute inset-0" style={{
+  backgroundImage: `
+    linear-gradient(to right, rgba(255,255,255,0.06) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255,255,255,0.06) 1px, transparent 1px)
+  `,
+  backgroundSize: '48px 48px',
+}} />
+```
+
+**Plus-corner SVG box** (reusable helper — keep inline in the file):
+```tsx
+const PlusCorner = ({ x, y }: { x: number; y: number }) => (
+  <g transform={`translate(${x - 6}, ${y - 6})`}>
+    <line x1="6" y1="2" x2="6" y2="10" stroke="rgba(255,255,255,0.5)" strokeWidth="1.5" />
+    <line x1="2" y1="6" x2="10" y2="6" stroke="rgba(255,255,255,0.5)" strokeWidth="1.5" />
+  </g>
+)
+// usage: one <svg> per box, positioned with absolute + top/bottom/left/right classes
+<svg className="absolute top-8 left-8 pointer-events-none" width="140" height="80">
+  <rect x="0" y="0" width="140" height="80" fill="none" stroke="rgba(255,255,255,0.12)" strokeWidth="1" />
+  <PlusCorner x={0} y={0} /> <PlusCorner x={140} y={0} />
+  <PlusCorner x={0} y={80} /> <PlusCorner x={140} y={80} />
+</svg>
+```
+
+**Radial vignette:**
+```tsx
+<div className="absolute inset-0" style={{
+  background: 'radial-gradient(ellipse at center, transparent 30%, rgba(0,0,0,0.55) 100%)',
+}} />
+```
+
+**Content layer:**
+- Badge: `border border-white/15 bg-white/5 px-3 py-1.5` with a small `rounded-full` status dot and `font-mono text-[10px] tracking-widest uppercase text-white/50`
+- Headline: `text-3xl font-bold text-white` with gradient span: `bg-gradient-to-r from-white via-white/70 to-white/30 bg-clip-text text-transparent`
+- Description: `font-mono text-[12px] text-white/35`
+- Cards grid: `grid grid-cols-2 gap-2` — each card: `border border-white/10 bg-white/5 p-3` (no rounded corners) with icon in `bg-white/10 p-1.5` wrapper
+
+**Rules:**
+- Always `bg-black` — never inherit theme background
+- No `rounded-*` anywhere — all sharp edges
+- No framer-motion — Zenve does not use it
+- Keep `PlusCorner` as a file-local SVG helper component, not exported
+- Two decorative boxes minimum: one top-left, one bottom-right
+
+## 7. Skills
 
 Use these slash commands before starting related work:
 
