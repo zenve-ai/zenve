@@ -1,7 +1,7 @@
 import { createApi } from '@reduxjs/toolkit/query/react'
 import { createBaseQueryWithReauth } from '@/lib/api'
 import config from '@/config'
-import type { ProjectIconKey, ProjectSummary } from '@/types'
+import type { GitHubRepo, ProjectIconKey, ProjectSummary } from '@/types'
 
 interface ProjectWithRoleResponse {
   id: string
@@ -65,11 +65,21 @@ export const projectApi = createApi({
       }),
       invalidatesTags: ['Project'],
     }),
-    connectGithub: builder.mutation<ProjectSummary, { projectId: string; installationId: number; repo: string }>({
+    listGithubRepos: builder.query<GitHubRepo[], void>({
+      query: () => `/github/repos`,
+    }),
+    saveGithubInstallation: builder.mutation<{ installation_id: number }, { installationId: number }>({
+      query: ({ installationId }) => ({
+        url: `/github/installation`,
+        method: 'POST',
+        params: { installation_id: installationId },
+      }),
+    }),
+    connectGithub: builder.mutation<ProjectSummary, { projectId: string; installationId?: number; repo: string }>({
       query: ({ projectId, installationId, repo }) => ({
         url: `/projects/${projectId}/github/connect`,
         method: 'POST',
-        body: { installation_id: installationId, repo },
+        body: { installation_id: installationId ?? null, repo },
       }),
       transformResponse: (r: ProjectWithRoleResponse) => toProjectSummary(r),
       invalidatesTags: ['Project'],
@@ -84,6 +94,8 @@ export const projectApi = createApi({
 export const {
   useListProjectsQuery,
   useCreateProjectMutation,
+  useListGithubReposQuery,
+  useSaveGithubInstallationMutation,
   useConnectGithubMutation,
   useDisconnectGithubMutation,
 } = projectApi

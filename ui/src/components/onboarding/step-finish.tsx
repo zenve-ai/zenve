@@ -1,23 +1,25 @@
-import { useNavigate } from 'react-router'
 import { Check, FolderOpen, GitFork, Bot } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 
 interface StepFinishProps {
   projectName: string
   projectDescription: string
-  githubStatus: 'idle' | 'connected'
+  githubRepo: string | null
   selectedAgentCount: number
+  onGetStarted: () => void
+  isLoading: boolean
+  error: string | null
 }
 
 export function StepFinish({
   projectName,
   projectDescription,
-  githubStatus,
+  githubRepo,
   selectedAgentCount,
+  onGetStarted,
+  isLoading,
+  error,
 }: StepFinishProps) {
-  // --- declarations ---
-  const navigate = useNavigate()
-
   // --- render helpers ---
   const renderSummaryRow = (
     icon: React.ReactNode,
@@ -64,8 +66,8 @@ export function StepFinish({
         {renderSummaryRow(
           <GitFork className="size-4" />,
           'GitHub',
-          githubStatus === 'connected' ? 'Connected' : 'Not connected',
-          githubStatus === 'connected',
+          githubRepo ?? 'Not connected',
+          githubRepo !== null,
         )}
         {renderSummaryRow(
           <Bot className="size-4" />,
@@ -77,14 +79,21 @@ export function StepFinish({
         )}
       </div>
 
+      {error && (
+        <div className="border border-dashed border-red-500/40 bg-red-500/5 px-3 py-2 text-[11px] font-mono text-red-400">
+          {error}
+        </div>
+      )}
+
       <div className="flex items-center gap-3">
         <Button
           size="xs"
           className="rounded-none gap-1.5"
-          onClick={() => navigate('/')}
+          disabled={isLoading}
+          onClick={onGetStarted}
         >
           <Check className="size-3.5" />
-          Get Started
+          {isLoading ? 'Creating…' : 'Get Started'}
         </Button>
         <span className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground/40">
           You can always change settings later

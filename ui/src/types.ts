@@ -91,6 +91,14 @@ export interface RunCreateBody {
   adapterConfig?: Record<string, unknown> | null
 }
 
+export interface GitHubRepo {
+  id: number
+  full_name: string
+  name: string
+  private: boolean
+  default_branch: string
+}
+
 export interface ProjectSummary {
   id: string
   name: string

@@ -20,7 +20,9 @@ export default function AppRoutes() {
       <Route path="/" element={<PrivateRoute><RootPathRedirect /></PrivateRoute>} />
 
       <Route path="/no-project" element={<PrivateRoute><NoProjectPage /></PrivateRoute>} />
-      <Route path="/onboarding" element={<PrivateRoute><OnboardingPage /></PrivateRoute>} />
+      <Route path="/onboarding" element={<PrivateRoute><Navigate to="/onboarding/1" replace /></PrivateRoute>} />
+      <Route path="/onboarding/:step" element={<PrivateRoute><OnboardingPage /></PrivateRoute>} />
+      <Route path="/github/callback" element={<PrivateRoute><GitHubCallback /></PrivateRoute>} />
       <Route
         path="/no-organization"
         element={<PrivateRoute><Navigate to="/no-project" replace /></PrivateRoute>}
@@ -37,7 +39,6 @@ export default function AppRoutes() {
         <Route path="agents" element={<AgentsList />} />
         <Route path="agents/:agentSlug" element={<AgentDetail />} />
         <Route path="github/setup" element={<GitHubSetup />} />
-        <Route path="github/callback" element={<GitHubCallback />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

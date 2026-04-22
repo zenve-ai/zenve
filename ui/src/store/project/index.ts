@@ -16,6 +16,8 @@ export {
   projectApi,
   useListProjectsQuery,
   useCreateProjectMutation,
+  useListGithubReposQuery,
+  useSaveGithubInstallationMutation,
   useConnectGithubMutation,
   useDisconnectGithubMutation,
 } from './api'

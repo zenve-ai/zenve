@@ -5,11 +5,13 @@ import { useAppSelector } from '@/store/hooks'
 import { selectCurrentProject } from '@/store/project'
 import config from '@/config'
 
+const PROJECT_SESSION_KEY = 'zenve_project_session'
+
 export default function GitHubSetup() {
   // --- declarations ---
   const { projectSlug } = useParams<{ projectSlug: string }>()
   const project = useAppSelector(selectCurrentProject)
-  const callbackUrl = `${window.location.origin}/${projectSlug}/github/callback`
+  const callbackUrl = `${window.location.origin}/github/callback`
   const installUrl = config.githubAppSlug
     ? `https://github.com/apps/${config.githubAppSlug}/installations/new?redirect_url=${encodeURIComponent(callbackUrl)}`
     : null
@@ -42,7 +44,12 @@ export default function GitHubSetup() {
       <Button
         size="xs"
         className="rounded-none gap-1.5"
-        onClick={() => { window.location.href = installUrl }}
+        onClick={() => {
+                if (project) {
+                  localStorage.setItem(PROJECT_SESSION_KEY, JSON.stringify({ projectId: project.id, projectSlug }))
+                }
+                window.location.href = installUrl
+              }}
       >
         <GitFork className="size-3.5" />
         Install GitHub App

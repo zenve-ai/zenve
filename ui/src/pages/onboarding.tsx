@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { useParams, useNavigate } from 'react-router'
 import { Button } from '@/components/ui/button'
 import {
   OnboardingDecorativePanel,
@@ -8,19 +9,53 @@ import {
   StepSelectAgents,
   StepFinish,
 } from '@/components/onboarding'
+import { useCreateProjectMutation, useConnectGithubMutation } from '@/store/project'
+import config from '@/config'
 
 const TOTAL_STEPS = 4
+const SESSION_KEY = 'zenve_onboarding_session'
+
+interface OnboardingSession {
+  projectName: string
+  projectDescription: string
+  selectedRepo?: string
+}
 
 export default function OnboardingPage() {
   // --- declarations ---
-  const [currentStep, setCurrentStep] = useState(0)
+  const { step } = useParams<{ step: string }>()
+  const navigate = useNavigate()
+  const currentStep = Math.max(0, Math.min(parseInt(step ?? '1', 10) - 1, TOTAL_STEPS - 1))
   const [projectName, setProjectName] = useState('')
   const [projectDescription, setProjectDescription] = useState('')
   const [nameError, setNameError] = useState<string | null>(null)
-  const [githubStatus, setGithubStatus] = useState<'idle' | 'connected'>('idle')
+  const [finishError, setFinishError] = useState<string | null>(null)
+  const [selectedRepo, setSelectedRepo] = useState<string | null>(null)
   const [selectedAgents, setSelectedAgents] = useState<Set<string>>(new Set())
+  const [createProject, { isLoading: isCreating }] = useCreateProjectMutation()
+  const [connectGithub, { isLoading: isConnecting }] = useConnectGithubMutation()
 
   const isLastStep = currentStep === TOTAL_STEPS - 1
+
+  const callbackUrl = `${window.location.origin}/github/callback`
+  const installUrl = config.githubAppSlug
+    ? `https://github.com/apps/${config.githubAppSlug}/installations/new?redirect_url=${encodeURIComponent(callbackUrl)}`
+    : null
+
+  // --- effects ---
+  useEffect(() => {
+    const raw = localStorage.getItem(SESSION_KEY)
+    if (!raw) return
+    try {
+      const session: OnboardingSession = JSON.parse(raw)
+      setProjectName(session.projectName)
+      setProjectDescription(session.projectDescription)
+      if (session.selectedRepo) setSelectedRepo(session.selectedRepo)
+    } catch {
+      // ignore malformed session
+    }
+    localStorage.removeItem(SESSION_KEY)
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   // --- render helpers ---
   const handleNext = () => {
@@ -31,12 +66,14 @@ export default function OnboardingPage() {
       }
       setNameError(null)
     }
-    setCurrentStep((s) => Math.min(s + 1, TOTAL_STEPS - 1))
+
+    navigate(`/onboarding/${currentStep + 2}`)
   }
 
   const handleBack = () => {
-    setCurrentStep((s) => Math.max(s - 1, 0))
     setNameError(null)
+    setFinishError(null)
+    navigate(`/onboarding/${currentStep}`)
   }
 
   const handleToggleAgent = (id: string) => {
@@ -46,6 +83,42 @@ export default function OnboardingPage() {
       else next.add(id)
       return next
     })
+  }
+
+  const handleConnectClick = () => {
+    if (!installUrl) return
+    const session: OnboardingSession = {
+      projectName,
+      projectDescription,
+    }
+    localStorage.setItem(SESSION_KEY, JSON.stringify(session))
+    window.location.href = installUrl
+  }
+
+  const handleFinish = async () => {
+    setFinishError(null)
+    const r1 = await createProject({ name: projectName.trim() })
+    if ('error' in r1) {
+      const err = r1.error
+      const detail = 'data' in err
+        ? String((err.data as Record<string, unknown>)?.detail ?? 'Failed to create project')
+        : 'Failed to create project'
+      setFinishError(detail)
+      return
+    }
+    const { id, slug } = r1.data
+    if (selectedRepo) {
+      const r2 = await connectGithub({ projectId: id, repo: selectedRepo })
+      if ('error' in r2) {
+        const err = r2.error
+        const detail = 'data' in err
+          ? String((err.data as Record<string, unknown>)?.detail ?? 'Failed to connect repository')
+          : 'Failed to connect repository'
+        setFinishError(detail)
+        return
+      }
+    }
+    navigate(`/${slug}`)
   }
 
   const renderStep = () => {
@@ -63,8 +136,10 @@ export default function OnboardingPage() {
       case 1:
         return (
           <StepGithubConnect
-            githubStatus={githubStatus}
-            onToggle={() => setGithubStatus((s) => s === 'connected' ? 'idle' : 'connected')}
+            selectedRepo={selectedRepo}
+            installUrl={installUrl}
+            onRepoSelected={setSelectedRepo}
+            onConnectClick={handleConnectClick}
           />
         )
       case 2:
@@ -79,8 +154,11 @@ export default function OnboardingPage() {
           <StepFinish
             projectName={projectName}
             projectDescription={projectDescription}
-            githubStatus={githubStatus}
+            githubRepo={selectedRepo}
             selectedAgentCount={selectedAgents.size}
+            onGetStarted={handleFinish}
+            isLoading={isCreating || isConnecting}
+            error={finishError}
           />
         )
       default:
@@ -91,22 +169,24 @@ export default function OnboardingPage() {
   const renderFooter = () => {
     if (isLastStep) return null
     return (
-      <div className="flex items-center justify-between border-t border-dashed border-border/60 px-8 py-4 bg-muted/10">
-        <Button
-          size="xs"
-          variant="ghost"
-          className={`rounded-none ${currentStep === 0 ? 'invisible' : ''}`}
-          onClick={handleBack}
-        >
-          Back
-        </Button>
-        <Button
-          size="xs"
-          className="rounded-none"
-          onClick={handleNext}
-        >
-          Next
-        </Button>
+      <div className="flex flex-col border-t border-dashed border-border/60 bg-muted/10">
+        <div className="flex items-center justify-between px-8 py-4">
+          <Button
+            size="xs"
+            variant="ghost"
+            className={`rounded-none ${currentStep === 0 ? 'invisible' : ''}`}
+            onClick={handleBack}
+          >
+            Back
+          </Button>
+          <Button
+            size="xs"
+            className="rounded-none"
+            onClick={handleNext}
+          >
+            Next
+          </Button>
+        </div>
       </div>
     )
   }
