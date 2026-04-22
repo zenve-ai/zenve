@@ -5,7 +5,8 @@ import type { Agent, AgentUpdateBody } from '@/types'
 
 interface AgentResponse {
   id: string
-  org_id: string
+  project_id?: string
+  org_id?: string
   name: string
   slug: string
   dir_path: string
@@ -23,7 +24,7 @@ interface AgentResponse {
 function toAgent(r: AgentResponse): Agent {
   return {
     id: r.id,
-    orgId: r.org_id,
+    projectId: r.project_id ?? r.org_id ?? '',
     name: r.name,
     slug: r.slug,
     adapterType: r.adapter_type,
@@ -43,22 +44,22 @@ export const agentsApi = createApi({
   baseQuery: createBaseQueryWithReauth(config.apiUrl),
   tagTypes: ['Agent'],
   endpoints: (builder) => ({
-    listAgents: builder.query<Agent[], { orgSlug: string }>({
-      query: ({ orgSlug }) => `/orgs/${orgSlug}/agents`,
+    listAgents: builder.query<Agent[], { projectSlug: string }>({
+      query: ({ projectSlug }) => `/projects/${projectSlug}/agents`,
       transformResponse: (response: AgentResponse[]) => response.map(toAgent),
       providesTags: ['Agent'],
     }),
-    getAgent: builder.query<Agent, { orgSlug: string; agentSlug: string }>({
-      query: ({ orgSlug, agentSlug }) => `/orgs/${orgSlug}/agents/${agentSlug}`,
+    getAgent: builder.query<Agent, { projectSlug: string; agentSlug: string }>({
+      query: ({ projectSlug, agentSlug }) => `/projects/${projectSlug}/agents/${agentSlug}`,
       transformResponse: (response: AgentResponse) => toAgent(response),
       providesTags: (_result, _err, { agentSlug }) => [{ type: 'Agent', id: agentSlug }],
     }),
     updateAgent: builder.mutation<
       Agent,
-      { orgSlug: string; agentIdOrSlug: string; body: AgentUpdateBody }
+      { projectSlug: string; agentIdOrSlug: string; body: AgentUpdateBody }
     >({
-      query: ({ orgSlug, agentIdOrSlug, body }) => ({
-        url: `/orgs/${orgSlug}/agents/${agentIdOrSlug}`,
+      query: ({ projectSlug, agentIdOrSlug, body }) => ({
+        url: `/projects/${projectSlug}/agents/${agentIdOrSlug}`,
         method: 'PATCH',
         body,
       }),

@@ -9,10 +9,10 @@ from zenve_models.agent import (
     AgentResponse,
     AgentUpdate,
 )
-from zenve_services import get_agent_service, get_membership_service, get_org_service
+from zenve_services import get_agent_service, get_membership_service, get_project_service
 from zenve_services.agent import AgentService
 from zenve_services.membership import MembershipService
-from zenve_services.org import OrgService
+from zenve_services.project import ProjectService
 from zenve_utils.auth import get_current_user
 
 router = APIRouter(prefix="/api/v1/orgs/{org_id}/agents", tags=["agents"])
@@ -23,7 +23,7 @@ def create_agent(
     org_id: str,
     body: AgentCreate,
     user: UserRecord = Depends(get_current_user),
-    org_service: OrgService = Depends(get_org_service),
+    org_service: ProjectService = Depends(get_project_service),
     membership_service: MembershipService = Depends(get_membership_service),
     service: AgentService = Depends(get_agent_service),
 ):
@@ -37,7 +37,7 @@ def create_agent_from_preset(
     org_id: str,
     body: AgentCreateFromPreset,
     user: UserRecord = Depends(get_current_user),
-    org_service: OrgService = Depends(get_org_service),
+    org_service: ProjectService = Depends(get_project_service),
     membership_service: MembershipService = Depends(get_membership_service),
     service: AgentService = Depends(get_agent_service),
 ):
@@ -52,7 +52,7 @@ def list_agents(
     agent_status: str | None = Query(None, alias="status"),
     adapter_type: str | None = Query(None),
     user: UserRecord = Depends(get_current_user),
-    org_service: OrgService = Depends(get_org_service),
+    org_service: ProjectService = Depends(get_project_service),
     membership_service: MembershipService = Depends(get_membership_service),
     service: AgentService = Depends(get_agent_service),
 ):
@@ -66,7 +66,7 @@ def get_agent(
     org_id: str,
     agent_id: str,
     user: UserRecord = Depends(get_current_user),
-    org_service: OrgService = Depends(get_org_service),
+    org_service: ProjectService = Depends(get_project_service),
     membership_service: MembershipService = Depends(get_membership_service),
     service: AgentService = Depends(get_agent_service),
 ):
@@ -81,7 +81,7 @@ def update_agent(
     agent_id: str,
     body: AgentUpdate,
     user: UserRecord = Depends(get_current_user),
-    org_service: OrgService = Depends(get_org_service),
+    org_service: ProjectService = Depends(get_project_service),
     membership_service: MembershipService = Depends(get_membership_service),
     service: AgentService = Depends(get_agent_service),
 ):
@@ -95,7 +95,7 @@ def archive_agent(
     org_id: str,
     agent_id: str,
     user: UserRecord = Depends(get_current_user),
-    org_service: OrgService = Depends(get_org_service),
+    org_service: ProjectService = Depends(get_project_service),
     membership_service: MembershipService = Depends(get_membership_service),
     service: AgentService = Depends(get_agent_service),
 ):
@@ -109,7 +109,7 @@ def list_agent_files(
     org_id: str,
     agent_id: str,
     user: UserRecord = Depends(get_current_user),
-    org_service: OrgService = Depends(get_org_service),
+    org_service: ProjectService = Depends(get_project_service),
     membership_service: MembershipService = Depends(get_membership_service),
     service: AgentService = Depends(get_agent_service),
 ):
@@ -125,7 +125,7 @@ def read_agent_file(
     agent_id: str,
     path: str,
     user: UserRecord = Depends(get_current_user),
-    org_service: OrgService = Depends(get_org_service),
+    org_service: ProjectService = Depends(get_project_service),
     membership_service: MembershipService = Depends(get_membership_service),
     service: AgentService = Depends(get_agent_service),
 ):
@@ -143,7 +143,7 @@ def write_agent_file(
     path: str,
     body: AgentFileContent,
     user: UserRecord = Depends(get_current_user),
-    org_service: OrgService = Depends(get_org_service),
+    org_service: ProjectService = Depends(get_project_service),
     membership_service: MembershipService = Depends(get_membership_service),
     service: AgentService = Depends(get_agent_service),
 ):

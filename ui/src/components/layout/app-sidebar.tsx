@@ -4,7 +4,7 @@ import { BookOpen, Bot, Settings2, Users } from 'lucide-react'
 import { useListAgentsQuery } from '@/store/agents'
 import { NavMain, type NavItem } from './nav-main'
 import { NavUser } from './nav-user'
-import { OrganizationSwitcher } from './organization-switcher'
+import { ProjectSwitcher } from './project-switcher'
 import { Sidebar, SidebarContent, SidebarFooter, SidebarHeader } from '@/components/ui/sidebar'
 
 const demoNavTail: NavItem[] = [
@@ -43,14 +43,14 @@ const demoNavTail: NavItem[] = [
 ]
 
 export function AppSidebar(props: React.ComponentProps<typeof Sidebar>) {
-  const { orgSlug } = useParams<{ orgSlug: string }>()
+  const { projectSlug } = useParams<{ projectSlug: string }>()
   const { data: agents = [] } = useListAgentsQuery(
-    { orgSlug: orgSlug! },
-    { skip: !orgSlug },
+    { projectSlug: projectSlug! },
+    { skip: !projectSlug },
   )
 
   const navItems = useMemo((): NavItem[] => {
-    const prefix = orgSlug ? `/${orgSlug}` : ''
+    const prefix = projectSlug ? `/${projectSlug}` : ''
     const agentsBlock: NavItem = {
       title: 'Agents',
       url: `${prefix}/agents`,
@@ -62,12 +62,12 @@ export function AppSidebar(props: React.ComponentProps<typeof Sidebar>) {
       })),
     }
     return [agentsBlock, ...demoNavTail]
-  }, [orgSlug, agents])
+  }, [projectSlug, agents])
 
   return (
     <Sidebar variant="inset" {...props}>
       <SidebarHeader>
-        <OrganizationSwitcher />
+        <ProjectSwitcher />
       </SidebarHeader>
       <SidebarContent>
         <NavMain items={navItems} />

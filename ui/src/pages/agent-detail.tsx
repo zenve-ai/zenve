@@ -16,12 +16,12 @@ import { useCreateRunMutation } from '@/store/runs'
 import type { Agent } from '@/types'
 
 export default function AgentDetail() {
-  const { orgSlug, agentSlug } = useParams<{ orgSlug: string; agentSlug: string }>()
-  const base = orgSlug ? `/${orgSlug}` : ''
+  const { projectSlug, agentSlug } = useParams<{ projectSlug: string; agentSlug: string }>()
+  const base = projectSlug ? `/${projectSlug}` : ''
   const [tab, setTab] = useState('dashboard')
   const [assignOpen, setAssignOpen] = useState(false)
 
-  const skip = !orgSlug || !agentSlug
+  const skip = !projectSlug || !agentSlug
   const {
     data: agent,
     isLoading,
@@ -29,7 +29,7 @@ export default function AgentDetail() {
     error,
     refetch,
   } = useGetAgentQuery(
-    { orgSlug: orgSlug!, agentSlug: agentSlug! },
+    { projectSlug: projectSlug!, agentSlug: agentSlug! },
     { skip },
   )
 
@@ -42,11 +42,11 @@ export default function AgentDetail() {
   const heartbeatLoading = createRunLoading && runAction === 'heartbeat'
 
   const handleAssignSubmit = async (message: string) => {
-    if (!orgSlug || !agent) return
+    if (!projectSlug || !agent) return
     setRunAction('assign')
     try {
       await createRun({
-        orgSlug,
+        projectSlug,
         body: { agent: agent.slug, message },
       }).unwrap()
       toast.success('Run queued')
@@ -59,11 +59,11 @@ export default function AgentDetail() {
   }
 
   const handleHeartbeat = async () => {
-    if (!orgSlug || !agent) return
+    if (!projectSlug || !agent) return
     setRunAction('heartbeat')
     try {
       await createRun({
-        orgSlug,
+        projectSlug,
         body: { agent: agent.slug, message: null },
       }).unwrap()
       toast.success('Heartbeat run queued')
@@ -75,11 +75,11 @@ export default function AgentDetail() {
   }
 
   const handleTogglePause = async () => {
-    if (!orgSlug || !agent) return
+    if (!projectSlug || !agent) return
     const next = agent.status === 'paused' ? 'active' : 'paused'
     try {
       await updateAgent({
-        orgSlug,
+        projectSlug,
         agentIdOrSlug: agent.slug,
         body: { status: next },
       }).unwrap()
@@ -122,7 +122,7 @@ export default function AgentDetail() {
         <TabsTrigger value="budget">Budget</TabsTrigger>
       </TabsList>
       <TabsContent value="dashboard" className="mt-0 min-h-0 flex-1">
-        <AgentDashboardTab orgSlug={orgSlug!} agentId={a.id} onViewRunDetails={() => setTab('runs')} />
+        <AgentDashboardTab projectSlug={projectSlug!} agentId={a.id} onViewRunDetails={() => setTab('runs')} />
       </TabsContent>
       <TabsContent value="instructions" className="mt-0 min-h-0 flex-1">
         <PlaceholderTab title="Instructions">

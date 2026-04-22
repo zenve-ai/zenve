@@ -5,7 +5,8 @@ import type { Run, RunCreateBody, RunEvent } from '@/types'
 
 interface RunResponse {
   id: string
-  org_id: string
+  project_id?: string
+  org_id?: string
   agent_id: string
   trigger: string
   status: string
@@ -44,7 +45,7 @@ function toRunEvent(r: RunEventResponse): RunEvent {
 function toRun(r: RunResponse): Run {
   return {
     id: r.id,
-    orgId: r.org_id,
+    projectId: r.project_id ?? r.org_id ?? '',
     agentId: r.agent_id,
     trigger: r.trigger,
     status: r.status,
@@ -66,32 +67,32 @@ export const runsApi = createApi({
   baseQuery: createBaseQueryWithReauth(config.apiUrl),
   tagTypes: ['Run'],
   endpoints: (builder) => ({
-    listRuns: builder.query<Run[], { orgSlug: string; agentId?: string; status?: string }>({
-      query: ({ orgSlug, agentId, status }) => {
+    listRuns: builder.query<Run[], { projectSlug: string; agentId?: string; status?: string }>({
+      query: ({ projectSlug, agentId, status }) => {
         const params = new URLSearchParams()
         if (agentId) params.set('agent_id', agentId)
         if (status) params.set('status', status)
         const qs = params.toString()
-        return `/orgs/${orgSlug}/runs${qs ? `?${qs}` : ''}`
+        return `/v1/projects/${projectSlug}/runs${qs ? `?${qs}` : ''}`
       },
       transformResponse: (response: RunResponse[]) => response.map(toRun),
       providesTags: ['Run'],
     }),
-    getRun: builder.query<Run, { orgSlug: string; runId: string }>({
-      query: ({ orgSlug, runId }) => `/orgs/${orgSlug}/runs/${runId}`,
+    getRun: builder.query<Run, { projectSlug: string; runId: string }>({
+      query: ({ projectSlug, runId }) => `/v1/projects/${projectSlug}/runs/${runId}`,
       transformResponse: (response: RunResponse) => toRun(response),
       providesTags: (_result, _err, { runId }) => [{ type: 'Run', id: runId }],
     }),
-    createRun: builder.mutation<Run, { orgSlug: string; body: RunCreateBody }>({
-      query: ({ orgSlug, body }) => ({
-        url: `/orgs/${orgSlug}/runs`,
+    createRun: builder.mutation<Run, { projectSlug: string; body: RunCreateBody }>({
+      query: ({ projectSlug, body }) => ({
+        url: `/v1/projects/${projectSlug}/runs`,
         method: 'POST',
         body,
       }),
       transformResponse: (response: RunResponse) => toRun(response),
     }),
-    getRunEvents: builder.query<RunEvent[], { orgSlug: string; runId: string }>({
-      query: ({ orgSlug, runId }) => `/orgs/${orgSlug}/runs/${runId}/events`,
+    getRunEvents: builder.query<RunEvent[], { projectSlug: string; runId: string }>({
+      query: ({ projectSlug, runId }) => `/v1/projects/${projectSlug}/runs/${runId}/events`,
       transformResponse: (response: RunEventResponse[]) => response.map(toRunEvent),
     }),
   }),

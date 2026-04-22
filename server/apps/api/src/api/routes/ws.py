@@ -7,7 +7,7 @@ from zenve_config.settings import get_settings
 from zenve_db.database import Session as DBSession
 from zenve_db.models import UserRecord
 from zenve_services.membership import MembershipService
-from zenve_services.org import OrgService
+from zenve_services.project import ProjectService
 from zenve_services.ws_manager import WebSocketManager
 from zenve_utils.auth import ALGORITHM
 
@@ -43,7 +43,7 @@ async def org_websocket(
         if not user:
             await websocket.close(code=4001)
             return
-        org = OrgService(db).get_by_id_or_slug(org_id)
+        org = ProjectService(db).get_by_id_or_slug(org_id)
         MembershipService(db).require_membership(user.id, org.id)
         org_db_id = org.id
     except Exception:

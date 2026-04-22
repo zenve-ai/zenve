@@ -52,14 +52,14 @@ export const runsSlice = createSlice({
 
 export const { runCreated, runStatusChanged, runEventReceived, runFinished } = runsSlice.actions
 
-export const selectRuns = (orgSlug: string) => (state: AppRootState): Run[] => {
-  const { data: runs = [] } = runsApi.endpoints.listRuns.select({ orgSlug })(state)
+export const selectRuns = (projectSlug: string) => (state: AppRootState): Run[] => {
+  const { data: runs = [] } = runsApi.endpoints.listRuns.select({ projectSlug })(state)
   const { patches } = state.runs
   return runs.map((run) => ({ ...run, ...patches[run.id] }))
 }
 
-export const selectRunById = (orgSlug: string, runId: string) => (state: AppRootState): Run | undefined => {
-  const runs = selectRuns(orgSlug)(state)
+export const selectRunById = (projectSlug: string, runId: string) => (state: AppRootState): Run | undefined => {
+  const runs = selectRuns(projectSlug)(state)
   return runs.find((r) => r.id === runId)
 }
 
