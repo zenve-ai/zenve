@@ -12,7 +12,6 @@ from api.routes import (
     auth_router,
     core_router,
     github_router,
-    preset_router,
     project_router,
     template_router,
     ws_router,
@@ -41,7 +40,6 @@ app.include_router(github_router)
 app.include_router(project_router)
 app.include_router(api_key_router)
 app.include_router(agent_router)
-app.include_router(preset_router)
 app.include_router(template_router)
 app.include_router(ws_router)
 

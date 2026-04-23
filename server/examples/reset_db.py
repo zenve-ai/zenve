@@ -16,7 +16,7 @@ import sys
 
 from sqlalchemy import text
 
-from zenve_db.database import Base, Session
+from zenve_db.database import Session
 
 
 def reset_db() -> None:

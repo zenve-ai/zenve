@@ -4,6 +4,7 @@ version = "0.1.0"
 description = "zenve monorepo workspace"
 requires-python = ">=3.13"
 dependencies = [
+    "httpx>=0.28.1",
     "zenve-db",
 ]
 
@@ -28,7 +29,6 @@ zenve-models = { workspace = true }
 zenve-utils = { workspace = true }
 zenve-services = { workspace = true }
 zenve-adapters = { workspace = true }
-zenve-scaffolding = { workspace = true }
 zenve-cli = { workspace = true }
 
 [dependency-groups]
@@ -65,6 +65,5 @@ known-first-party = [
     "zenve_db",
     "zenve_models",
     "zenve_utils",
-    "zenve_scaffolding",
     "zenve_services",
 ]

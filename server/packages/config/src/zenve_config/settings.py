@@ -28,6 +28,16 @@ class Settings(BaseSettings):
     github_webhook_secret: str | None = None
     zenve_webhook_secret: str | None = None
 
+    # GitHub OAuth App credentials (user login flow)
+    github_app_client_id: str | None = None
+    github_app_client_secret: str | None = None
+    github_frontend_redirect_uri: str | None = None
+
+    # GitHub public repo for agent templates (e.g. "myorg/agent-templates")
+    github_agents_repo: str | None = None
+    # Optional PAT for higher GitHub API rate limits
+    github_token: str | None = None
+
     model_config = SettingsConfigDict(env_file=(".env", ".env.local"), env_file_encoding="utf-8", extra="ignore")
 
     @property

@@ -9,9 +9,9 @@ from sqlalchemy.orm import Session
 from zenve_adapters.registry import AdapterRegistry
 from zenve_config.settings import get_settings
 from zenve_db.models import Agent, Project
-from zenve_models.agent import AgentCreate, AgentCreateFromPreset, AgentUpdate
-from zenve_scaffolding import PresetService, ScaffoldingService
-from zenve_services.template import TemplateService
+from zenve_models.agent import AgentCreate, AgentUpdate
+from zenve_models.github_template import AgentCreateFromGitHubTemplate
+from zenve_services.template import GitHubTemplateService
 
 
 def slugify(name: str) -> str:
@@ -25,29 +25,49 @@ class AgentService:
         self,
         db: Session,
         adapter_registry: AdapterRegistry,
-        template_service: TemplateService,
-        scaffolding: ScaffoldingService,
-        preset_service: PresetService,
+        github_template_service: GitHubTemplateService,
     ):
         self.db = db
         self.adapter_registry = adapter_registry
-        self.template_service = template_service
-        self.scaffolding = scaffolding
-        self.preset_service = preset_service
+        self.github_template_service = github_template_service
 
-    def create_from_preset(self, org: Project, data: AgentCreateFromPreset) -> Agent:
-        preset = self.preset_service.load_preset(data.preset)
-        create_data = AgentCreate(
-            name=data.name or preset.name,
-            adapter_type=preset.adapter_type,
-            adapter_config=preset.adapter_config,
-            template=preset.template,
-            template_vars=preset.template_vars,
-            skills=preset.skills,
-            tools=preset.tools,
-            heartbeat_interval_seconds=preset.heartbeat_interval_seconds,
+    def create_from_github_template(self, org: Project, data: AgentCreateFromGitHubTemplate) -> Agent:
+        if not self.github_template_service.is_enabled():
+            raise HTTPException(status_code=503, detail="GitHub agent templates are not configured")
+        template = self.github_template_service.get_template(data.template_id)
+        name = data.name or template.name
+        slug = slugify(name)
+        base_path = str(Path(get_settings().data_dir) / "orgs" / org.slug)
+        dir_path = self.github_template_service.scaffold_agent_from_template(
+            template_id=data.template_id,
+            org_slug=org.slug,
+            agent_slug=slug,
+            base_path=base_path,
         )
-        return self.create(org, create_data)
+        agent_id = str(uuid.uuid4())
+        agent = Agent(
+            id=agent_id,
+            org_id=org.id,
+            name=name,
+            slug=slug,
+            dir_path=dir_path,
+            adapter_type=template.adapter_type,
+            adapter_config={},
+            skills=[],
+            tools=[],
+            status="active",
+        )
+        self.db.add(agent)
+        try:
+            self.db.commit()
+        except IntegrityError as exc:
+            self.db.rollback()
+            raise HTTPException(
+                status_code=409,
+                detail="An agent with this name or slug already exists in this organization",
+            ) from exc
+        self.db.refresh(agent)
+        return agent
 
     def create(self, org: Project, data: AgentCreate) -> Agent:
         if not self.adapter_registry.has(data.adapter_type):
@@ -62,23 +82,16 @@ class AgentService:
         adapter.validate_config(adapter_config)
 
         slug = slugify(data.name)
-
-        template_name = self.template_service.resolve_template_name(data.template)
-        self.template_service.validate_vars(template_name, data.template_vars)
-
-        template_vars = {k: v for k, v in data.template_vars.items() if v is not None}
-
         base_path = str(Path(get_settings().data_dir) / "orgs" / org.slug)
-        dir_path = self.scaffolding.scaffold_agent_dir(
-            org_slug=org.slug,
-            agent_slug=slug,
-            base_path=base_path,
-            template_vars=template_vars,
-            template_name=data.template,
-        )
+        agent_dir = Path(base_path) / "agents" / slug
+        if agent_dir.exists():
+            raise HTTPException(status_code=409, detail=f"Agent directory already exists: {agent_dir}")
+        agent_dir.mkdir(parents=True)
+        (agent_dir / "memory").mkdir()
+        (agent_dir / "runs").mkdir()
+        dir_path = str(agent_dir)
 
         agent_id = str(uuid.uuid4())
-
         agent = Agent(
             id=agent_id,
             org_id=org.id,
@@ -168,16 +181,16 @@ class AgentService:
         return [str(path.relative_to(root)) for path in root.rglob("*") if path.is_file()]
 
     def read_agent_file(self, agent: Agent, path: str) -> str:
-        full_path = self._validate_path(agent.dir_path, path)
+        full_path = self.validate_path(agent.dir_path, path)
         return Path(full_path).read_text(encoding="utf-8")
 
     def write_agent_file(self, agent: Agent, path: str, content: str) -> None:
-        full_path = self._validate_path(agent.dir_path, path)
+        full_path = self.validate_path(agent.dir_path, path)
         file_path = Path(full_path)
         file_path.parent.mkdir(parents=True, exist_ok=True)
         file_path.write_text(content, encoding="utf-8")
 
-    def _validate_path(self, agent_dir: str, file_path: str) -> str:
+    def validate_path(self, agent_dir: str, file_path: str) -> str:
         root = Path(agent_dir).resolve()
         resolved = (root / file_path).resolve()
         if not str(resolved).startswith(f"{root}/") and resolved != root:

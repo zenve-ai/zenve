@@ -18,6 +18,7 @@ from .agent import (
 from .api_key import ApiKeyCreate, ApiKeyCreated, ApiKeyResponse
 from .auth import LoginRequest, SignupRequest, TokenResponse, UserResponse
 from .membership import MembershipResponse
+from .github_template import AgentCreateFromGitHubTemplate, GitHubTemplateSummary
 from .preset import Preset, PresetSummary
 from .project import (
     ProjectCreate,
@@ -31,6 +32,7 @@ from .project import (
 __all__ = [
     "AdapterConfigBase",
     "AgentCreate",
+    "AgentCreateFromGitHubTemplate",
     "AgentCreateFromPreset",
     "AgentFileContent",
     "AgentFileList",
@@ -44,6 +46,7 @@ __all__ = [
     "CodexConfig",
     "OpenCodeConfig",
     "LoginRequest",
+    "GitHubTemplateSummary",
     "MembershipResponse",
     "Preset",
     "PresetSummary",

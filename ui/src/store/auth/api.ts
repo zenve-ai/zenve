@@ -37,6 +37,18 @@ export const authApi = createApi({
         }
       },
     }),
+    me: builder.query<User, void>({
+      query: () => ({ url: '/auth/me', method: 'GET' }),
+      async onQueryStarted(_, { dispatch, queryFulfilled }) {
+        try {
+          const { data } = await queryFulfilled
+          setUserData(data)
+          dispatch(setCurrentUser(data))
+        } catch {
+          // token may be invalid
+        }
+      },
+    }),
     logout: builder.mutation<void, void>({
       query: () => ({ url: '/auth/logout', method: 'POST' }),
       async onQueryStarted(_, { dispatch, queryFulfilled }) {
@@ -52,4 +64,4 @@ export const authApi = createApi({
   }),
 })
 
-export const { useLoginMutation, useSignupMutation, useLogoutMutation } = authApi
+export const { useLoginMutation, useSignupMutation, useLogoutMutation, useMeQuery } = authApi

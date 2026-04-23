@@ -4,6 +4,7 @@ import AgentsList from './pages/agents-list'
 import Dashboard from './pages/dashboard'
 import GitHubSetup from './pages/github-setup'
 import GitHubCallback from './pages/github-callback'
+import AuthOAuthCallback from './pages/github-auth-callback'
 import Login from './pages/login'
 import NoProjectPage from './pages/no-project'
 import OnboardingPage from './pages/onboarding'
@@ -15,6 +16,7 @@ export default function AppRoutes() {
   return (
     <Routes>
       <Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />
+      <Route path="/auth/callback" element={<AuthOAuthCallback />} />
 
       {/* `/` is not a public page — redirect only (to /:projectSlug or /no-project). Guests are sent to /login by PrivateRoute. */}
       <Route path="/" element={<PrivateRoute><RootPathRedirect /></PrivateRoute>} />

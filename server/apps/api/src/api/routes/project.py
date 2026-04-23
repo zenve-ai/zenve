@@ -16,7 +16,6 @@ from zenve_services import (
     get_membership_service,
     get_project_service,
 )
-
 from zenve_services.api_key import ApiKeyService
 from zenve_services.github import GitHubService
 from zenve_services.membership import MembershipService

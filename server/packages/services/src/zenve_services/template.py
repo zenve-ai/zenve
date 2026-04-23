@@ -1,53 +1,160 @@
-import json
+import time
 from pathlib import Path
-from typing import Any
 
+import httpx
+import yaml
 from fastapi import HTTPException
 
 from zenve_config.settings import Settings
-from zenve_models.template import TemplateManifest, TemplateSummary
+from zenve_models.github_template import GitHubTemplateSummary
+
+GITHUB_API = "https://api.github.com"
+
+_cache: dict[str, tuple[object, float]] = {}
+CACHE_TTL = 300.0
 
 
-class TemplateService:
+class GitHubTemplateService:
     def __init__(self, settings: Settings) -> None:
-        self._templates_dir = Path(settings.templates_dir)
+        self.repo = settings.github_agents_repo
+        self.token = settings.github_token
 
-    def list_templates(self) -> list[TemplateSummary]:
-        if not self._templates_dir.exists():
-            return []
-        results = []
-        for child in sorted(self._templates_dir.iterdir()):
-            if not child.is_dir():
-                continue
-            manifest = self._load_manifest(child)
-            results.append(TemplateSummary(name=child.name, description=manifest.description))
-        return results
+    def is_enabled(self) -> bool:
+        return bool(self.repo)
 
-    def get_manifest(self, template_name: str) -> TemplateManifest:
-        template_dir = self._templates_dir / template_name
-        if not template_dir.exists():
-            raise HTTPException(status_code=404, detail=f"Template '{template_name}' not found")
-        return self._load_manifest(template_dir)
+    def auth_headers(self) -> dict:
+        headers = {"Accept": "application/vnd.github+json", "X-GitHub-Api-Version": "2022-11-28"}
+        if self.token:
+            headers["Authorization"] = f"Bearer {self.token}"
+        return headers
 
-    def validate_vars(self, template_name: str, template_vars: dict[str, Any] | None) -> None:
-        manifest = self.get_manifest(template_name)
-        provided = template_vars or {}
-        missing = [v.name for v in manifest.variables if v.required and v.name not in provided]
-        if missing:
-            raise HTTPException(
-                status_code=422,
-                detail=f"Missing required template variables [{', '.join(missing)}] for template '{template_name}'",
+    def cached_get(self, url: str, params: dict | None = None) -> object:
+        cache_key = url + str(sorted((params or {}).items()))
+        now = time.monotonic()
+        if cache_key in _cache:
+            data, expires_at = _cache[cache_key]
+            if now < expires_at:
+                return data
+        try:
+            response = httpx.get(url, headers=self.auth_headers(), params=params, timeout=15)
+        except httpx.RequestError as exc:
+            raise HTTPException(status_code=502, detail="GitHub API unreachable") from exc
+        if response.status_code == 404:
+            raise HTTPException(status_code=404, detail="Not found in GitHub repo")
+        if response.status_code in (401, 403):
+            raise HTTPException(status_code=422, detail="Cannot access GitHub repo")
+        if response.status_code == 429:
+            raise HTTPException(status_code=429, detail="GitHub API rate limit exceeded")
+        if not response.is_success:
+            raise HTTPException(status_code=502, detail="GitHub API unreachable")
+        data = response.json()
+        _cache[cache_key] = (data, now + CACHE_TTL)
+        return data
+
+    def list_repo_dir(self, path: str) -> list[dict]:
+        url = f"{GITHUB_API}/repos/{self.repo}/contents/{path}"
+        result = self.cached_get(url)
+        if not isinstance(result, list):
+            raise HTTPException(status_code=404, detail=f"Path '{path}' is not a directory")
+        return result
+
+    def list_tree_blobs(self, prefix: str) -> list[dict]:
+        ref_url = f"{GITHUB_API}/repos/{self.repo}/git/ref/heads/main"
+        try:
+            ref_data = self.cached_get(ref_url)
+        except HTTPException:
+            ref_url = f"{GITHUB_API}/repos/{self.repo}/git/ref/heads/master"
+            ref_data = self.cached_get(ref_url)
+        tree_sha = ref_data["object"]["sha"]  # type: ignore[index]
+        tree_url = f"{GITHUB_API}/repos/{self.repo}/git/trees/{tree_sha}"
+        tree_data = self.cached_get(tree_url, params={"recursive": "1"})
+        tree = tree_data["tree"]  # type: ignore[index]
+        return [item for item in tree if item.get("type") == "blob" and item.get("path", "").startswith(prefix)]
+
+    def fetch_blob_bytes(self, blob_url: str) -> bytes:
+        try:
+            response = httpx.get(
+                blob_url,
+                headers={**self.auth_headers(), "Accept": "application/vnd.github.raw+json"},
+                follow_redirects=True,
+                timeout=30,
             )
+        except httpx.RequestError as exc:
+            raise HTTPException(status_code=502, detail="GitHub API unreachable") from exc
+        if not response.is_success:
+            raise HTTPException(status_code=502, detail="Failed to fetch file from GitHub")
+        return response.content
 
-    def resolve_template_name(self, template_name: str) -> str:
-        template_dir = self._templates_dir / template_name
-        if template_dir.exists():
-            return template_name
-        return "default"
+    def read_manifest(self, template_id: str) -> dict:
+        import base64
 
-    def _load_manifest(self, template_dir: Path) -> TemplateManifest:
-        manifest_path = template_dir / "manifest.json"
-        if not manifest_path.exists():
-            return TemplateManifest(name=template_dir.name)
-        data = json.loads(manifest_path.read_text(encoding="utf-8"))
-        return TemplateManifest(**data)
+        url = f"{GITHUB_API}/repos/{self.repo}/contents/agents/{template_id}/manifest.yaml"
+        try:
+            file_data = self.cached_get(url)
+            content = base64.b64decode(file_data["content"]).decode("utf-8")  # type: ignore[index]
+            return yaml.safe_load(content) or {}
+        except HTTPException as exc:
+            if exc.status_code == 404:
+                return {}
+            raise
+
+    def list_templates(self) -> list[GitHubTemplateSummary]:
+        entries = self.list_repo_dir("agents")
+        templates = []
+        for entry in entries:
+            if entry.get("type") != "dir":
+                continue
+            template_id = entry["name"]
+            manifest = self.read_manifest(template_id)
+            templates.append(
+                GitHubTemplateSummary(
+                    id=template_id,
+                    name=manifest.get("name", template_id),
+                    description=manifest.get("description", ""),
+                    adapter_type=manifest.get("adapter_type", "claude_code"),
+                )
+            )
+        return templates
+
+    def get_template(self, template_id: str) -> GitHubTemplateSummary:
+        url = f"{GITHUB_API}/repos/{self.repo}/contents/agents/{template_id}"
+        entry = self.cached_get(url)
+        if isinstance(entry, dict) and entry.get("type") != "dir":
+            raise HTTPException(status_code=404, detail=f"Template '{template_id}' not found")
+        manifest = self.read_manifest(template_id)
+        return GitHubTemplateSummary(
+            id=template_id,
+            name=manifest.get("name", template_id),
+            description=manifest.get("description", ""),
+            adapter_type=manifest.get("adapter_type", "claude_code"),
+        )
+
+    def scaffold_agent_from_template(
+        self,
+        template_id: str,
+        org_slug: str,
+        agent_slug: str,
+        base_path: str,
+    ) -> str:
+        prefix = f"agents/{template_id}/"
+        blobs = self.list_tree_blobs(prefix)
+
+        agent_dir = Path(base_path) / "agents" / agent_slug
+        if agent_dir.exists():
+            raise HTTPException(status_code=409, detail=f"Agent directory already exists: {agent_dir}")
+        agent_dir.mkdir(parents=True)
+
+        for blob in blobs:
+            blob_path = blob["path"]
+            relative = blob_path[len(prefix):]
+            if relative == "manifest.yaml":
+                continue
+            dest = agent_dir / relative
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            content = self.fetch_blob_bytes(blob["url"])
+            dest.write_bytes(content)
+
+        (agent_dir / "memory").mkdir(exist_ok=True)
+        (agent_dir / "runs").mkdir(exist_ok=True)
+
+        return str(agent_dir)

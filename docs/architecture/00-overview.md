@@ -109,6 +109,7 @@ Filesystem mirrors the DB: `/data/orgs/{slug}/` holds a single git repo (`.git/`
 | 15 | Run Event System               | 05, 07, 08 | RunEvent model, on_event callback, event timeline API | implemented     | 2026-04-12 |
 | 16 | Org-Level Git Versioning       | 07, 08     | OrgRepo helper, commit-per-run lifecycle, rollback, diff endpoint, remote push, org git config | not started     | —          |
 | 17 | Org-Level WebSocket            | 01, 08, 15 | WebSocketManager, WS endpoint with JWT auth, run.* broadcast messages, frontend hook + Redux slice | implemented     | 2026-04-13 |
+| 18 | GitHub Agent Templates         | 03         | GitHubTemplateService, GitHubTemplateSummary model, /api/v1/github-templates, /from-github-template endpoint, module-level TTL cache | implemented     | 2026-04-23 |
 
 ## Cross-Cutting Concerns
 

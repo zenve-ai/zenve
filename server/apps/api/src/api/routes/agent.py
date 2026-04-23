@@ -3,19 +3,19 @@ from fastapi import APIRouter, Depends, Query, status
 from zenve_db.models import UserRecord
 from zenve_models.agent import (
     AgentCreate,
-    AgentCreateFromPreset,
     AgentFileContent,
     AgentFileList,
     AgentResponse,
     AgentUpdate,
 )
+from zenve_models.github_template import AgentCreateFromGitHubTemplate
 from zenve_services import get_agent_service, get_membership_service, get_project_service
 from zenve_services.agent import AgentService
 from zenve_services.membership import MembershipService
 from zenve_services.project import ProjectService
 from zenve_utils.auth import get_current_user
 
-router = APIRouter(prefix="/api/v1/orgs/{org_id}/agents", tags=["agents"])
+router = APIRouter(prefix="/api/v1/projects/{org_id}/agents", tags=["agents"])
 
 
 @router.post("", response_model=AgentResponse, status_code=status.HTTP_201_CREATED)
@@ -32,10 +32,10 @@ def create_agent(
     return service.create(org, body)
 
 
-@router.post("/from-preset", response_model=AgentResponse, status_code=status.HTTP_201_CREATED)
-def create_agent_from_preset(
+@router.post("/from-template", response_model=AgentResponse, status_code=status.HTTP_201_CREATED)
+def create_agent_from_github_template(
     org_id: str,
-    body: AgentCreateFromPreset,
+    body: AgentCreateFromGitHubTemplate,
     user: UserRecord = Depends(get_current_user),
     org_service: ProjectService = Depends(get_project_service),
     membership_service: MembershipService = Depends(get_membership_service),
@@ -43,7 +43,8 @@ def create_agent_from_preset(
 ):
     org = org_service.get_by_id_or_slug(org_id)
     membership_service.require_membership(user.id, org.id)
-    return service.create_from_preset(org, body)
+    return service.create_from_github_template(org, body)
+
 
 
 @router.get("", response_model=list[AgentResponse])
