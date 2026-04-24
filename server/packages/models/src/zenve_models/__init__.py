@@ -9,16 +9,14 @@ from .adapter import (
 )
 from .agent import (
     AgentCreate,
-    AgentCreateFromPreset,
     AgentFileContent,
     AgentFileList,
-    AgentResponse,
     AgentUpdate,
 )
 from .api_key import ApiKeyCreate, ApiKeyCreated, ApiKeyResponse
 from .auth import LoginRequest, SignupRequest, TokenResponse, UserResponse
-from .membership import MembershipResponse
 from .github_template import AgentCreateFromGitHubTemplate, GitHubTemplateSummary
+from .membership import MembershipResponse
 from .preset import Preset, PresetSummary
 from .project import (
     ProjectCreate,
@@ -28,15 +26,16 @@ from .project import (
     ProjectUpdate,
     ProjectWithRoleResponse,
 )
+from .repo import AgentDetail, AgentSummary, ProjectSettings, RunDetail, RunSummary
 
 __all__ = [
     "AdapterConfigBase",
     "AgentCreate",
     "AgentCreateFromGitHubTemplate",
-    "AgentCreateFromPreset",
+    "AgentDetail",
     "AgentFileContent",
     "AgentFileList",
-    "AgentResponse",
+    "AgentSummary",
     "AgentUpdate",
     "AnthropicAPIConfig",
     "ApiKeyCreate",
@@ -54,10 +53,13 @@ __all__ = [
     "ProjectCreatedResponse",
     "ProjectGitHubConnect",
     "ProjectResponse",
+    "ProjectSettings",
     "ProjectUpdate",
     "ProjectWithRoleResponse",
     "RunContext",
+    "RunDetail",
     "RunResult",
+    "RunSummary",
     "SignupRequest",
     "TokenResponse",
     "UserResponse",

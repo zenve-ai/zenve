@@ -34,7 +34,7 @@ zenve-cli = { workspace = true }
 [dependency-groups]
 dev = [
     "alembic>=1.13",
-    "pyright>=1.1.407",
+    "pyright>=1.1.409",
     "pytest>=8.0",
     "pytest-asyncio>=0.25",
     "pytest-cov>=7.1.0",

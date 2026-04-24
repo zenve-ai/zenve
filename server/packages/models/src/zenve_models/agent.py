@@ -1,7 +1,4 @@
-from datetime import datetime
-from typing import Any
-
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 
 class AgentCreate(BaseModel):
@@ -11,16 +8,7 @@ class AgentCreate(BaseModel):
     skills: list[str] = []
     tools: list[str] = ["Read", "Write", "Bash"]
     heartbeat_interval_seconds: int = 0
-    template: str = "default"
-    template_vars: dict[str, Any] = Field(
-        default_factory=dict,
-        description="Jinja context for the chosen template set; keys depend on that template's manifest.",
-    )
-
-
-class AgentCreateFromPreset(BaseModel):
-    preset: str
-    name: str | None = None
+    template: str | None = None
 
 
 class AgentUpdate(BaseModel):
@@ -28,27 +16,8 @@ class AgentUpdate(BaseModel):
     adapter_config: dict | None = None
     skills: list[str] | None = None
     tools: list[str] | None = None
-    status: str | None = None
+    enabled: bool | None = None
     heartbeat_interval_seconds: int | None = None
-
-
-class AgentResponse(BaseModel):
-    id: str
-    org_id: str
-    name: str
-    slug: str
-    dir_path: str
-    adapter_type: str
-    adapter_config: dict
-    skills: list[str]
-    tools: list[str]
-    status: str
-    heartbeat_interval_seconds: int
-    last_heartbeat_at: datetime | None
-    created_at: datetime
-    updated_at: datetime
-
-    model_config = {"from_attributes": True}
 
 
 class AgentFileList(BaseModel):

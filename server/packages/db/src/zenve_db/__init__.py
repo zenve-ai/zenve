@@ -1,8 +1,7 @@
 from .database import Base, Session, engine, get_db
-from .models import Agent, ApiKeyRecord, Project, UserRecord
+from .models import ApiKeyRecord, Project, UserRecord
 
 __all__ = [
-    "Agent",
     "ApiKeyRecord",
     "Base",
     "Project",

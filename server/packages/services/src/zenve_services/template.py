@@ -69,7 +69,11 @@ class GitHubTemplateService:
         tree_url = f"{GITHUB_API}/repos/{self.repo}/git/trees/{tree_sha}"
         tree_data = self.cached_get(tree_url, params={"recursive": "1"})
         tree = tree_data["tree"]  # type: ignore[index]
-        return [item for item in tree if item.get("type") == "blob" and item.get("path", "").startswith(prefix)]
+        return [
+            item
+            for item in tree
+            if item.get("type") == "blob" and item.get("path", "").startswith(prefix)
+        ]
 
     def fetch_blob_bytes(self, blob_url: str) -> bytes:
         try:
@@ -112,6 +116,10 @@ class GitHubTemplateService:
                     name=manifest.get("name", template_id),
                     description=manifest.get("description", ""),
                     adapter_type=manifest.get("adapter_type", "claude_code"),
+                    adapter_config=manifest.get("adapter_config", {}),
+                    skills=manifest.get("skills", []),
+                    tools=manifest.get("tools", ["Read", "Write", "Bash"]),
+                    heartbeat_interval_seconds=manifest.get("heartbeat_interval_seconds", 0),
                 )
             )
         return templates
@@ -121,18 +129,37 @@ class GitHubTemplateService:
         entry = self.cached_get(url)
         if isinstance(entry, dict) and entry.get("type") != "dir":
             raise HTTPException(status_code=404, detail=f"Template '{template_id}' not found")
+
         manifest = self.read_manifest(template_id)
+
         return GitHubTemplateSummary(
             id=template_id,
             name=manifest.get("name", template_id),
             description=manifest.get("description", ""),
             adapter_type=manifest.get("adapter_type", "claude_code"),
+            adapter_config=manifest.get("adapter_config", {}),
+            skills=manifest.get("skills", []),
+            tools=manifest.get("tools", ["Read", "Write", "Bash"]),
+            heartbeat_interval_seconds=manifest.get("heartbeat_interval_seconds", 0),
         )
+
+    def fetch_template_files(self, template_id: str) -> dict[str, bytes]:
+        """Return all non-manifest files from agents/{template_id}/ as in-memory bytes."""
+        prefix = f"agents/{template_id}/"
+        blobs = self.list_tree_blobs(prefix)
+        files: dict[str, bytes] = {}
+
+        for blob in blobs:
+            relative = blob["path"][len(prefix) :]
+            if relative in ("manifest.yaml", "manifest.json"):
+                continue
+            files[relative] = self.fetch_blob_bytes(blob["url"])
+
+        return files
 
     def scaffold_agent_from_template(
         self,
         template_id: str,
-        org_slug: str,
         agent_slug: str,
         base_path: str,
     ) -> str:
@@ -141,12 +168,14 @@ class GitHubTemplateService:
 
         agent_dir = Path(base_path) / "agents" / agent_slug
         if agent_dir.exists():
-            raise HTTPException(status_code=409, detail=f"Agent directory already exists: {agent_dir}")
+            raise HTTPException(
+                status_code=409, detail=f"Agent directory already exists: {agent_dir}"
+            )
         agent_dir.mkdir(parents=True)
 
         for blob in blobs:
             blob_path = blob["path"]
-            relative = blob_path[len(prefix):]
+            relative = blob_path[len(prefix) :]
             if relative == "manifest.yaml":
                 continue
             dest = agent_dir / relative

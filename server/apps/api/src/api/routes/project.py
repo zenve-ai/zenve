@@ -10,16 +10,19 @@ from zenve_models.project import (
     ProjectUpdate,
     ProjectWithRoleResponse,
 )
+from zenve_models.repo import ProjectSettings
 from zenve_services import (
     get_api_key_service,
     get_github_service,
     get_membership_service,
     get_project_service,
+    get_repo_reader_service,
 )
 from zenve_services.api_key import ApiKeyService
 from zenve_services.github import GitHubService
 from zenve_services.membership import MembershipService
 from zenve_services.project import ProjectService
+from zenve_services.repo_reader import RepoReaderService
 from zenve_utils.auth import get_current_user
 
 router = APIRouter(prefix="/api/v1/projects", tags=["projects"])
@@ -118,6 +121,20 @@ def github_disconnect(
     project = project_service.get_by_id_or_slug(project_id)
     membership_service.require_role(user.id, project.id, ["owner", "admin"])
     github_service.disconnect(project)
+
+
+@router.get("/{project_id}/settings", response_model=ProjectSettings)
+def get_project_settings(
+    project_id: str,
+    user: UserRecord = Depends(get_current_user),
+    project_service: ProjectService = Depends(get_project_service),
+    membership_service: MembershipService = Depends(get_membership_service),
+    repo_reader: RepoReaderService = Depends(get_repo_reader_service),
+):
+    project = project_service.get_by_id_or_slug(project_id)
+    membership_service.require_membership(user.id, project.id)
+    settings = repo_reader.get_project_settings(project)
+    return ProjectSettings.model_validate(settings)
 
 
 @router.patch("/{project_id}", response_model=ProjectWithRoleResponse)
