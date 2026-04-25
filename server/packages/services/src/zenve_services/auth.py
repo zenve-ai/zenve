@@ -1,12 +1,12 @@
 import secrets
 
 import httpx
-from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
 from zenve_config.settings import get_settings
 from zenve_db.models import UserRecord
 from zenve_models import LoginRequest, SignupRequest, TokenResponse, UserResponse
+from zenve_models.errors import AuthError, ConflictError
 from zenve_utils.auth import create_token, hash_password, verify_password
 
 _oauth_states: set[str] = set()
@@ -18,9 +18,7 @@ class AuthService:
 
     def signup(self, body: SignupRequest) -> TokenResponse:
         if self.db.query(UserRecord).filter(UserRecord.email == body.email).first():
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT, detail="Email already registered"
-            )
+            raise ConflictError("Email already registered")
 
         user = UserRecord(
             email=body.email,
@@ -44,10 +42,7 @@ class AuthService:
             or not user.password_hash
             or not verify_password(body.password, user.password_hash)
         ):
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid email or password",
-            )
+            raise AuthError("Invalid email or password")
 
         return TokenResponse(
             access_token=create_token(user.id),

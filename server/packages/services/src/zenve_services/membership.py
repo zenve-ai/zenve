@@ -1,10 +1,10 @@
 import uuid
 
-from fastapi import HTTPException
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from zenve_db.models import Membership
+from zenve_models.errors import AuthError, ConflictError
 
 
 class MembershipService:
@@ -23,9 +23,7 @@ class MembershipService:
             self.db.commit()
         except IntegrityError as exc:
             self.db.rollback()
-            raise HTTPException(
-                status_code=409, detail="User is already a member of this project"
-            ) from exc
+            raise ConflictError("User is already a member of this project") from exc
         self.db.refresh(membership)
         return membership
 
@@ -39,11 +37,11 @@ class MembershipService:
     def require_membership(self, user_id: str, project_id: str) -> Membership:
         membership = self.get_membership(user_id, project_id)
         if not membership:
-            raise HTTPException(status_code=403, detail="You are not a member of this project")
+            raise AuthError("You are not a member of this project")
         return membership
 
     def require_role(self, user_id: str, project_id: str, roles: list[str]) -> Membership:
         membership = self.require_membership(user_id, project_id)
         if membership.role not in roles:
-            raise HTTPException(status_code=403, detail="Insufficient role for this action")
+            raise AuthError("Insufficient role for this action")
         return membership

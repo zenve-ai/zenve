@@ -1,9 +1,9 @@
 import json
 
 import httpx
-from fastapi import HTTPException
 
 from zenve_db.models import Project
+from zenve_models.errors import NotFoundError, ValidationError
 from zenve_models.repo import AgentDetail, AgentSummary, RunDetail, RunSummary
 from zenve_services.repo_writer import validate_relpath
 from zenve_utils.github import get_repo_file, list_repo_dir, list_tree_paths
@@ -16,7 +16,7 @@ class RepoReaderService:
             or not project.github_repo
             or not project.github_default_branch
         ):
-            raise HTTPException(status_code=422, detail="Project has no GitHub repo connected")
+            raise ValidationError("Project has no GitHub repo connected")
         return project.github_installation_id, project.github_repo, project.github_default_branch
 
     def list_agents(self, project: Project) -> list[AgentSummary]:
@@ -63,7 +63,7 @@ class RepoReaderService:
             )
         except httpx.HTTPStatusError as exc:
             if exc.response.status_code == 404:
-                raise HTTPException(status_code=404, detail=f"Agent '{name}' not found") from exc
+                raise NotFoundError(f"Agent '{name}' not found") from exc
             raise
         settings = json.loads(settings_bytes)
         files = self.list_agent_files(project, name)
@@ -94,7 +94,7 @@ class RepoReaderService:
             )
         except httpx.HTTPStatusError as exc:
             if exc.response.status_code == 404:
-                raise HTTPException(status_code=404, detail=f"File '{relpath}' not found") from exc
+                raise NotFoundError(f"File '{relpath}' not found") from exc
             raise
 
     def list_agent_files(self, project: Project, name: str) -> list[str]:
@@ -133,7 +133,7 @@ class RepoReaderService:
             )
         except httpx.HTTPStatusError as exc:
             if exc.response.status_code == 404:
-                raise HTTPException(status_code=404, detail=f"Run '{run_id}' not found") from exc
+                raise NotFoundError(f"Run '{run_id}' not found") from exc
             raise
         data = json.loads(run_bytes)
         return RunDetail(

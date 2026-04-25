@@ -3,9 +3,9 @@ from pathlib import Path
 
 import httpx
 import yaml
-from fastapi import HTTPException
 
 from zenve_config.settings import Settings
+from zenve_models.errors import ConflictError, ExternalError, NotFoundError, RateLimitError, ValidationError
 from zenve_models.github_template import GitHubTemplateSummary
 
 GITHUB_API = "https://api.github.com"
@@ -38,15 +38,15 @@ class GitHubTemplateService:
         try:
             response = httpx.get(url, headers=self.auth_headers(), params=params, timeout=15)
         except httpx.RequestError as exc:
-            raise HTTPException(status_code=502, detail="GitHub API unreachable") from exc
+            raise ExternalError("GitHub API unreachable") from exc
         if response.status_code == 404:
-            raise HTTPException(status_code=404, detail="Not found in GitHub repo")
+            raise NotFoundError("Not found in GitHub repo")
         if response.status_code in (401, 403):
-            raise HTTPException(status_code=422, detail="Cannot access GitHub repo")
+            raise ValidationError("Cannot access GitHub repo")
         if response.status_code == 429:
-            raise HTTPException(status_code=429, detail="GitHub API rate limit exceeded")
+            raise RateLimitError("GitHub API rate limit exceeded")
         if not response.is_success:
-            raise HTTPException(status_code=502, detail="GitHub API unreachable")
+            raise ExternalError("GitHub API unreachable")
         data = response.json()
         _cache[cache_key] = (data, now + CACHE_TTL)
         return data
@@ -55,14 +55,14 @@ class GitHubTemplateService:
         url = f"{GITHUB_API}/repos/{self.repo}/contents/{path}"
         result = self.cached_get(url)
         if not isinstance(result, list):
-            raise HTTPException(status_code=404, detail=f"Path '{path}' is not a directory")
+            raise NotFoundError(f"Path '{path}' is not a directory")
         return result
 
     def list_tree_blobs(self, prefix: str) -> list[dict]:
         ref_url = f"{GITHUB_API}/repos/{self.repo}/git/ref/heads/main"
         try:
             ref_data = self.cached_get(ref_url)
-        except HTTPException:
+        except NotFoundError:
             ref_url = f"{GITHUB_API}/repos/{self.repo}/git/ref/heads/master"
             ref_data = self.cached_get(ref_url)
         tree_sha = ref_data["object"]["sha"]  # type: ignore[index]
@@ -84,9 +84,9 @@ class GitHubTemplateService:
                 timeout=30,
             )
         except httpx.RequestError as exc:
-            raise HTTPException(status_code=502, detail="GitHub API unreachable") from exc
+            raise ExternalError("GitHub API unreachable") from exc
         if not response.is_success:
-            raise HTTPException(status_code=502, detail="Failed to fetch file from GitHub")
+            raise ExternalError("Failed to fetch file from GitHub")
         return response.content
 
     def read_manifest(self, template_id: str) -> dict:
@@ -97,10 +97,8 @@ class GitHubTemplateService:
             file_data = self.cached_get(url)
             content = base64.b64decode(file_data["content"]).decode("utf-8")  # type: ignore[index]
             return yaml.safe_load(content) or {}
-        except HTTPException as exc:
-            if exc.status_code == 404:
-                return {}
-            raise
+        except NotFoundError:
+            return {}
 
     def list_templates(self) -> list[GitHubTemplateSummary]:
         entries = self.list_repo_dir("agents")
@@ -128,7 +126,7 @@ class GitHubTemplateService:
         url = f"{GITHUB_API}/repos/{self.repo}/contents/agents/{template_id}"
         entry = self.cached_get(url)
         if isinstance(entry, dict) and entry.get("type") != "dir":
-            raise HTTPException(status_code=404, detail=f"Template '{template_id}' not found")
+            raise NotFoundError(f"Template '{template_id}' not found")
 
         manifest = self.read_manifest(template_id)
 
@@ -168,9 +166,7 @@ class GitHubTemplateService:
 
         agent_dir = Path(base_path) / "agents" / agent_slug
         if agent_dir.exists():
-            raise HTTPException(
-                status_code=409, detail=f"Agent directory already exists: {agent_dir}"
-            )
+            raise ConflictError(f"Agent directory already exists: {agent_dir}")
         agent_dir.mkdir(parents=True)
 
         for blob in blobs:

@@ -1,11 +1,11 @@
 import uuid
 from datetime import UTC, datetime
 
-from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
 from zenve_db.models import ApiKeyRecord
 from zenve_models.api_key import ApiKeyCreate
+from zenve_models.errors import NotFoundError
 from zenve_utils.api_key import (
     extract_prefix,
     generate_api_key,
@@ -55,7 +55,7 @@ class ApiKeyService:
     def revoke(self, key_id: str) -> ApiKeyRecord:
         record = self.db.query(ApiKeyRecord).filter(ApiKeyRecord.id == key_id).first()
         if not record:
-            raise HTTPException(status_code=404, detail="API key not found")
+            raise NotFoundError("API key not found")
         record.is_active = False
         self.db.commit()
         self.db.refresh(record)

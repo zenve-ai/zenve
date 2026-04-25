@@ -1,8 +1,8 @@
 import httpx
-from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
 from zenve_db.models import Project, UserRecord
+from zenve_models.errors import ExternalError, ValidationError
 from zenve_models.project import GitHubRepo
 from zenve_utils.github import get_repo_info, list_installation_repos
 
@@ -17,13 +17,12 @@ class GitHubService:
             info = get_repo_info(installation_id, repo)
         except httpx.HTTPStatusError as exc:
             if exc.response.status_code in (401, 403, 404):
-                raise HTTPException(
-                    status_code=422,
-                    detail=f"GitHub App cannot access repo '{repo}'. Check installation_id and repo name.",
+                raise ValidationError(
+                    f"GitHub App cannot access repo '{repo}'. Check installation_id and repo name."
                 ) from exc
-            raise HTTPException(status_code=502, detail="GitHub API error") from exc
+            raise ExternalError("GitHub API error") from exc
         except Exception as exc:
-            raise HTTPException(status_code=502, detail="GitHub API unreachable") from exc
+            raise ExternalError("GitHub API unreachable") from exc
 
         project.github_installation_id = installation_id
         project.github_repo = repo
@@ -44,12 +43,12 @@ class GitHubService:
             raw = list_installation_repos(installation_id)
         except httpx.HTTPStatusError as exc:
             if exc.response.status_code in (401, 403, 404):
-                raise HTTPException(status_code=422, detail="GitHub App installation not found or access denied.") from exc
-            raise HTTPException(status_code=502, detail="GitHub API error") from exc
+                raise ValidationError("GitHub App installation not found or access denied.") from exc
+            raise ExternalError("GitHub API error") from exc
         except RuntimeError as exc:
-            raise HTTPException(status_code=500, detail=str(exc)) from exc
+            raise ExternalError(str(exc)) from exc
         except Exception as exc:
-            raise HTTPException(status_code=502, detail="GitHub API unreachable") from exc
+            raise ExternalError("GitHub API unreachable") from exc
         return [
             GitHubRepo(
                 id=r["id"],

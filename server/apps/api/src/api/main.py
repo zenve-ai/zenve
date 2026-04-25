@@ -2,7 +2,7 @@ import logging
 import os
 
 import uvicorn
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 
 from api.lifespan import lifespan
@@ -16,8 +16,52 @@ from api.routes import (
     template_router,
     ws_router,
 )
+from zenve_models.errors import (
+    AuthError,
+    ConflictError,
+    ExternalError,
+    NotFoundError,
+    RateLimitError,
+    ValidationError,
+    ZenveError,
+)
 
 app = FastAPI(lifespan=lifespan)
+
+
+@app.exception_handler(NotFoundError)
+async def not_found_handler(request: Request, exc: NotFoundError) -> None:
+    raise HTTPException(status_code=404, detail=exc.message)
+
+
+@app.exception_handler(ConflictError)
+async def conflict_handler(request: Request, exc: ConflictError) -> None:
+    raise HTTPException(status_code=409, detail=exc.message)
+
+
+@app.exception_handler(ValidationError)
+async def validation_handler(request: Request, exc: ValidationError) -> None:
+    raise HTTPException(status_code=422, detail=exc.message)
+
+
+@app.exception_handler(ExternalError)
+async def external_handler(request: Request, exc: ExternalError) -> None:
+    raise HTTPException(status_code=502, detail=exc.message)
+
+
+@app.exception_handler(RateLimitError)
+async def rate_limit_handler(request: Request, exc: RateLimitError) -> None:
+    raise HTTPException(status_code=429, detail=exc.message)
+
+
+@app.exception_handler(AuthError)
+async def auth_handler(request: Request, exc: AuthError) -> None:
+    raise HTTPException(status_code=403, detail=exc.message)
+
+
+@app.exception_handler(ZenveError)
+async def zenve_handler(request: Request, exc: ZenveError) -> None:
+    raise HTTPException(status_code=500, detail=exc.message)
 
 
 origins = [

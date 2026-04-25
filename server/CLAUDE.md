@@ -31,6 +31,7 @@ server/
 - All business logic lives here
 - Receive `db: Session` via constructor, never import `get_db` directly
 - Dependency functions (`get_*_service`) go in `zenve_services/__init__.py`
+- **Never raise `HTTPException`** — services are HTTP-agnostic. Raise domain exceptions from `zenve_models.errors` instead (`NotFoundError`, `ConflictError`, `ValidationError`, `ExternalError`, `RateLimitError`, `AuthError`). FastAPI exception handlers in `apps/api/src/api/main.py` convert these to HTTP responses.
 
 ### Models (`packages/models/`)
 - All Pydantic models go here — never define them inside `apps/api/`
@@ -97,6 +98,7 @@ Two auth systems coexist — use the right one for each context:
 - Pydantic models defined inside `apps/api/`
 - Business logic (db queries, conditionals) inside route handlers
 - Helper functions defined inside `apps/api/routes/` — move to `zenve_utils`
+- `from fastapi import HTTPException` inside any `packages/services/` file — use domain errors instead
 
 ## Development Commands
 
@@ -122,78 +124,6 @@ just docker-logs  # tail logs
 4. **Dependency function** → `packages/services/src/zenve_services/__init__.py`
 5. **Route** → `apps/api/src/api/routes/{domain}.py` (thin wrapper)
 6. **Register Router** → `apps/api/src/api/routes/__init__.py` + `main.py`
-
-## Architecture Documentation
-
-@../docs/architecture/00-overview.md
-
-Project architecture is documented in `../docs/architecture/` using a numbered chunk system:
-
-```
-docs/architecture/
-    00-overview.md          # Master index — entry point, lists every chunk with dependencies and deliverables
-    01-organizations-crud.md
-    02-api-key-auth.md
-    ...
-    NN-feature-name.md      # One file per feature/domain boundary
-```
-
-- **`00-overview.md`** is always the entry point. It contains a table of every chunk with its number, name, dependencies, and key deliverables.
-- **Chunk files (`01–NN`)** each describe a single feature or domain boundary.
-
-**IMPORTANT:** Whenever a new feature is added or an architectural change is made, you **must** update the relevant chunk file(s) in `docs/architecture/` and keep `00-overview.md` in sync. Do not leave docs stale after implementation changes.
-
-### Chunk Template
-
-When creating a new chunk file, use this structure:
-
-```markdown
-# Chunk NN — Feature Name
-
-## Goal
-One paragraph: what this feature does and why it exists.
-
-## Depends On
-- Chunk XX — Name (what it provides to this feature)
-- Chunk YY — Name
-
-## Referenced By
-- Chunk ZZ — Name (what this feature provides to it)
-
-## Deliverables
-
-### 1. ORM Model — `db/models.py`
-Table schema, column definitions, relationships.
-
-### 2. Pydantic Models — `models/{domain}.py`
-Request/response schemas with field descriptions.
-
-### 3. Service — `services/{domain}.py`
-Class signature, public methods, key business rules.
-
-### 4. Dependency Function — `services/__init__.py`
-The `get_*_service` factory.
-
-### 5. Routes — `api/routes/{domain}.py`
-Endpoint table (method, path, description).
-
-### 6. Agent Integration — `agents/{domain}.py` (if applicable)
-How agents interact with this feature.
-
-## Config
-Environment variables or settings this feature introduces.
-
-## Key Decisions
-| Decision | Choice | Rationale |
-|----------|--------|-----------|
-
-## Notes
-Edge cases, open questions, things to revisit.
-
-## Change Log
-| Date | Change | Reason |
-|------|--------|--------|
-```
 
 ## Adding a New Package
 

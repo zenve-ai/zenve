@@ -1,11 +1,11 @@
 import re
 import uuid
 
-from fastapi import HTTPException
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from zenve_db.models import Membership, Project
+from zenve_models.errors import ConflictError, NotFoundError
 from zenve_models.project import ProjectCreate, ProjectUpdate
 
 
@@ -54,10 +54,7 @@ class ProjectService:
             self.db.flush()
         except IntegrityError as exc:
             self.db.rollback()
-            raise HTTPException(
-                status_code=409,
-                detail=conflict_detail(exc),
-            ) from exc
+            raise ConflictError(conflict_detail(exc)) from exc
 
         return project
 
@@ -67,10 +64,7 @@ class ProjectService:
             self.db.commit()
         except IntegrityError as exc:
             self.db.rollback()
-            raise HTTPException(
-                status_code=409,
-                detail=conflict_detail(exc),
-            ) from exc
+            raise ConflictError(conflict_detail(exc)) from exc
         self.db.refresh(project)
         return project
 
@@ -88,13 +82,13 @@ class ProjectService:
     def get_by_id(self, project_id: str) -> Project:
         project = self.db.query(Project).filter(Project.id == project_id).first()
         if not project:
-            raise HTTPException(status_code=404, detail="Project not found")
+            raise NotFoundError("Project not found")
         return project
 
     def get_by_slug(self, slug: str) -> Project:
         project = self.db.query(Project).filter(Project.slug == slug).first()
         if not project:
-            raise HTTPException(status_code=404, detail="Project not found")
+            raise NotFoundError("Project not found")
         return project
 
     def get_by_id_or_slug(self, identifier: str) -> Project:
@@ -126,9 +120,6 @@ class ProjectService:
             self.db.commit()
         except IntegrityError as exc:
             self.db.rollback()
-            raise HTTPException(
-                status_code=409,
-                detail=conflict_detail(exc),
-            ) from exc
+            raise ConflictError(conflict_detail(exc)) from exc
         self.db.refresh(project)
         return project
