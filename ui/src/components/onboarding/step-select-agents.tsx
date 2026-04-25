@@ -1,20 +1,22 @@
 import { cn } from '@/lib/utils'
-import { MOCK_AGENTS } from './mock-agents'
+import type { AgentTemplate } from '@/types'
 
 interface StepSelectAgentsProps {
+  templates: AgentTemplate[]
+  isLoading: boolean
   selectedAgents: Set<string>
   onToggle: (id: string) => void
 }
 
-export function StepSelectAgents({ selectedAgents, onToggle }: StepSelectAgentsProps) {
+export function StepSelectAgents({ templates, isLoading, selectedAgents, onToggle }: StepSelectAgentsProps) {
   // --- render helpers ---
-  const renderAgentCard = (agent: typeof MOCK_AGENTS[number]) => {
-    const selected = selectedAgents.has(agent.id)
+  const renderAgentCard = (template: AgentTemplate) => {
+    const selected = selectedAgents.has(template.id)
     return (
       <button
-        key={agent.id}
+        key={template.id}
         type="button"
-        onClick={() => onToggle(agent.id)}
+        onClick={() => onToggle(template.id)}
         className={cn(
           'flex items-stretch gap-0 border border-dashed text-left transition-colors',
           selected
@@ -24,18 +26,32 @@ export function StepSelectAgents({ selectedAgents, onToggle }: StepSelectAgentsP
       >
         <div className={cn('w-[3px] shrink-0', selected ? 'bg-emerald-500' : 'bg-muted-foreground/20')} />
         <div className="flex flex-col gap-0.5 px-3 py-2.5">
-          <div className="flex items-center justify-between gap-2">
-            <span className="text-[11px] font-mono font-medium leading-tight">{agent.name}</span>
-            <span className={cn(
-              'text-[9px] font-mono tracking-widest uppercase',
-              selected ? 'text-emerald-500' : 'text-muted-foreground/40',
-            )}>
-              {agent.category}
-            </span>
-          </div>
-          <p className="text-[11px] text-muted-foreground leading-snug">{agent.description}</p>
+          <span className="text-[11px] font-mono font-medium leading-tight">{template.name}</span>
+          <p className="text-[11px] text-muted-foreground leading-snug">{template.description}</p>
         </div>
       </button>
+    )
+  }
+
+  const renderContent = () => {
+    if (isLoading) {
+      return (
+        <p className="font-mono text-[10px] tracking-widest uppercase text-muted-foreground/40">
+          Loading templates...
+        </p>
+      )
+    }
+    if (templates.length === 0) {
+      return (
+        <p className="font-mono text-[10px] tracking-widest uppercase text-muted-foreground/40">
+          No templates available
+        </p>
+      )
+    }
+    return (
+      <div className="grid grid-cols-2 gap-2">
+        {templates.map(renderAgentCard)}
+      </div>
     )
   }
 
@@ -52,9 +68,7 @@ export function StepSelectAgents({ selectedAgents, onToggle }: StepSelectAgentsP
         </p>
       </div>
 
-      <div className="grid grid-cols-2 gap-2">
-        {MOCK_AGENTS.map(renderAgentCard)}
-      </div>
+      {renderContent()}
 
       {selectedAgents.size > 0 && (
         <p className="font-mono text-[10px] tracking-widest uppercase text-emerald-500">

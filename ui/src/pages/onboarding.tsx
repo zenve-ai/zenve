@@ -9,7 +9,8 @@ import {
   StepSelectAgents,
   StepFinish,
 } from '@/components/onboarding'
-import { useCreateProjectMutation, useConnectGithubMutation } from '@/store/project'
+import { useCreateProjectMutation, useConnectGithubMutation, useInitProjectMutation } from '@/store/project'
+import { useListTemplatesQuery } from '@/store/agents'
 import config from '@/config'
 
 const TOTAL_STEPS = 4
@@ -32,8 +33,10 @@ export default function OnboardingPage() {
   const [finishError, setFinishError] = useState<string | null>(null)
   const [selectedRepo, setSelectedRepo] = useState<string | null>(null)
   const [selectedAgents, setSelectedAgents] = useState<Set<string>>(new Set())
+  const { data: templates = [], isLoading: isLoadingTemplates } = useListTemplatesQuery()
   const [createProject, { isLoading: isCreating }] = useCreateProjectMutation()
   const [connectGithub, { isLoading: isConnecting }] = useConnectGithubMutation()
+  const [initProject, { isLoading: isIniting }] = useInitProjectMutation()
 
   const isLastStep = currentStep === TOTAL_STEPS - 1
 
@@ -117,6 +120,23 @@ export default function OnboardingPage() {
         setFinishError(detail)
         return
       }
+
+      const agentSpecs = Array.from(selectedAgents).map((templateId) => {
+        const t = templates.find((a) => a.id === templateId)!
+        return { name: t.name, template: t.id }
+      })
+      const r3 = await initProject({
+        projectId: id,
+        body: { description: projectDescription.trim() || undefined, agents: agentSpecs },
+      })
+      if ('error' in r3) {
+        const err = r3.error
+        const detail = 'data' in err
+          ? String((err.data as Record<string, unknown>)?.detail ?? 'Failed to initialize project')
+          : 'Failed to initialize project'
+        setFinishError(detail)
+        return
+      }
     }
     navigate(`/${slug}`)
   }
@@ -145,6 +165,8 @@ export default function OnboardingPage() {
       case 2:
         return (
           <StepSelectAgents
+            templates={templates}
+            isLoading={isLoadingTemplates}
             selectedAgents={selectedAgents}
             onToggle={handleToggleAgent}
           />
@@ -157,7 +179,7 @@ export default function OnboardingPage() {
             githubRepo={selectedRepo}
             selectedAgentCount={selectedAgents.size}
             onGetStarted={handleFinish}
-            isLoading={isCreating || isConnecting}
+            isLoading={isCreating || isConnecting || isIniting}
             error={finishError}
           />
         )

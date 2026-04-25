@@ -47,6 +47,21 @@ function toProjectSummary(p: ProjectWithRoleResponse): ProjectSummary {
   }
 }
 
+interface InitAgentSpec {
+  name: string
+  template?: string | null
+}
+
+interface ProjectInitBody {
+  description?: string | null
+  agents: InitAgentSpec[]
+}
+
+interface AgentSummary {
+  name: string
+  slug: string
+}
+
 export const projectApi = createApi({
   reducerPath: 'projectApi',
   baseQuery: createBaseQueryWithReauth(config.apiUrl),
@@ -88,6 +103,13 @@ export const projectApi = createApi({
       query: ({ projectId }) => ({ url: `/projects/${projectId}/github/disconnect`, method: 'DELETE' }),
       invalidatesTags: ['Project'],
     }),
+    initProject: builder.mutation<AgentSummary[], { projectId: string; body: ProjectInitBody }>({
+      query: ({ projectId, body }) => ({
+        url: `/projects/${projectId}/init`,
+        method: 'POST',
+        body,
+      }),
+    }),
   }),
 })
 
@@ -98,4 +120,5 @@ export const {
   useSaveGithubInstallationMutation,
   useConnectGithubMutation,
   useDisconnectGithubMutation,
+  useInitProjectMutation,
 } = projectApi

@@ -20,4 +20,5 @@ export {
   useSaveGithubInstallationMutation,
   useConnectGithubMutation,
   useDisconnectGithubMutation,
+  useInitProjectMutation,
 } from './api'

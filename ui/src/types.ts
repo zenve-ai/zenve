@@ -91,6 +91,12 @@ export interface RunCreateBody {
   adapterConfig?: Record<string, unknown> | null
 }
 
+export interface AgentTemplate {
+  id: string
+  name: string
+  description: string
+}
+
 export interface GitHubRepo {
   id: number
   full_name: string

@@ -1,7 +1,7 @@
 import { createApi } from '@reduxjs/toolkit/query/react'
 import { createBaseQueryWithReauth } from '@/lib/api'
 import config from '@/config'
-import type { Agent, AgentUpdateBody } from '@/types'
+import type { Agent, AgentTemplate, AgentUpdateBody } from '@/types'
 
 interface AgentResponse {
   id: string
@@ -44,6 +44,11 @@ export const agentsApi = createApi({
   baseQuery: createBaseQueryWithReauth(config.apiUrl),
   tagTypes: ['Agent'],
   endpoints: (builder) => ({
+    listTemplates: builder.query<AgentTemplate[], void>({
+      query: () => '/templates',
+      transformResponse: (response: { id: string; name: string; description: string }[]) =>
+        response.map(({ id, name, description }) => ({ id, name, description })),
+    }),
     listAgents: builder.query<Agent[], { projectSlug: string }>({
       query: ({ projectSlug }) => `/projects/${projectSlug}/agents`,
       transformResponse: (response: AgentResponse[]) => response.map(toAgent),
@@ -72,4 +77,4 @@ export const agentsApi = createApi({
   }),
 })
 
-export const { useListAgentsQuery, useGetAgentQuery, useUpdateAgentMutation } = agentsApi
+export const { useListTemplatesQuery, useListAgentsQuery, useGetAgentQuery, useUpdateAgentMutation } = agentsApi
