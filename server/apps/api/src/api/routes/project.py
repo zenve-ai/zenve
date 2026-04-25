@@ -6,18 +6,21 @@ from zenve_models.project import (
     ProjectCreate,
     ProjectCreatedResponse,
     ProjectGitHubConnect,
+    ProjectInit,
     ProjectResponse,
     ProjectUpdate,
     ProjectWithRoleResponse,
 )
-from zenve_models.repo import ProjectSettings
+from zenve_models.repo import AgentSummary, ProjectSettings
 from zenve_services import (
+    get_agent_service,
     get_api_key_service,
     get_github_service,
     get_membership_service,
     get_project_service,
     get_repo_reader_service,
 )
+from zenve_services.agent import AgentService
 from zenve_services.api_key import ApiKeyService
 from zenve_services.github import GitHubService
 from zenve_services.membership import MembershipService
@@ -121,6 +124,20 @@ def github_disconnect(
     project = project_service.get_by_id_or_slug(project_id)
     membership_service.require_role(user.id, project.id, ["owner", "admin"])
     github_service.disconnect(project)
+
+
+@router.post("/{project_id}/init", response_model=list[AgentSummary])
+def init_project(
+    project_id: str,
+    body: ProjectInit,
+    user: UserRecord = Depends(get_current_user),
+    project_service: ProjectService = Depends(get_project_service),
+    membership_service: MembershipService = Depends(get_membership_service),
+    agent_service: AgentService = Depends(get_agent_service),
+):
+    project = project_service.get_by_id_or_slug(project_id)
+    membership_service.require_role(user.id, project.id, ["owner", "admin"])
+    return agent_service.init(project, body)
 
 
 @router.get("/{project_id}/settings", response_model=ProjectSettings)

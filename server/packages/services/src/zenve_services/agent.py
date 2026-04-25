@@ -1,42 +1,14 @@
 import json
-import re
 
 from zenve_db.models import Project
 from zenve_models.agent import AgentCreate, AgentUpdate
+from zenve_models.errors import ConflictError, NotFoundError
+from zenve_models.project import ProjectInit
 from zenve_models.repo import AgentDetail, AgentSummary
 from zenve_services.repo_reader import RepoReaderService
 from zenve_services.repo_writer import RepoWriterService
 from zenve_services.template import GitHubTemplateService
-
-
-def slugify(name: str) -> str:
-    slug = name.lower().strip()
-    slug = re.sub(r"[^a-z0-9]+", "-", slug)
-    return slug.strip("-")
-
-
-DEFAULT_SOUL_MD = b"# Soul\n\nYou are a helpful AI agent.\n"
-DEFAULT_AGENTS_MD = b"# Agents\n\nNo collaborators configured.\n"
-
-
-def default_files() -> dict[str, bytes]:
-    return {
-        "SOUL.md": DEFAULT_SOUL_MD,
-        "AGENTS.md": DEFAULT_AGENTS_MD,
-    }
-
-
-def build_settings_json(data: AgentCreate) -> bytes:
-    settings = {
-        "name": data.name,
-        "adapter_type": data.adapter_type,
-        "adapter_config": data.adapter_config,
-        "skills": data.skills,
-        "tools": data.tools,
-        "heartbeat_interval_seconds": data.heartbeat_interval_seconds,
-        "enabled": True,
-    }
-    return json.dumps(settings, indent=2).encode()
+from zenve_utils.scaffolding import build_settings_json, default_files, slugify
 
 
 class AgentService:
@@ -50,7 +22,7 @@ class AgentService:
         self.writer = writer
         self.template_service = template_service
 
-    def list(self, project: Project) -> list[AgentSummary]:
+    def get_all(self, project: Project) -> list[AgentSummary]:
         return self.reader.list_agents(project)
 
     def get(self, project: Project, name: str) -> AgentDetail:
@@ -58,11 +30,27 @@ class AgentService:
 
     def create(self, project: Project, data: AgentCreate) -> AgentDetail:
         slug = slugify(data.name)
+        try:
+            self.reader.get_agent(project, slug)
+            raise ConflictError(f"Agent '{slug}' already exists")
+        except NotFoundError:
+            pass
         if data.template:
             files = self.template_service.fetch_template_files(data.template)
+            manifest = self.template_service.get_template(data.template)
+            merged = AgentCreate(
+                name=data.name,
+                template=data.template,
+                adapter_type=manifest.adapter_type,
+                adapter_config=manifest.adapter_config,
+                skills=manifest.skills,
+                tools=manifest.tools,
+                heartbeat_interval_seconds=manifest.heartbeat_interval_seconds,
+            )
         else:
             files = default_files()
-        files["settings.json"] = build_settings_json(data)
+            merged = data
+        files["settings.json"] = build_settings_json(merged, slug)
         self.writer.scaffold_agent(project, slug, files, f"feat(agents): create agent {slug}")
         return self.reader.get_agent(project, slug)
 
@@ -100,6 +88,51 @@ class AgentService:
 
     def delete(self, project: Project, name: str) -> None:
         self.writer.delete_agent(project, name, f"feat(agents): delete agent {name}")
+
+    def init(self, project: Project, data: ProjectInit) -> list[AgentSummary]:
+        settings = self.reader.get_project_settings(project)
+        if settings:
+            raise ConflictError("Project already initialized")
+
+        all_files: dict[str, bytes | None] = {}
+        pipeline: dict[str, None] = {}
+
+        for spec in data.agents:
+            slug = slugify(spec.name)
+            pipeline[f"zenve:{slug}"] = None
+
+            if spec.template:
+                files = self.template_service.fetch_template_files(spec.template)
+                manifest = self.template_service.get_template(spec.template)
+                merged = AgentCreate(
+                    name=spec.name,
+                    template=spec.template,
+                    adapter_type=manifest.adapter_type,
+                    adapter_config=manifest.adapter_config,
+                    skills=manifest.skills,
+                    tools=manifest.tools,
+                    heartbeat_interval_seconds=manifest.heartbeat_interval_seconds,
+                )
+            else:
+                files = default_files()
+                merged = AgentCreate(name=spec.name)
+            files["settings.json"] = build_settings_json(merged, slug)
+            for relpath, content in files.items():
+                all_files[f".zenve/agents/{slug}/{relpath}"] = content
+
+        root_settings = {
+            "project": project.name,
+            "description": data.description,
+            "repo": project.github_repo,
+            "default_branch": project.github_default_branch,
+            "commit_message_prefix": "[zenve]",
+            "run_timeout_seconds": 600,
+            "pipeline": pipeline,
+        }
+        all_files[".zenve/settings.json"] = json.dumps(root_settings, indent=2).encode()
+
+        self.writer.scaffold_project(project, all_files, "feat(zenve): initialize project")
+        return self.reader.list_agents(project)
 
     def write_file(self, project: Project, name: str, relpath: str, content: bytes) -> None:
         self.writer.write_file(

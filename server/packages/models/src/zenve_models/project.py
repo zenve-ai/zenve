@@ -52,3 +52,13 @@ class GitHubRepo(BaseModel):
 
 class GitHubInstallationResponse(BaseModel):
     installation_id: int
+
+
+class InitAgentSpec(BaseModel):
+    name: str
+    template: str | None = None
+
+
+class ProjectInit(BaseModel):
+    description: str | None = None
+    agents: list[InitAgentSpec] = []

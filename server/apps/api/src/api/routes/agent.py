@@ -28,7 +28,7 @@ def list_agents(
 ):
     project = project_service.get_by_id_or_slug(project_id)
     membership_service.require_membership(user.id, project.id)
-    return service.list(project)
+    return service.get_all(project)
 
 
 @router.post("", response_model=AgentDetail, status_code=status.HTTP_201_CREATED)
