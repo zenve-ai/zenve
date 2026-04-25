@@ -10,6 +10,8 @@ dependencies = [
     "python-dotenv>=1.0",
     "zenve-adapters",
     "zenve-models",
+    "zenve-services",
+    "zenve-utils",
 ]
 
 [project.scripts]
