@@ -5,7 +5,13 @@ import httpx
 import yaml
 
 from zenve_config.settings import Settings
-from zenve_models.errors import ConflictError, ExternalError, NotFoundError, RateLimitError, ValidationError
+from zenve_models.errors import (
+    ConflictError,
+    ExternalError,
+    NotFoundError,
+    RateLimitError,
+    ValidationError,
+)
 from zenve_models.github_template import GitHubTemplateSummary
 
 GITHUB_API = "https://api.github.com"
