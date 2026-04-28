@@ -16,3 +16,9 @@ AGENT_FAILED = "agent.failed"
 
 PIPELINE_TRANSITION = "pipeline.transition"
 PIPELINE_END = "pipeline.end"
+
+ADAPTER_OUTPUT = "adapter.output"
+ADAPTER_TOOL_CALL = "adapter.tool_call"
+ADAPTER_TOOL_RESULT = "adapter.tool_result"
+ADAPTER_USAGE = "adapter.usage"
+ADAPTER_ERROR = "adapter.error"

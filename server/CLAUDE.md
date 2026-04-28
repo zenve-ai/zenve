@@ -2,6 +2,10 @@
 
 Architecture and development rules for this FastAPI monorepo.
 
+## Sub-project docs
+
+- [apps/cli/CLAUDE.md](apps/cli/CLAUDE.md) — CLI app: structure, layer rules, `.zenve/` convention, env vars, run flow
+
 ## Monorepo Structure
 
 ```
@@ -11,6 +15,8 @@ server/
 │       ├── routes/   # Thin HTTP handlers only
 │       ├── lifespan.py
 │       └── main.py
+├── apps/cli/         # Typer CLI — runs agents against a GitHub repo
+│   └── src/zenve_cli/
 └── packages/
     ├── config/       # Settings (pydantic-settings)
     ├── db/           # SQLAlchemy engine, session, ORM models

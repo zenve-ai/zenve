@@ -1,5 +1,5 @@
-from sqlalchemy import create_engine
-from sqlalchemy.orm import declarative_base, sessionmaker
+from sqlalchemy import Engine, create_engine
+from sqlalchemy.orm import Session, declarative_base, sessionmaker
 
 from zenve_config.settings import get_settings
 
@@ -22,12 +22,26 @@ def create_postgres_engine(connection_string: str | None = None):
 
 Base = declarative_base()
 
-engine = create_postgres_engine()
-Session = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+_engine: Engine | None = None
+_SessionFactory: sessionmaker[Session] | None = None
+
+
+def get_engine() -> Engine:
+    global _engine, _SessionFactory
+    if _engine is None:
+        _engine = create_postgres_engine()
+        _SessionFactory = sessionmaker(autocommit=False, autoflush=False, bind=_engine)
+    return _engine
+
+
+def make_session() -> Session:
+    get_engine()
+    assert _SessionFactory is not None
+    return _SessionFactory()
 
 
 def get_db():
-    db = Session()
+    db = make_session()
     try:
         yield db
     finally:

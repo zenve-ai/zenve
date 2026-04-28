@@ -4,15 +4,31 @@ from pathlib import Path
 
 import typer
 
+from zenve_cli.commands import doctor as doctor_cmd
 from zenve_cli.commands import init as init_cmd
 from zenve_cli.commands import pipeline as pipeline_cmd
+from zenve_cli.commands import run as run_cmd
 from zenve_cli.commands import snapshot as snapshot_cmd
-from zenve_cli.commands import start as start_cmd
 from zenve_cli.commands import status as status_cmd
 from zenve_cli.commands.agent import agent_app
+from zenve_cli.core.console import print_logo
 
 app = typer.Typer(name="zenve", help="Zenve CLI — autonomous agents in your repo")
-app.add_typer(agent_app, name="agent")
+app.add_typer(agent_app, name="agents")
+
+
+@app.callback(invoke_without_command=True)
+def main(ctx: typer.Context) -> None:
+    if ctx.invoked_subcommand is not None:
+        print_logo()
+
+
+@app.command()
+def doctor(
+    repo: Path = typer.Option(Path("."), "--repo", help="Path to the repo root"),
+) -> None:
+    """Check that this repo is correctly set up for Zenve."""
+    doctor_cmd.cmd(repo_root=repo)
 
 
 @app.command()
@@ -25,13 +41,13 @@ def init(
 
 
 @app.command()
-def start(
+def run(
     agent: str | None = typer.Option(None, "--agent", help="Run only this agent"),
     dry_run: bool = typer.Option(False, "--dry-run", help="Show plan, no writes"),
     repo: Path = typer.Option(Path("."), "--repo", help="Path to the repo root"),
 ) -> None:
     """Run all enabled agents against a fresh GitHub snapshot."""
-    start_cmd.cmd(repo_root=repo, agent=agent, dry_run=dry_run)
+    run_cmd.cmd(repo_root=repo, agent=agent, dry_run=dry_run)
 
 
 @app.command()

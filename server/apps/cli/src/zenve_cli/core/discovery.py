@@ -55,8 +55,8 @@ def discover_agents(repo_root: Path, only: str | None = None) -> list[Discovered
 
         if not settings.enabled:
             continue
-        if only is not None and settings.name != only:
+        if only is not None and child.name != only:
             continue
-        results.append(DiscoveredAgent(name=settings.name, path=child, settings=settings))
+        results.append(DiscoveredAgent(name=child.name, path=child, settings=settings))
 
     return results

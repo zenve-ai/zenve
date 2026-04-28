@@ -73,19 +73,16 @@ class RunContext:
     """
 
     agent_dir: str
+    project_dir: str
     agent_id: str
     agent_slug: str
     agent_name: str
-    org_id: str
-    org_slug: str
+    project_slug: str
     run_id: str
     adapter_type: str
     adapter_config: dict
     message: str | None
     heartbeat: bool
-    gateway_url: str
-    agent_token: str  # short-lived JWT (Chunk 09); empty string until then
-    session_id: str | None = None
     tools: list[str] | None = None  # None = all tools allowed
     env_vars: dict = field(default_factory=dict)
     on_event: Callable[[str, str | None, dict | None], None] = field(default=lambda *a, **kw: None)
@@ -106,4 +103,3 @@ class RunResult:
     token_usage: dict | None = None  # {input_tokens, output_tokens, cost_usd}
     error: str | None = None
     outcome: str | None = None  # final response text from the model
-    session_id: str | None = None

@@ -46,13 +46,13 @@ class GitHubTemplateService:
         except httpx.RequestError as exc:
             raise ExternalError("GitHub API unreachable") from exc
         if response.status_code == 404:
-            raise NotFoundError("Not found in GitHub repo")
+            raise NotFoundError(f"Not found in GitHub repo: {url}")
         if response.status_code in (401, 403):
-            raise ValidationError("Cannot access GitHub repo")
+            raise ValidationError(f"Cannot access GitHub repo (HTTP {response.status_code}): {url}")
         if response.status_code == 429:
             raise RateLimitError("GitHub API rate limit exceeded")
         if not response.is_success:
-            raise ExternalError("GitHub API unreachable")
+            raise ExternalError(f"GitHub API error (HTTP {response.status_code}): {url}")
         data = response.json()
         _cache[cache_key] = (data, now + CACHE_TTL)
         return data

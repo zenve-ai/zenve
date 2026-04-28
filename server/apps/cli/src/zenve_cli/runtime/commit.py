@@ -26,7 +26,18 @@ def has_changes(repo_root: Path) -> bool:
     return bool(out.strip())
 
 
-def commit_and_push(
+def commit_zenve_dir(repo_root: Path, message: str, branch: str = "main") -> bool:
+    """Stage .zenve/, commit, and push. Returns True if a commit was made."""
+    run_git(["add", ".zenve"], repo_root)
+    out = run_git(["diff", "--cached", "--name-only"], repo_root)
+    if not out.strip():
+        return False
+    run_git(["commit", "-m", message], repo_root)
+    run_git(["push", "origin", branch], repo_root)
+    return True
+
+
+def commit_agents(
     repo_root: Path,
     run_id: str,
     prefix: str = "[zenve]",

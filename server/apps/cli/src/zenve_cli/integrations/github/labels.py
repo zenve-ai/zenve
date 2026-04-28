@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from zenve_cli.github.client import GitHubClient, GitHubError
+from zenve_cli.integrations.github.client import GitHubClient, GitHubError
 
 IN_PROGRESS_LABEL = "in-progress"
 

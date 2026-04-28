@@ -16,11 +16,11 @@ import sys
 
 from sqlalchemy import text
 
-from zenve_db.database import Session
+from zenve_db.database import make_session
 
 
 def reset_db() -> None:
-    db = Session()
+    db = make_session()
     try:
         db.execute(text("DROP SCHEMA public CASCADE"))
         db.execute(text("CREATE SCHEMA public"))

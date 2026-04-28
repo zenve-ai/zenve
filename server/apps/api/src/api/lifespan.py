@@ -7,13 +7,14 @@ from sqlalchemy import text
 from zenve_adapters.claude_code import ClaudeCodeAdapter
 from zenve_adapters.open_code import OpenCodeAdapter
 from zenve_adapters.registry import AdapterRegistry
-from zenve_db.database import Base, engine
+from zenve_db.database import Base, get_engine
 from zenve_services.ws_manager import WebSocketManager
 
 logger = logging.getLogger(__name__)
 
 
 def setup_database(_: FastAPI):
+    engine = get_engine()
     Base.metadata.create_all(bind=engine)
     logger.info("Database tables created/verified.")
 
@@ -55,5 +56,5 @@ async def lifespan(app: FastAPI):
 
     yield
 
-    engine.dispose()
+    get_engine().dispose()
     print("zenve API shutdown complete")

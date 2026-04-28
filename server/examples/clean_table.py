@@ -3,7 +3,7 @@ from typing import Any
 
 from sqlalchemy import text
 
-from zenve_db.database import Session
+from zenve_db.database import make_session
 
 
 def clean_table(table_name: str) -> None:
@@ -12,7 +12,7 @@ def clean_table(table_name: str) -> None:
     Args:
         table_name: Name of the table to truncate (e.g., "runs", "agents")
     """
-    db = Session()
+    db = make_session()
     try:
         query = text(f"DELETE FROM {table_name}")
         result: Any = db.execute(query)

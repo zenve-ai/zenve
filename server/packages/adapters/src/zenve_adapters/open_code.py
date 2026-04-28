@@ -62,10 +62,9 @@ class OpenCodeAdapter(BaseAdapter):
             f"- agent_id: {ctx.agent_id}\n"
             f"- agent_slug: {ctx.agent_slug}\n"
             f"- agent_name: {ctx.agent_name}\n"
-            f"- org_id: {ctx.org_id}\n"
-            f"- org_slug: {ctx.org_slug}\n"
+            f"- project_slug: {ctx.project_slug}\n"
+            f"- project_dir: {ctx.project_dir}\n"
             f"- run_id: {ctx.run_id}\n"
-            f"- gateway_url: {ctx.gateway_url}\n"
         )
 
         if ctx.heartbeat:
@@ -81,22 +80,20 @@ class OpenCodeAdapter(BaseAdapter):
 
         env = {
             **os.environ,
-            "GATEWAY_URL": ctx.gateway_url,
-            "GATEWAY_AGENT_TOKEN": ctx.agent_token,
-            "GATEWAY_AGENT_ID": ctx.agent_id,
-            "GATEWAY_AGENT_SLUG": ctx.agent_slug,
-            "GATEWAY_ORG_SLUG": ctx.org_slug,
-            "GATEWAY_RUN_ID": ctx.run_id,
+            "ZENVE_AGENT_ID": ctx.agent_id,
+            "ZENVE_AGENT_SLUG": ctx.agent_slug,
+            "ZENVE_PROJECT_SLUG": ctx.project_slug,
+            "ZENVE_RUN_ID": ctx.run_id,
             "OPENCODE_PERMISSION": '{"*": "allow"}',
             "OPENCODE_DISABLE_PROJECT_CONFIG": "true",
             **ctx.env_vars,
         }
 
-        args = self.build_cli_args(config, session_id=ctx.session_id)
+        args = self.build_cli_args(config)
 
         proc = await asyncio.create_subprocess_exec(
             *args,
-            cwd=ctx.agent_dir,
+            cwd=ctx.project_dir,
             env=env,
             stdin=asyncio.subprocess.PIPE,
             stdout=asyncio.subprocess.PIPE,
@@ -111,7 +108,6 @@ class OpenCodeAdapter(BaseAdapter):
         full_stdout_lines: list[str] = []
 
         token_usage: dict | None = None
-        session_id: str | None = ctx.session_id
         last_text: str | None = None
         outcome: str | None = None
 
@@ -132,12 +128,11 @@ class OpenCodeAdapter(BaseAdapter):
 
                 # Track session ID from first event that carries one
                 evt_session = parsed.get("sessionID", "")
-                if evt_session and session_id is None:
-                    session_id = evt_session
+                if evt_session:
                     ctx.on_event(
                         "output",
-                        f"Session started: {session_id}",
-                        {"session_id": session_id},
+                        f"Session started: {evt_session}",
+                        {"session_id": evt_session},
                     )
 
                 event: tuple | None = None
@@ -207,22 +202,19 @@ class OpenCodeAdapter(BaseAdapter):
             token_usage=token_usage,
             error=stderr if proc.returncode != 0 else None,
             outcome=outcome,
-            session_id=session_id,
         )
 
     # ------------------------------------------------------------------
     # Private helpers
     # ------------------------------------------------------------------
 
-    def build_cli_args(self, config: OpenCodeConfig, session_id: str | None = None) -> list[str]:
+    def build_cli_args(self, config: OpenCodeConfig) -> list[str]:
         args = [
             "opencode",
             "run",
             "--format",
             config.output_format,
         ]
-        if session_id:
-            args.extend(["--session", session_id])
         if config.model:
             args.extend(["--model", config.model])
         return args

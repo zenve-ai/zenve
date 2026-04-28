@@ -1,23 +1,32 @@
 from __future__ import annotations
 
 import asyncio
+import dataclasses
+import json
 from pathlib import Path
 
 import typer
+from rich.console import Console
+from rich.text import Text
 
 from zenve_adapters import AdapterRegistry
 from zenve_adapters.claude_code import ClaudeCodeAdapter
 from zenve_adapters.open_code import OpenCodeAdapter
-from zenve_cli.commands.snapshot import repo_slug_from_url
+from zenve_cli.commands.snapshot import git_remote_slug
 from zenve_cli.core.config import ConfigError, load_project_settings
+from zenve_cli.core.console import print_event
 from zenve_cli.core.discovery import DiscoveryError, discover_agents
 from zenve_cli.core.env import EnvError, load_env
 from zenve_cli.events import types as et
 from zenve_cli.events.emitter import EventEmitter
-from zenve_cli.github.client import GitHubClient
-from zenve_cli.github.snapshot import build_snapshot, write_snapshot
-from zenve_cli.runtime.commit import GitError, commit_and_push
+from zenve_cli.integrations.github.client import GitHubClient
+from zenve_cli.integrations.github.snapshot import build_snapshot, write_snapshot
+from zenve_cli.runtime.commit import GitError, commit_agents
+from zenve_cli.models.run_result import RunResultFile
+from zenve_cli.runtime.executor import DryRunResult
 from zenve_cli.runtime.parallel import run_all
+
+console = Console()
 
 
 def build_registry() -> AdapterRegistry:
@@ -48,9 +57,9 @@ def cmd(
         typer.echo("No enabled agents to run.")
         raise typer.Exit(0)
 
-    repo = project.repo or repo_slug_from_url(env.repo_url)
+    repo = git_remote_slug(repo_root)
     if not repo:
-        typer.echo("✗ Could not determine repo (check settings.repo or ZENVE_REPO_URL).")
+        typer.echo("✗ Could not determine repo. Ensure git remote origin is a GitHub URL.")
         raise typer.Exit(1)
 
     emitter = EventEmitter(
@@ -58,18 +67,14 @@ def cmd(
         run_id=env.run_id,
         webhook_url=env.webhook_url,
         webhook_secret=env.webhook_secret,
+        on_event=None if dry_run else print_event,
     )
     emitter.emit(
         et.RUN_STARTED,
         data={"agents": [a.name for a in agents], "repo": repo, "dry_run": dry_run},
     )
 
-    env_vars = {
-        "GITHUB_TOKEN": env.github_token,
-        "ANTHROPIC_API_KEY": env.anthropic_api_key,
-        "ZENVE_RUN_ID": env.run_id,
-        "ZENVE_REPO_URL": env.repo_url,
-    }
+    env_vars = {"ZENVE_RUN_ID": env.run_id}
 
     with GitHubClient(env.github_token, repo) as gh:
         snapshot = build_snapshot(gh, env.run_id)
@@ -97,6 +102,7 @@ def cmd(
                 agents=agents,
                 snapshot=snapshot,
                 project=project,
+                repo_root=repo_root,
                 run_id=env.run_id,
                 registry=registry,
                 gh=gh,
@@ -108,11 +114,54 @@ def cmd(
         )
 
     if dry_run:
+        dry_lookup = {r.agent_name: r for r in results if isinstance(r, DryRunResult)}
+        label_w = 12
+
+        def row(label: str, value: str, value_style: str = "white") -> None:
+            line = Text()
+            line.append(f"    {label:<{label_w}}", style="dim")
+            line.append(value, style=value_style)
+            console.print(line)
+
+        console.print()
+        for ag in agents:
+            slug_line = Text()
+            slug_line.append("  ◆ ", style="bold cyan")
+            slug_line.append(ag.name, style="bold white")
+            console.print(slug_line)
+
+            dr = dry_lookup.get(ag.name)
+            if dr is None:
+                console.print("    [dim]no result[/dim]")
+                console.print()
+                continue
+
+            row("name", ag.settings.name)
+            row("label", dr.label, "cyan")
+            row("model", ag.settings.model, "dim white")
+
+            if dr.item is not None:
+                pick_text = f"{dr.item.kind} #{dr.item.number}: {dr.item.title}"
+                row("would pick", pick_text)
+            else:
+                row("would pick", "nothing to do", "dim")
+
+            ctx_dict = {
+                k: v
+                for k, v in dataclasses.asdict(dr.context).items()
+                if not callable(v)
+            }
+            ctx_json = json.dumps(ctx_dict, indent=2)
+            indented = "\n".join(f"    {line}" for line in ctx_json.splitlines())
+            console.print()
+            console.print("    context", style="dim")
+            console.print(indented, style="dim")
+            console.print()
+
         emitter.emit(et.RUN_COMPLETED, data={"dry_run": True})
-        typer.echo("✓ dry-run complete")
         return
 
-    summaries = [r for r in results if r is not None]
+    summaries = [r for r in results if isinstance(r, RunResultFile)]
     summary = ", ".join(
         f"{r.agent}: {r.status}{' #' + str(r.item.number) if r.item else ''}"
         for r in summaries
@@ -120,7 +169,7 @@ def cmd(
 
     emitter.emit(et.RUN_COMMITTING, data={"summary": summary})
     try:
-        committed = commit_and_push(
+        committed = commit_agents(
             repo_root=repo_root,
             run_id=env.run_id,
             prefix=project.commit_message_prefix,
@@ -136,4 +185,3 @@ def cmd(
         et.RUN_COMPLETED,
         data={"committed": committed, "summary": summary, "agents": len(summaries)},
     )
-    typer.echo(f"✓ run {env.run_id} complete ({len(summaries)} agent(s))")

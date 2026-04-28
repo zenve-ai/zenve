@@ -1,14 +1,15 @@
 from __future__ import annotations
 
 import re
+import subprocess
 from pathlib import Path
 
 import typer
 
 from zenve_cli.core.config import load_project_settings
-from zenve_cli.core.env import EnvError, load_env
-from zenve_cli.github.client import GitHubClient
-from zenve_cli.github.snapshot import build_snapshot, write_snapshot
+from zenve_cli.core.env import new_run_id, resolve_github_token
+from zenve_cli.integrations.github.client import GitHubClient
+from zenve_cli.integrations.github.snapshot import build_snapshot, write_snapshot
 
 
 def repo_slug_from_url(url: str) -> str | None:
@@ -19,23 +20,39 @@ def repo_slug_from_url(url: str) -> str | None:
     return f"{m.group(1)}/{m.group(2)}"
 
 
+def git_remote_slug(repo_root: Path) -> str | None:
+    """Return the `owner/repo` slug from git remote origin."""
+    try:
+        result = subprocess.run(
+            ["git", "remote", "get-url", "origin"],
+            capture_output=True,
+            text=True,
+            check=True,
+            cwd=repo_root,
+        )
+        return repo_slug_from_url(result.stdout.strip())
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        return None
+
+
 def cmd(repo_root: Path = Path(".")) -> None:
     """Fetch current GitHub state and write it to `.zenve/snapshot.json`."""
-    try:
-        env = load_env()
-    except EnvError as exc:
-        typer.echo(f"✗ {exc}")
-        raise typer.Exit(1) from exc
-
-    settings = load_project_settings(repo_root)
-
-    repo = settings.repo or repo_slug_from_url(env.repo_url)
-    if not repo:
-        typer.echo("✗ Could not determine repo (check settings.repo or ZENVE_REPO_URL).")
+    token = resolve_github_token()
+    if not token:
+        typer.echo("✗ No GitHub token found. Run `gh auth login`.")
         raise typer.Exit(1)
 
-    with GitHubClient(env.github_token, repo) as gh:
-        snapshot = build_snapshot(gh, env.run_id)
+    load_project_settings(repo_root)
+
+    repo = git_remote_slug(repo_root)
+    if not repo:
+        typer.echo("✗ Could not determine repo. Ensure git remote origin is a GitHub URL.")
+        raise typer.Exit(1)
+
+    run_id = new_run_id()
+
+    with GitHubClient(token, repo) as gh:
+        snapshot = build_snapshot(gh, run_id)
 
     path = write_snapshot(repo_root, snapshot)
     typer.echo(f"✓ snapshot written to {path}")

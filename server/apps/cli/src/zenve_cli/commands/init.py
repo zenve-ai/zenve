@@ -9,6 +9,8 @@ import typer
 from questionary import Choice
 from rich.console import Console
 
+from zenve_cli.commands.snapshot import git_remote_slug, resolve_github_token
+from zenve_cli.runtime.commit import commit_zenve_dir
 from zenve_config.settings import get_settings
 from zenve_models.agent import AgentCreate
 from zenve_models.errors import ZenveError
@@ -33,15 +35,6 @@ WIZARD_STYLE = questionary.Style(
     ]
 )
 
-# ANSI Shadow-style ZENVE logo (6 rows)
-LOGO = """███████╗ ███████╗ ███╗   ██╗ ██╗   ██╗ ███████╗
-╚══███╔╝ ██╔════╝ ████╗  ██║ ██║   ██║ ██╔════╝
-  ███╔╝  █████╗   ██╔██╗ ██║ ██║   ██║ █████╗
- ███╔╝   ██╔══╝   ██║╚██╗██║ ╚██╗ ██╔╝ ██╔══╝
-███████╗ ███████╗ ██║ ╚████║  ╚████╔╝  ███████╗
-╚══════╝ ╚══════╝ ╚═╝  ╚═══╝   ╚═══╝   ╚══════╝"""
-
-
 def git_current_branch() -> str:
     try:
         result = subprocess.run(
@@ -54,12 +47,6 @@ def git_current_branch() -> str:
         return branch if branch and branch != "HEAD" else "main"
     except (subprocess.CalledProcessError, FileNotFoundError):
         return "main"
-
-
-def print_logo() -> None:
-    console.print()
-    console.print(LOGO, style="bold cyan")
-    console.print()
 
 
 def sep() -> None:
@@ -119,12 +106,11 @@ def cmd(repo_root: Path = Path("."), description: str | None = None) -> None:
         if agents_dir.exists():
             existing_agent_slugs = {p.name for p in agents_dir.iterdir() if p.is_dir()}
 
-    print_logo()
-
     # Load templates early so the list is ready before prompts begin
-    settings = get_settings()
-    if not settings.github_agents_repo:
-        settings = settings.model_copy(update={"github_agents_repo": DEFAULT_AGENTS_REPO})
+    settings = get_settings().model_copy(update={
+        "github_agents_repo": get_settings().github_agents_repo or DEFAULT_AGENTS_REPO,
+        "github_token": get_settings().github_token or resolve_github_token(),
+    })
     svc = GitHubTemplateService(settings)
 
     try:
@@ -141,39 +127,25 @@ def cmd(repo_root: Path = Path("."), description: str | None = None) -> None:
 
     detected_branch = git_current_branch()
 
+    remote_repo = git_remote_slug(repo_root)
+    if not remote_repo:
+        console.print(
+            "[red]✗[/red] Could not detect git remote origin. "
+            "Run `git remote add origin <github-url>` first."
+        )
+        raise typer.Exit(1)
+
     if update_mode:
         console.print(
             "[cyan]◆[/cyan] [white]Updating existing [cyan].zenve/[/cyan] configuration[/white]"
         )
         sep()
 
-    repo_path = questionary.text(
-        "GitHub repository  (username/repo)",
-        default=existing_settings.get("repo", ""),
-        style=WIZARD_STYLE,
-        qmark="◆",
-        validate=lambda v: (
-            True
-            if len(v.strip().split("/")) == 2 and not v.startswith("http")
-            else "Enter in format: username/repo"
-        ),
-    ).ask()
+    console.print(f"[cyan]◆[/cyan] [white]Repository  [cyan]{remote_repo}[/cyan][/white]")
     sep()
-    if repo_path is None:
-        raise typer.Exit(1)
 
-    # Derive slug from repo name — no separate prompt
-    slug = slugify(repo_path.strip().split("/")[-1].removesuffix(".git"))
-
-    name = questionary.text(
-        "Project name",
-        default=existing_settings.get("project", ""),
-        style=WIZARD_STYLE,
-        qmark="◆",
-    ).ask()
-    sep()
-    if not name:
-        raise typer.Exit(1)
+    # Derive slug from repo name
+    slug = slugify(remote_repo.split("/")[-1].removesuffix(".git"))
 
     if description is None:
         description = questionary.text(
@@ -235,7 +207,6 @@ def cmd(repo_root: Path = Path("."), description: str | None = None) -> None:
         **(existing_settings if update_mode else {}),
         "project": slug,
         "description": description,
-        "repo": repo_path.strip(),
         "default_branch": detected_branch,
         "commit_message_prefix": existing_settings.get("commit_message_prefix", "[zenve]"),
         "run_timeout_seconds": existing_settings.get("run_timeout_seconds", 600),
@@ -261,5 +232,21 @@ def cmd(repo_root: Path = Path("."), description: str | None = None) -> None:
             f"[cyan]◆[/cyan] [white]Initialized with {len(agent_names)} agent(s): {', '.join(agent_names)}[/white]"
         )
     sep()
-    console.print("[cyan]◆[/cyan] [white]Commit and push [cyan].zenve/[/cyan] to activate[/white]")
+    do_commit = questionary.confirm(
+        "Commit and push .zenve/?",
+        default=True,
+        style=WIZARD_STYLE,
+        qmark="◆",
+    ).ask()
+    sep()
+
+    if do_commit:
+        commit_msg = "[zenve] update" if update_mode else "[zenve] init"
+        committed = commit_zenve_dir(repo_root, commit_msg, branch=detected_branch)
+        if committed:
+            console.print("[cyan]◆[/cyan] [white]Committed and pushed [cyan].zenve/[/cyan] — activated[/white]")
+        else:
+            console.print("[yellow]◆[/yellow] [white]Nothing to commit[/white]")
+    else:
+        console.print("[cyan]◆[/cyan] [white]Commit and push [cyan].zenve/[/cyan] to activate[/white]")
     console.print()

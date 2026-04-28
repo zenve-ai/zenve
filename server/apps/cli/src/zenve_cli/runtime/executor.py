@@ -12,8 +12,8 @@ from zenve_cli.core.discovery import DiscoveredAgent
 from zenve_cli.core.pipeline import next_label
 from zenve_cli.events import types as et
 from zenve_cli.events.emitter import EventEmitter
-from zenve_cli.github.client import GitHubClient
-from zenve_cli.github.labels import claim_item, transition
+from zenve_cli.integrations.github.client import GitHubClient
+from zenve_cli.integrations.github.labels import claim_item, transition
 from zenve_cli.models.run_result import (
     PipelineTransition,
     RunItem,
@@ -37,6 +37,15 @@ class PlannedItem:
     labels: list[str]
     assignees: list[str]
     created_at: str
+
+
+@dataclass
+class DryRunResult:
+    agent_name: str
+    picks_up: str
+    label: str
+    item: PlannedItem | None
+    context: RunContext
 
 
 def filter_for_agent(snapshot: Snapshot, settings: AgentSettings) -> list[PlannedItem]:
@@ -90,6 +99,7 @@ def build_run_context(
     agent: DiscoveredAgent,
     run_id: str,
     project: ProjectSettings,
+    repo_root: Path,
     item: PlannedItem | None,
     env_vars: dict[str, str],
 ) -> RunContext:
@@ -104,18 +114,16 @@ def build_run_context(
 
     return RunContext(
         agent_dir=str(agent.path),
-        agent_id=agent.name,
-        agent_slug=agent.name,
-        agent_name=agent.settings.display_name or agent.name,
-        org_id=project.project,
-        org_slug=project.project,
+        project_dir=str(repo_root.resolve()),
+        agent_id=agent.settings.slug,
+        agent_slug=agent.settings.slug,
+        agent_name=agent.settings.name,
+        project_slug=project.project,
         run_id=run_id,
         adapter_type=agent.settings.adapter_type,
         adapter_config=config,
         message=message,
         heartbeat=False,
-        gateway_url="",
-        agent_token="",
         env_vars=env_vars,
     )
 
@@ -136,6 +144,7 @@ async def run_agent(
     agent: DiscoveredAgent,
     snapshot: Snapshot,
     project: ProjectSettings,
+    repo_root: Path,
     run_id: str,
     registry: AdapterRegistry,
     gh: GitHubClient,
@@ -143,28 +152,33 @@ async def run_agent(
     emitter: EventEmitter,
     env_vars: dict[str, str],
     dry_run: bool = False,
-) -> RunResultFile | None:
+) -> DryRunResult | RunResultFile | None:
     """Execute one agent end-to-end — claim → adapter → label transition."""
-    emitter.emit(et.AGENT_STARTED, agent=agent.name)
-
     items = filter_for_agent(snapshot, agent.settings)
     item: PlannedItem | None = None
+
+    if agent.settings.picks_up != "none" and items:
+        item = pick_unclaimed(items)
+
+    if dry_run:
+        ctx = build_run_context(agent, run_id, project, repo_root, item, env_vars)
+        return DryRunResult(
+            agent_name=agent.name,
+            picks_up=agent.settings.picks_up,
+            label=agent.settings.github_label,
+            item=item,
+            context=ctx,
+        )
+
+    emitter.emit(et.AGENT_STARTED, agent=agent.name)
 
     if agent.settings.picks_up != "none":
         if not items:
             emitter.emit(et.AGENT_NOTHING_TO_DO, agent=agent.name)
             return None
-        item = pick_unclaimed(items)
         if item is None:
             emitter.emit(et.AGENT_NOTHING_TO_DO, agent=agent.name)
             return None
-
-    if dry_run:
-        data: dict = {"picks_up": agent.settings.picks_up, "label": agent.settings.github_label}
-        if item is not None:
-            data["item"] = {"kind": item.kind, "number": item.number, "title": item.title}
-        emitter.emit("agent.dry_run", agent=agent.name, data=data)
-        return None
 
     if item is not None:
         claimed = claim_item(gh, item.number, bot_login)
@@ -184,7 +198,21 @@ async def run_agent(
     started_at = now_iso()
     start_mono = time.monotonic()
 
-    ctx = build_run_context(agent, run_id, project, item, env_vars)
+    ctx = build_run_context(agent, run_id, project, repo_root, item, env_vars)
+
+    adapter_event_map = {
+        "output": et.ADAPTER_OUTPUT,
+        "tool_call": et.ADAPTER_TOOL_CALL,
+        "tool_result": et.ADAPTER_TOOL_RESULT,
+        "usage": et.ADAPTER_USAGE,
+        "error": et.ADAPTER_ERROR,
+    }
+
+    def on_adapter_event(event_type: str, message: str | None, data: dict | None) -> None:
+        mapped = adapter_event_map.get(event_type, f"adapter.{event_type}")
+        emitter.emit(mapped, agent=agent.name, data={"message": message, **(data or {})})
+
+    ctx.on_event = on_adapter_event
 
     try:
         adapter = registry.get(ctx.adapter_type)

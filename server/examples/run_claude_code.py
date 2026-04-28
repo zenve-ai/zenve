@@ -56,11 +56,11 @@ async def main() -> None:
 
         ctx = RunContext(
             agent_dir=agent_dir,
+            project_dir=agent_dir,
             agent_id="dev-01",
             agent_slug="dev",
             agent_name="Devy",
-            org_id="1",
-            org_slug="logzai",
+            project_slug="logzai",
             run_id="run-001",
             adapter_type="claude_code",
             adapter_config={
@@ -69,8 +69,6 @@ async def main() -> None:
             },
             message=MESSAGE,
             heartbeat=False,
-            gateway_url="http://localhost:8000",
-            agent_token="",
             tools=["Read", "Write", "Edit", "Bash"],
             on_event=on_event,
         )

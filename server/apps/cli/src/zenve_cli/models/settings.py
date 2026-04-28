@@ -13,7 +13,6 @@ class ProjectSettings(BaseModel):
     model_config = {"extra": "ignore"}
 
     project: str
-    repo: str
     default_branch: str = "main"
     commit_message_prefix: str = "[zenve]"
     run_timeout_seconds: int = 600
@@ -25,8 +24,8 @@ class AgentSettings(BaseModel):
 
     model_config = {"extra": "ignore"}
 
+    slug: str
     name: str
-    display_name: str = ""
     model: str = "claude-sonnet-4-6"
     adapter_type: str = "claude_code"
     enabled: bool = True

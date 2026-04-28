@@ -65,10 +65,10 @@ class ClaudeCodeAdapter(BaseAdapter):
             f"- agent_id: {ctx.agent_id}\n"
             f"- agent_slug: {ctx.agent_slug}\n"
             f"- agent_name: {ctx.agent_name}\n"
-            f"- org_id: {ctx.org_id}\n"
-            f"- org_slug: {ctx.org_slug}\n"
+            f"- project_slug: {ctx.project_slug}\n"
+            f"- project_dir: {ctx.project_dir}\n"
+            f"- agent_dir: {ctx.agent_dir}\n"
             f"- run_id: {ctx.run_id}\n"
-            f"- gateway_url: {ctx.gateway_url}\n"
         )
 
         if ctx.heartbeat:
@@ -82,22 +82,18 @@ class ClaudeCodeAdapter(BaseAdapter):
 
         env = {
             **os.environ,
-            "GATEWAY_URL": ctx.gateway_url,
-            "GATEWAY_AGENT_TOKEN": ctx.agent_token,
-            "GATEWAY_AGENT_ID": ctx.agent_id,
-            "GATEWAY_AGENT_SLUG": ctx.agent_slug,
-            "GATEWAY_ORG_SLUG": ctx.org_slug,
-            "GATEWAY_RUN_ID": ctx.run_id,
+            "ZENVE_AGENT_ID": ctx.agent_id,
+            "ZENVE_AGENT_SLUG": ctx.agent_slug,
+            "ZENVE_PROJECT_SLUG": ctx.project_slug,
+            "ZENVE_RUN_ID": ctx.run_id,
             **ctx.env_vars,
         }
 
-        args = self.build_cli_args(
-            config, message, system_prompt, ctx.tools, session_id=ctx.session_id
-        )
+        args = self.build_cli_args(config, message, system_prompt, ctx.tools)
 
         proc = await asyncio.create_subprocess_exec(
             *args,
-            cwd=ctx.agent_dir,
+            cwd=ctx.project_dir,
             env=env,
             stdin=asyncio.subprocess.PIPE,
             stdout=asyncio.subprocess.PIPE,
@@ -112,7 +108,6 @@ class ClaudeCodeAdapter(BaseAdapter):
         full_stdout_lines: list[str] = []
         token_usage: dict | None = None
         outcome: str | None = None
-        session_id: str | None = ctx.session_id
 
         assert proc.stdout is not None
         async for raw_line in proc.stdout:
@@ -135,8 +130,6 @@ class ClaudeCodeAdapter(BaseAdapter):
 
             if event_type == "system":
                 captured_session = parsed.get("session_id", "unknown")
-                if session_id is None:
-                    session_id = captured_session
                 event = (
                     "output",
                     f"Session started: {captured_session}",
@@ -228,7 +221,6 @@ class ClaudeCodeAdapter(BaseAdapter):
             token_usage=token_usage,
             error=stderr if proc.returncode != 0 else None,
             outcome=outcome,
-            session_id=session_id,
         )
 
     # ------------------------------------------------------------------
@@ -241,7 +233,6 @@ class ClaudeCodeAdapter(BaseAdapter):
         message: str,
         system_prompt: str,
         tools: list[str] | None = None,
-        session_id: str | None = None,
     ) -> list[str]:
         args = [
             "claude",
@@ -251,8 +242,6 @@ class ClaudeCodeAdapter(BaseAdapter):
             "stream-json",
         ]
         args.extend(["--system-prompt", system_prompt])
-        if session_id:
-            args.extend(["--resume", session_id])
         if config.model:
             args.extend(["--model", config.model])
         if config.max_tokens is not None:

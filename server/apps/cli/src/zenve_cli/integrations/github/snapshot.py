@@ -5,7 +5,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from zenve_cli.core.config import zenve_dir
-from zenve_cli.github.client import GitHubClient
+from zenve_cli.integrations.github.client import GitHubClient
 from zenve_cli.models.snapshot import Snapshot, SnapshotIssue, SnapshotPR
 
 SNAPSHOT_FILE = "snapshot.json"

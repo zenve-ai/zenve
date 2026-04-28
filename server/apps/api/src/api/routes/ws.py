@@ -4,7 +4,7 @@ from fastapi import APIRouter, Query, WebSocket, WebSocketDisconnect
 from jose import JWTError, jwt
 
 from zenve_config.settings import get_settings
-from zenve_db.database import Session as DBSession
+from zenve_db.database import get_db
 from zenve_db.models import UserRecord
 from zenve_services.membership import MembershipService
 from zenve_services.project import ProjectService
@@ -37,7 +37,7 @@ async def project_websocket(
 
     # Authorize project membership
     project_db_id: str | None = None
-    db = DBSession()
+    db = next(get_db())
     try:
         user = db.query(UserRecord).filter(UserRecord.id == user_id).first()
         if not user:

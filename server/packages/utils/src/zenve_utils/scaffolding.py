@@ -22,6 +22,7 @@ def default_files() -> dict[str, bytes]:
 
 def build_settings_json(data: AgentCreate, slug: str) -> bytes:
     settings = {
+        "slug": slug,
         "name": data.name,
         "adapter_type": data.adapter_type,
         "adapter_config": data.adapter_config,

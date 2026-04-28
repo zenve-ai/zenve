@@ -5,6 +5,7 @@ import hmac
 import json
 import logging
 import threading
+from collections.abc import Callable
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -29,10 +30,12 @@ class EventEmitter:
         run_id: str,
         webhook_url: str | None = None,
         webhook_secret: str | None = None,
+        on_event: Callable[[dict], None] | None = None,
     ) -> None:
         self._run_id = run_id
         self._webhook_url = webhook_url
         self._webhook_secret = webhook_secret
+        self._on_event = on_event
         self._log_path = zenve_dir(repo_root) / EVENTS_LOG_FILE
         self._log_path.parent.mkdir(parents=True, exist_ok=True)
         self._lock = threading.Lock()
@@ -52,6 +55,8 @@ class EventEmitter:
         }
         body = json.dumps(event)
         self.write_local(body)
+        if self._on_event:
+            self._on_event(event)
         if self._webhook_url:
             threading.Thread(target=self.deliver, args=(body,), daemon=True).start()
 

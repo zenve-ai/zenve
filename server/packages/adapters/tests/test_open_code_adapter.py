@@ -17,18 +17,16 @@ def make_ctx(on_event=None, **kwargs) -> RunContext:
     """Minimal RunContext for execute() tests."""
     defaults = dict(
         agent_dir="/tmp",
+        project_dir="/tmp",
         agent_id="a1",
         agent_slug="dev",
         agent_name="Dev",
-        org_id="o1",
-        org_slug="acme",
+        project_slug="acme",
         run_id="r1",
         adapter_type="open_code",
         adapter_config={},
         message="hello",
         heartbeat=False,
-        gateway_url="http://localhost:8000",
-        agent_token="",
     )
     defaults.update(kwargs)
     if on_event is not None:
@@ -61,25 +59,6 @@ def test_build_cli_args_custom_model():
     assert "openai/gpt-4o" in args
 
 
-def test_build_cli_args_with_session_id():
-    adapter = OpenCodeAdapter()
-    config = OpenCodeConfig()
-
-    args = adapter.build_cli_args(config, session_id="sess-456")
-
-    assert "--session" in args
-    idx = args.index("--session")
-    assert args[idx + 1] == "sess-456"
-
-
-def test_build_cli_args_without_session_id():
-    adapter = OpenCodeAdapter()
-    config = OpenCodeConfig()
-
-    args = adapter.build_cli_args(config, session_id=None)
-
-    assert "--session" not in args
-
 
 # ---------------------------------------------------------------------------
 # on_event tests
@@ -97,23 +76,10 @@ async def test_on_event_session_id():
         ]
     )
     with patch("asyncio.create_subprocess_exec", new=AsyncMock(return_value=proc)):
-        result = await OpenCodeAdapter().execute(ctx)
+        await OpenCodeAdapter().execute(ctx)
 
     assert events[0] == ("output", "Session started: sess-abc", {"session_id": "sess-abc"})
     assert events[1] == ("output", "Hi", None)
-    assert result.session_id == "sess-abc"
-
-
-@pytest.mark.asyncio
-async def test_execute_preserves_input_session_id():
-    """When ctx.session_id is set, the result retains it even without a sessionID event."""
-    ctx = make_ctx(session_id="existing-sess")
-
-    proc = make_proc([])
-    with patch("asyncio.create_subprocess_exec", new=AsyncMock(return_value=proc)):
-        result = await OpenCodeAdapter().execute(ctx)
-
-    assert result.session_id == "existing-sess"
 
 
 @pytest.mark.asyncio
