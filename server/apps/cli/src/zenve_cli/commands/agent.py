@@ -111,7 +111,7 @@ def list_agents(repo_root: Path = typer.Option(Path("."), "--repo")) -> None:
 
         row("picks up", s.picks_up, "yellow")
         row("label", s.github_label, "cyan")
-        row("model", s.model, "dim white")
+        row("model", str(s.adapter_config.get("model", "")), "dim white")
 
         console.print()
 

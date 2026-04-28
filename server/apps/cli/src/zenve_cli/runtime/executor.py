@@ -103,9 +103,7 @@ def build_run_context(
     item: PlannedItem | None,
     env_vars: dict[str, str],
 ) -> RunContext:
-    config: dict = {}
-    if agent.settings.model:
-        config["model"] = agent.settings.model
+    config: dict = dict(agent.settings.adapter_config)
 
     message_lines = [f"Run: {run_id}", f"Agent: {agent.name}"]
     if item is not None:
@@ -123,7 +121,8 @@ def build_run_context(
         adapter_type=agent.settings.adapter_type,
         adapter_config=config,
         message=message,
-        heartbeat=False,
+        heartbeat=agent.settings.heartbeat_interval_seconds > 0,
+        tools=agent.settings.tools or None,
         env_vars=env_vars,
     )
 
@@ -138,6 +137,30 @@ def write_run_result(agent: DiscoveredAgent, result: RunResultFile) -> Path:
 
 def now_iso() -> str:
     return datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def apply_pipeline_transition(
+    gh: GitHubClient,
+    project: ProjectSettings,
+    agent: DiscoveredAgent,
+    item: PlannedItem,
+    emitter: EventEmitter,
+) -> PipelineTransition | None:
+    to_label = next_label(project.pipeline, agent.settings.github_label)
+    transition(gh, item.number, agent.settings.github_label, to_label)
+    emitter.emit(
+        et.PIPELINE_END if to_label is None else et.PIPELINE_TRANSITION,
+        agent=agent.name,
+        data={
+            "number": item.number,
+            "from": agent.settings.github_label,
+            "to": to_label,
+        },
+    )
+    return PipelineTransition(
+        from_label=agent.settings.github_label,
+        to_label=to_label,
+    )
 
 
 async def run_agent(
@@ -181,7 +204,7 @@ async def run_agent(
             return None
 
     if item is not None:
-        claimed = claim_item(gh, item.number, bot_login)
+        claimed = True  # claim_item(gh, item.number, bot_login)
         if not claimed:
             emitter.emit(
                 et.AGENT_NOTHING_TO_DO,
@@ -207,9 +230,12 @@ async def run_agent(
         "usage": et.ADAPTER_USAGE,
         "error": et.ADAPTER_ERROR,
     }
+    adapter_errors: list[str] = []
 
     def on_adapter_event(event_type: str, message: str | None, data: dict | None) -> None:
         mapped = adapter_event_map.get(event_type, f"adapter.{event_type}")
+        if mapped == et.ADAPTER_ERROR and message:
+            adapter_errors.append(message)
         emitter.emit(mapped, agent=agent.name, data={"message": message, **(data or {})})
 
     ctx.on_event = on_adapter_event
@@ -243,24 +269,15 @@ async def run_agent(
     finished_at = now_iso()
 
     pipeline_transition: PipelineTransition | None = None
-    if item is not None:
-        to_label = next_label(project.pipeline, agent.settings.github_label)
-        transition(gh, item.number, agent.settings.github_label, to_label)
-        pipeline_transition = PipelineTransition(
-            from_label=agent.settings.github_label,
-            to_label=to_label,
-        )
-        emitter.emit(
-            et.PIPELINE_END if to_label is None else et.PIPELINE_TRANSITION,
-            agent=agent.name,
-            data={
-                "number": item.number,
-                "from": agent.settings.github_label,
-                "to": to_label,
-            },
-        )
+    # if item is not None:
+    #    pipeline_transition = apply_pipeline_transition(gh, project, agent, item, emitter)
 
     status = "completed" if result.exit_code == 0 else "failed"
+    error_text = result.error
+    if status == "failed" and not error_text and adapter_errors:
+        error_text = adapter_errors[-1]
+    if status == "failed" and not error_text:
+        error_text = f"Adapter exited with code {result.exit_code}"
     token_usage = (
         TokenUsage(
             input_tokens=result.token_usage.get("input_tokens", 0),
@@ -284,13 +301,17 @@ async def run_agent(
         else None,
         pipeline_transition=pipeline_transition,
         token_usage=token_usage,
-        error=result.error,
+        error=error_text,
     )
     write_run_result(agent, run_result)
 
     emitter.emit(
         et.AGENT_COMPLETED if status == "completed" else et.AGENT_FAILED,
         agent=agent.name,
-        data={"exit_code": result.exit_code, "duration_seconds": result.duration_seconds},
+        data={
+            "exit_code": result.exit_code,
+            "duration_seconds": result.duration_seconds,
+            **({"error": error_text} if status == "failed" and error_text else {}),
+        },
     )
     return run_result

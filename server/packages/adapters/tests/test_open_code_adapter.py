@@ -72,6 +72,7 @@ async def test_on_event_session_id():
 
     proc = make_proc(
         [
+            json_line({"type": "step_start", "sessionID": "sess-abc", "part": {"type": "step-start"}}),
             json_line({"type": "text", "sessionID": "sess-abc", "part": {"text": "Hi"}}),
         ]
     )
@@ -125,6 +126,70 @@ async def test_on_event_tool_use():
     assert event_type == "tool_call"
     assert content == "Calling tool: Glob"
     assert meta == {"tool": "Glob", "input": {"pattern": "*.py"}}
+
+
+@pytest.mark.asyncio
+async def test_on_event_tool_use_falls_back_to_alternate_tool_fields():
+    events: list[tuple] = []
+    ctx = make_ctx(on_event=lambda *a: events.append(a))
+
+    proc = make_proc(
+        [
+            json_line(
+                {
+                    "type": "tool_use",
+                    "part": {
+                        "tool": {"name": "Write"},
+                        "input": {"file": "hello.py"},
+                        "state": {"status": "running"},
+                    },
+                }
+            ),
+        ]
+    )
+    with patch("asyncio.create_subprocess_exec", new=AsyncMock(return_value=proc)):
+        await OpenCodeAdapter().execute(ctx)
+
+    assert len(events) == 1
+    event_type, content, meta = events[0]
+    assert event_type == "tool_call"
+    assert content == "Calling tool: Write"
+    assert meta == {"tool": "Write", "input": {"file": "hello.py"}}
+
+
+@pytest.mark.asyncio
+async def test_on_event_tool_use_reads_input_from_state():
+    events: list[tuple] = []
+    ctx = make_ctx(on_event=lambda *a: events.append(a))
+
+    proc = make_proc(
+        [
+            json_line(
+                {
+                    "type": "tool_use",
+                    "part": {
+                        "tool": "glob",
+                        "state": {
+                            "status": "completed",
+                            "input": {"pattern": "hello.py", "path": "/tmp/project"},
+                            "output": "No files found",
+                        },
+                    },
+                }
+            ),
+        ]
+    )
+    with patch("asyncio.create_subprocess_exec", new=AsyncMock(return_value=proc)):
+        await OpenCodeAdapter().execute(ctx)
+
+    assert len(events) == 1
+    event_type, content, meta = events[0]
+    assert event_type == "tool_call"
+    assert content == "Calling tool: glob"
+    assert meta == {
+        "tool": "glob",
+        "input": {"pattern": "hello.py", "path": "/tmp/project"},
+    }
 
 
 @pytest.mark.asyncio
@@ -197,6 +262,62 @@ async def test_on_event_step_finish():
 
 
 @pytest.mark.asyncio
+async def test_on_event_step_finish_aggregates_multiple_steps():
+    events: list[tuple] = []
+    ctx = make_ctx(on_event=lambda *a: events.append(a))
+
+    proc = make_proc(
+        [
+            json_line(
+                {
+                    "type": "step_finish",
+                    "part": {
+                        "tokens": {
+                            "input": 100,
+                            "output": 50,
+                            "reasoning": 10,
+                            "cache": {"read": 20},
+                        },
+                        "cost": 0.05,
+                    },
+                }
+            ),
+            json_line(
+                {
+                    "type": "step_finish",
+                    "part": {
+                        "tokens": {
+                            "input": 7,
+                            "output": 3,
+                            "reasoning": 2,
+                            "cache": {"read": 1},
+                        },
+                        "cost": 0.01,
+                    },
+                }
+            ),
+        ]
+    )
+    with patch("asyncio.create_subprocess_exec", new=AsyncMock(return_value=proc)):
+        result = await OpenCodeAdapter().execute(ctx)
+
+    assert events == [
+        (
+            "usage",
+            None,
+            {
+                "input_tokens": 107,
+                "output_tokens": 53,
+                "reasoning_tokens": 12,
+                "cache_read_input_tokens": 21,
+                "cost_usd": 0.06,
+            },
+        )
+    ]
+    assert result.token_usage == events[0][2]
+
+
+@pytest.mark.asyncio
 async def test_on_event_error():
     events: list[tuple] = []
     ctx = make_ctx(on_event=lambda *a: events.append(a))
@@ -237,6 +358,7 @@ async def test_on_event_full_sequence():
 
     proc = make_proc(
         [
+            json_line({"type": "step_start", "sessionID": "s1", "part": {"type": "step-start"}}),
             json_line({"type": "text", "sessionID": "s1", "part": {"text": "Thinking..."}}),
             json_line(
                 {
@@ -270,3 +392,23 @@ async def test_on_event_full_sequence():
 
     types = [e[0] for e in events]
     assert types == ["output", "output", "tool_call", "output", "usage"]
+
+
+@pytest.mark.asyncio
+async def test_on_event_session_started_only_once():
+    events: list[tuple] = []
+    ctx = make_ctx(on_event=lambda *a: events.append(a))
+
+    proc = make_proc(
+        [
+            json_line({"type": "step_start", "sessionID": "sess-abc", "part": {"type": "step-start"}}),
+            json_line({"type": "text", "sessionID": "sess-abc", "part": {"text": "Hi"}}),
+            json_line({"type": "tool_use", "sessionID": "sess-abc", "part": {"name": "Glob", "input": {}, "state": {"status": "running"}}}),
+            json_line({"type": "step_start", "sessionID": "sess-abc", "part": {"type": "step-start"}}),
+        ]
+    )
+    with patch("asyncio.create_subprocess_exec", new=AsyncMock(return_value=proc)):
+        await OpenCodeAdapter().execute(ctx)
+
+    session_started_events = [event for event in events if event[1] == "Session started: sess-abc"]
+    assert session_started_events == [("output", "Session started: sess-abc", {"session_id": "sess-abc"})]

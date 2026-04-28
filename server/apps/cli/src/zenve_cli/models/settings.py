@@ -26,8 +26,11 @@ class AgentSettings(BaseModel):
 
     slug: str
     name: str
-    model: str = "claude-sonnet-4-6"
     adapter_type: str = "claude_code"
+    adapter_config: dict = Field(default_factory=dict)
+    skills: list[str] = Field(default_factory=list)
+    tools: list[str] = Field(default_factory=list)
+    heartbeat_interval_seconds: int = 0
     enabled: bool = True
     github_label: str
     timeout_seconds: int = 300

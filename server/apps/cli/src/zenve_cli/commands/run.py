@@ -21,8 +21,8 @@ from zenve_cli.events import types as et
 from zenve_cli.events.emitter import EventEmitter
 from zenve_cli.integrations.github.client import GitHubClient
 from zenve_cli.integrations.github.snapshot import build_snapshot, write_snapshot
-from zenve_cli.runtime.commit import GitError, commit_agents
 from zenve_cli.models.run_result import RunResultFile
+from zenve_cli.runtime.commit import GitError, commit_agents
 from zenve_cli.runtime.executor import DryRunResult
 from zenve_cli.runtime.parallel import run_all
 
@@ -138,24 +138,23 @@ def cmd(
 
             row("name", ag.settings.name)
             row("label", dr.label, "cyan")
-            row("model", ag.settings.model, "dim white")
+            row("model", str(ag.settings.adapter_config.get("model", "")), "dim white")
 
             if dr.item is not None:
                 pick_text = f"{dr.item.kind} #{dr.item.number}: {dr.item.title}"
                 row("would pick", pick_text)
+
+                ctx_dict = {
+                    k: v for k, v in dataclasses.asdict(dr.context).items() if not callable(v)
+                }
+                ctx_json = json.dumps(ctx_dict, indent=2)
+                indented = "\n".join(f"    {line}" for line in ctx_json.splitlines())
+                console.print()
+                console.print("    context", style="dim")
+                console.print(indented, style="dim")
             else:
                 row("would pick", "nothing to do", "dim")
 
-            ctx_dict = {
-                k: v
-                for k, v in dataclasses.asdict(dr.context).items()
-                if not callable(v)
-            }
-            ctx_json = json.dumps(ctx_dict, indent=2)
-            indented = "\n".join(f"    {line}" for line in ctx_json.splitlines())
-            console.print()
-            console.print("    context", style="dim")
-            console.print(indented, style="dim")
             console.print()
 
         emitter.emit(et.RUN_COMPLETED, data={"dry_run": True})
@@ -163,25 +162,24 @@ def cmd(
 
     summaries = [r for r in results if isinstance(r, RunResultFile)]
     summary = ", ".join(
-        f"{r.agent}: {r.status}{' #' + str(r.item.number) if r.item else ''}"
-        for r in summaries
+        f"{r.agent}: {r.status}{' #' + str(r.item.number) if r.item else ''}" for r in summaries
     )
 
-    emitter.emit(et.RUN_COMMITTING, data={"summary": summary})
-    try:
-        committed = commit_agents(
-            repo_root=repo_root,
-            run_id=env.run_id,
-            prefix=project.commit_message_prefix,
-            branch=project.default_branch,
-            summary=summary,
-        )
-    except GitError as exc:
-        emitter.emit(et.RUN_FAILED, data={"error": str(exc), "stage": "commit"})
-        typer.echo(f"✗ commit/push failed: {exc}")
-        raise typer.Exit(1) from exc
+    # emitter.emit(et.RUN_COMMITTING, data={"summary": summary})
+    # try:
+    #     committed = commit_agents(
+    #         repo_root=repo_root,
+    #         run_id=env.run_id,
+    #         prefix=project.commit_message_prefix,
+    #         branch=project.default_branch,
+    #         summary=summary,
+    #     )
+    # except GitError as exc:
+    #     emitter.emit(et.RUN_FAILED, data={"error": str(exc), "stage": "commit"})
+    #     typer.echo(f"✗ commit/push failed: {exc}")
+    #     raise typer.Exit(1) from exc
 
     emitter.emit(
         et.RUN_COMPLETED,
-        data={"committed": committed, "summary": summary, "agents": len(summaries)},
+        data={"committed": False, "summary": summary, "agents": len(summaries)},
     )

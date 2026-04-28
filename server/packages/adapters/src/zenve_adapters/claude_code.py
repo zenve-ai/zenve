@@ -108,6 +108,8 @@ class ClaudeCodeAdapter(BaseAdapter):
         full_stdout_lines: list[str] = []
         token_usage: dict | None = None
         outcome: str | None = None
+        last_error_message: str | None = None
+        last_error_payload: dict | None = None
 
         assert proc.stdout is not None
         async for raw_line in proc.stdout:
@@ -201,8 +203,11 @@ class ClaudeCodeAdapter(BaseAdapter):
                     event = ("usage", f"Cost: {parsed.get('total_cost_usd')}", token_usage)
 
             elif event_type == "error":
-                msg = parsed.get("message", "unknown error")
-                event = ("error", msg, {"type": "error"})
+                payload = {k: v for k, v in parsed.items() if k != "type"}
+                msg = self.extract_error_message(payload)
+                last_error_message = msg
+                last_error_payload = payload
+                event = ("error", msg, {"type": "error", "payload": payload})
 
             if event:
                 ctx.on_event(*event)
@@ -212,6 +217,12 @@ class ClaudeCodeAdapter(BaseAdapter):
 
         duration = time.monotonic() - start
         stderr = stderr_bytes.decode(errors="replace")
+        error = self.compose_error_text(
+            return_code=proc.returncode or 0,
+            stderr=stderr,
+            last_error_message=last_error_message,
+            last_error_payload=last_error_payload,
+        )
 
         return RunResult(
             exit_code=proc.returncode or 0,
@@ -219,7 +230,7 @@ class ClaudeCodeAdapter(BaseAdapter):
             stderr=stderr,
             duration_seconds=duration,
             token_usage=token_usage,
-            error=stderr if proc.returncode != 0 else None,
+            error=error,
             outcome=outcome,
         )
 
@@ -270,6 +281,56 @@ class ClaudeCodeAdapter(BaseAdapter):
         except (json.JSONDecodeError, AttributeError):
             pass
         return None
+
+    @staticmethod
+    def extract_error_message(payload: dict) -> str:
+        message = payload.get("message")
+        if isinstance(message, str) and message:
+            return message
+
+        error = payload.get("error")
+        if isinstance(error, str) and error:
+            return error
+        if isinstance(error, dict):
+            for key in ("message", "name", "type"):
+                value = error.get(key)
+                if isinstance(value, str) and value:
+                    return value
+
+        for key in ("name", "type"):
+            value = payload.get(key)
+            if isinstance(value, str) and value:
+                return value
+
+        return "unknown error"
+
+    @classmethod
+    def compose_error_text(
+        cls,
+        *,
+        return_code: int,
+        stderr: str,
+        last_error_message: str | None,
+        last_error_payload: dict | None,
+    ) -> str | None:
+        if return_code == 0:
+            return None
+
+        stderr_text = stderr.strip()
+        if stderr_text and last_error_message and last_error_message not in stderr_text:
+            return f"{last_error_message}\n\nstderr:\n{stderr_text}"
+        if stderr_text:
+            return stderr_text
+        if last_error_message:
+            details = ""
+            if last_error_payload:
+                details = json.dumps(last_error_payload, ensure_ascii=True)
+            return (
+                f"{last_error_message} | details: {details}"
+                if details and details != "{}"
+                else last_error_message
+            )
+        return f"claude exited with code {return_code}"
 
     @staticmethod
     def read_file(path: Path) -> str:
