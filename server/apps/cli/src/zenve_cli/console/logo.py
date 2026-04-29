@@ -1,0 +1,17 @@
+from __future__ import annotations
+
+from rich.text import Text
+
+LOGO = """███████╗ ███████╗ ███╗   ██╗ ██╗   ██╗ ███████╗
+╚══███╔╝ ██╔════╝ ████╗  ██║ ██║   ██║ ██╔════╝
+  ███╔╝  █████╗   ██╔██╗ ██║ ██║   ██║ █████╗
+ ███╔╝   ██╔══╝   ██║╚██╗██║ ╚██╗ ██╔╝ ██╔══╝
+███████╗ ███████╗ ██║ ╚████║  ╚████╔╝  ███████╗
+╚══════╝ ╚══════╝ ╚═╝  ╚═══╝   ╚═══╝   ╚══════╝"""
+
+
+def print_logo() -> None:
+    from rich.console import Console
+
+    Console().print()
+    Console().print(Text(LOGO, style="bold cyan"))

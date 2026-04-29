@@ -6,7 +6,7 @@ from pathlib import Path
 
 from zenve_cli.core.config import zenve_dir
 from zenve_cli.integrations.github.client import GitHubClient
-from zenve_cli.models.snapshot import Snapshot, SnapshotIssue, SnapshotPR
+from zenve_cli.models.snapshot import Snapshot, SnapshotComment, SnapshotIssue, SnapshotPR
 
 SNAPSHOT_FILE = "snapshot.json"
 
@@ -33,6 +33,14 @@ def build_snapshot(client: GitHubClient, run_id: str) -> Snapshot:
             assignees=assignee_logins(raw.get("assignees", [])),
             state=raw.get("state", "open"),
             created_at=raw.get("created_at", "") or "",
+            comments=[
+                SnapshotComment(
+                    author=c["user"]["login"],
+                    body=c["body"],
+                    created_at=c["created_at"],
+                )
+                for c in client.get_comments(raw["number"])
+            ],
         )
         for raw in issues_raw
     ]
@@ -49,6 +57,14 @@ def build_snapshot(client: GitHubClient, run_id: str) -> Snapshot:
             base=(raw.get("base") or {}).get("ref", ""),
             draft=bool(raw.get("draft", False)),
             created_at=raw.get("created_at", "") or "",
+            comments=[
+                SnapshotComment(
+                    author=c["user"]["login"],
+                    body=c["body"],
+                    created_at=c["created_at"],
+                )
+                for c in client.get_comments(raw["number"])
+            ],
         )
         for raw in pulls_raw
     ]

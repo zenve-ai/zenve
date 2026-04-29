@@ -14,9 +14,11 @@ from zenve_cli.core.pipeline import next_label
 from zenve_cli.events import types as et
 from zenve_cli.events.emitter import EventEmitter
 from zenve_cli.integrations.github.client import GitHubClient, GitHubError
+from zenve_adapters.base import BaseAdapter
 from zenve_cli.integrations.github.labels import (
     CLAIMED_LABEL,
     FAILED_LABEL,
+    NEEDS_INPUT_LABEL,
     claim_item,
     transition,
     unclaim_item,
@@ -29,7 +31,7 @@ from zenve_cli.models.run_result import (
     TokenUsage,
 )
 from zenve_cli.models.settings import AgentSettings, ProjectSettings
-from zenve_cli.models.snapshot import Snapshot
+from zenve_cli.models.snapshot import Snapshot, SnapshotIssue, SnapshotPR
 from zenve_models.adapter import RunContext
 
 logger = logging.getLogger(__name__)
@@ -103,20 +105,55 @@ def pick_unclaimed(items: list[PlannedItem]) -> PlannedItem | None:
     return None
 
 
+def find_snapshot_item(snapshot: Snapshot, item: PlannedItem) -> SnapshotIssue | SnapshotPR | None:
+    if item.kind == "issue":
+        return next((i for i in snapshot.issues if i.number == item.number), None)
+    return next((p for p in snapshot.pull_requests if p.number == item.number), None)
+
+
+def build_message(run_id: str, agent_name: str, item: PlannedItem | None, snapshot: Snapshot) -> str:
+    lines = [f"Run: {run_id}", f"Agent: {agent_name}"]
+
+    if item is None:
+        return "\n".join(lines)
+
+    kind_label = "Issue" if item.kind == "issue" else "PR"
+    lines.append(f"\n## {kind_label} #{item.number}: {item.title}")
+
+    snap = find_snapshot_item(snapshot, item)
+    if snap is None:
+        return "\n".join(lines)
+
+    meta: list[str] = []
+    if snap.labels:
+        meta.append(f"**Labels:** {', '.join(snap.labels)}")
+    if snap.assignees:
+        meta.append(f"**Assignees:** {', '.join(snap.assignees)}")
+    if meta:
+        lines.append("\n".join(meta))
+
+    if snap.body:
+        lines.append(f"\n### Description\n{snap.body}")
+
+    if snap.comments:
+        lines.append(f"\n### Comments ({len(snap.comments)})")
+        for c in snap.comments:
+            lines.append(f"\n**@{c.author}** · {c.created_at}\n{c.body}")
+
+    return "\n".join(lines)
+
+
 def build_run_context(
     agent: DiscoveredAgent,
     run_id: str,
     project: ProjectSettings,
     repo_root: Path,
     item: PlannedItem | None,
+    snapshot: Snapshot,
     env_vars: dict[str, str],
 ) -> RunContext:
     config: dict = dict(agent.settings.adapter_config)
-
-    message_lines = [f"Run: {run_id}", f"Agent: {agent.name}"]
-    if item is not None:
-        message_lines.append(f"{item.kind} #{item.number}: {item.title}")
-    message = "\n".join(message_lines)
+    message = build_message(run_id, agent.name, item, snapshot)
 
     return RunContext(
         agent_dir=str(agent.path),
@@ -232,7 +269,7 @@ async def run_agent(
         item = pick_unclaimed(items)
 
     if dry_run:
-        ctx = build_run_context(agent, run_id, project, repo_root, item, env_vars)
+        ctx = build_run_context(agent, run_id, project, repo_root, item, snapshot, env_vars)
         return DryRunResult(
             agent_name=agent.name,
             picks_up=agent.settings.picks_up,
@@ -279,7 +316,7 @@ async def run_agent(
     started_at = now_iso()
     start_mono = time.monotonic()
 
-    ctx = build_run_context(agent, run_id, project, repo_root, item, env_vars)
+    ctx = build_run_context(agent, run_id, project, repo_root, item, snapshot, env_vars)
 
     adapter_event_map = {
         "output": et.ADAPTER_OUTPUT,
@@ -333,7 +370,11 @@ async def run_agent(
 
     finished_at = now_iso()
 
-    status = "completed" if result.exit_code == 0 else "failed"
+    if result.exit_code == 0:
+        run_status = BaseAdapter.parse_run_status(result.outcome or "")
+    else:
+        run_status = "failed"
+    status = run_status if run_status in ("completed", "needs_input") else "failed"
     error_text = result.error
     if status == "failed" and not error_text and adapter_errors:
         error_text = adapter_errors[-1]
@@ -344,6 +385,12 @@ async def run_agent(
     if item is not None:
         if status == "completed":
             pipeline_transition = apply_pipeline_transition(gh, project, agent, item, emitter)
+        elif status == "needs_input":
+            unclaim_item(gh, item.number)
+            try:
+                gh.add_labels(item.number, [NEEDS_INPUT_LABEL])
+            except GitHubError:
+                pass
         else:
             unclaim_item(gh, item.number)
             try:
@@ -352,6 +399,8 @@ async def run_agent(
                 pass
         if status == "completed":
             comment_body = f"Run complete\n\n{result.outcome}" if result.outcome else "Run complete"
+        elif status == "needs_input":
+            comment_body = f"Run needs input\n\n{result.outcome}" if result.outcome else "Run needs input"
         else:
             comment_body = f"Run failed\n\n{error_text}" if error_text else "Run failed"
         try:
@@ -387,8 +436,14 @@ async def run_agent(
     )
     write_run_result(agent, run_result)
 
+    if status == "completed":
+        event_type = et.AGENT_COMPLETED
+    elif status == "needs_input":
+        event_type = et.AGENT_NEEDS_INPUT
+    else:
+        event_type = et.AGENT_FAILED
     emitter.emit(
-        et.AGENT_COMPLETED if status == "completed" else et.AGENT_FAILED,
+        event_type,
         agent=agent.name,
         data={
             "exit_code": result.exit_code,

@@ -3,6 +3,14 @@ from __future__ import annotations
 from pydantic import BaseModel, Field
 
 
+class SnapshotComment(BaseModel):
+    model_config = {"extra": "ignore"}
+
+    author: str
+    body: str
+    created_at: str
+
+
 class SnapshotIssue(BaseModel):
     model_config = {"extra": "ignore"}
 
@@ -13,6 +21,7 @@ class SnapshotIssue(BaseModel):
     assignees: list[str] = Field(default_factory=list)
     state: str = "open"
     created_at: str = ""
+    comments: list[SnapshotComment] = Field(default_factory=list)
 
 
 class SnapshotPR(BaseModel):
@@ -28,6 +37,7 @@ class SnapshotPR(BaseModel):
     base: str = ""
     draft: bool = False
     created_at: str = ""
+    comments: list[SnapshotComment] = Field(default_factory=list)
 
 
 class Snapshot(BaseModel):

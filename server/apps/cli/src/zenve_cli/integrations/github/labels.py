@@ -4,6 +4,7 @@ from zenve_cli.integrations.github.client import GitHubClient, GitHubError
 
 CLAIMED_LABEL = "zenve:claimed"
 FAILED_LABEL = "zenve:failed"
+NEEDS_INPUT_LABEL = "zenve:needs-input"
 
 
 def claim_item(client: GitHubClient, number: int) -> bool:

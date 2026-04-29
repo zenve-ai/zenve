@@ -14,8 +14,8 @@ from zenve_adapters import AdapterRegistry
 from zenve_adapters.claude_code import ClaudeCodeAdapter
 from zenve_adapters.open_code import OpenCodeAdapter
 from zenve_cli.commands.snapshot import git_remote_slug
+from zenve_cli.console import ZenveTUI
 from zenve_cli.core.config import ConfigError, load_project_settings
-from zenve_cli.core.console import ZenveTUI
 from zenve_cli.core.discovery import DiscoveryError, discover_agents
 from zenve_cli.core.env import EnvError, load_env
 from zenve_cli.events import types as et
@@ -198,8 +198,7 @@ def cmd(
 
         summaries = [r for r in results if isinstance(r, RunResultFile)]
         summary = ", ".join(
-            f"{r.agent}: {r.status}{' #' + str(r.item.number) if r.item else ''}"
-            for r in summaries
+            f"{r.agent}: {r.status}{' #' + str(r.item.number) if r.item else ''}" for r in summaries
         )
         emitter.emit(
             et.RUN_COMPLETED,

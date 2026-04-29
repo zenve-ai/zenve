@@ -115,6 +115,25 @@ class GitHubClient:
             json={"assignees": assignees},
         )
 
+    def get_comments(self, number: int) -> list[dict]:
+        """Return all comments for an issue or PR across all pages."""
+        items: list[dict] = []
+        page = 1
+        while True:
+            resp = self.request(
+                "GET",
+                f"/repos/{self.repo}/issues/{number}/comments",
+                params={"per_page": 100, "page": page},
+            )
+            batch = resp.json()
+            if not batch:
+                break
+            items.extend(batch)
+            if len(batch) < 100:
+                break
+            page += 1
+        return items
+
     def post_comment(self, number: int, body: str) -> None:
         self.request(
             "POST",
