@@ -13,6 +13,7 @@ dependencies = [
     "zenve-models",
     "zenve-services",
     "zenve-utils",
+    "textual>=8.2.4",
 ]
 
 [project.scripts]
