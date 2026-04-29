@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import dataclasses
 import json
+from collections.abc import Callable
 from pathlib import Path
 
 import typer
@@ -14,7 +15,7 @@ from zenve_adapters.claude_code import ClaudeCodeAdapter
 from zenve_adapters.open_code import OpenCodeAdapter
 from zenve_cli.commands.snapshot import git_remote_slug
 from zenve_cli.core.config import ConfigError, load_project_settings
-from zenve_cli.core.console import print_event
+from zenve_cli.core.console import ZenveTUI
 from zenve_cli.core.discovery import DiscoveryError, discover_agents
 from zenve_cli.core.env import EnvError, load_env
 from zenve_cli.events import types as et
@@ -22,7 +23,7 @@ from zenve_cli.events.emitter import EventEmitter
 from zenve_cli.integrations.github.client import GitHubClient
 from zenve_cli.integrations.github.snapshot import build_snapshot, write_snapshot
 from zenve_cli.models.run_result import RunResultFile
-from zenve_cli.runtime.commit import GitError, commit_agents
+from zenve_cli.runtime.commit import GitError
 from zenve_cli.runtime.executor import DryRunResult
 from zenve_cli.runtime.parallel import run_all
 
@@ -62,58 +63,50 @@ def cmd(
         typer.echo("✗ Could not determine repo. Ensure git remote origin is a GitHub URL.")
         raise typer.Exit(1)
 
-    emitter = EventEmitter(
-        repo_root=repo_root,
-        run_id=env.run_id,
-        webhook_url=env.webhook_url,
-        webhook_secret=env.webhook_secret,
-        on_event=None if dry_run else print_event,
-    )
-    emitter.emit(
-        et.RUN_STARTED,
-        data={"agents": [a.name for a in agents], "repo": repo, "dry_run": dry_run},
-    )
-
     env_vars = {"ZENVE_RUN_ID": env.run_id}
 
-    with GitHubClient(env.github_token, repo) as gh:
-        snapshot = build_snapshot(gh, env.run_id)
-        write_snapshot(repo_root, snapshot)
-        emitter.emit(
-            et.SNAPSHOT_FETCHED,
-            data={
-                "issues": len(snapshot.issues),
-                "pull_requests": len(snapshot.pull_requests),
-                "branches": len(snapshot.branches),
-            },
-        )
-
-        bot_login = ""
-        if not dry_run:
-            try:
-                bot_login = gh.viewer_login()
-            except Exception as exc:
-                typer.echo(f"✗ Could not resolve viewer login: {exc}")
-                raise typer.Exit(1) from exc
-
-        registry = build_registry()
-        results = asyncio.run(
-            run_all(
-                agents=agents,
-                snapshot=snapshot,
-                project=project,
-                repo_root=repo_root,
-                run_id=env.run_id,
-                registry=registry,
-                gh=gh,
-                bot_login=bot_login,
-                emitter=emitter,
-                env_vars=env_vars,
-                dry_run=dry_run,
-            )
-        )
-
     if dry_run:
+        emitter = EventEmitter(
+            repo_root=repo_root,
+            run_id=env.run_id,
+            webhook_url=env.webhook_url,
+            webhook_secret=env.webhook_secret,
+            on_event=None,
+        )
+        emitter.emit(
+            et.RUN_STARTED,
+            data={"agents": [a.name for a in agents], "repo": repo, "dry_run": True},
+        )
+
+        with GitHubClient(env.github_token, repo) as gh:
+            snapshot = build_snapshot(gh, env.run_id)
+            write_snapshot(repo_root, snapshot)
+            emitter.emit(
+                et.SNAPSHOT_FETCHED,
+                data={
+                    "issues": len(snapshot.issues),
+                    "pull_requests": len(snapshot.pull_requests),
+                    "branches": len(snapshot.branches),
+                },
+            )
+
+            registry = build_registry()
+            results = asyncio.run(
+                run_all(
+                    agents=agents,
+                    snapshot=snapshot,
+                    project=project,
+                    repo_root=repo_root,
+                    run_id=env.run_id,
+                    registry=registry,
+                    gh=gh,
+                    bot_login="",
+                    emitter=emitter,
+                    env_vars=env_vars,
+                    dry_run=True,
+                )
+            )
+
         dry_lookup = {r.agent_name: r for r in results if isinstance(r, DryRunResult)}
         label_w = 12
 
@@ -160,26 +153,64 @@ def cmd(
         emitter.emit(et.RUN_COMPLETED, data={"dry_run": True})
         return
 
-    summaries = [r for r in results if isinstance(r, RunResultFile)]
-    summary = ", ".join(
-        f"{r.agent}: {r.status}{' #' + str(r.item.number) if r.item else ''}" for r in summaries
-    )
+    # ── Live run — launch TUI ─────────────────────────────────────────────────
 
-    # emitter.emit(et.RUN_COMMITTING, data={"summary": summary})
-    # try:
-    #     committed = commit_agents(
-    #         repo_root=repo_root,
-    #         run_id=env.run_id,
-    #         prefix=project.commit_message_prefix,
-    #         branch=project.default_branch,
-    #         summary=summary,
-    #     )
-    # except GitError as exc:
-    #     emitter.emit(et.RUN_FAILED, data={"error": str(exc), "stage": "commit"})
-    #     typer.echo(f"✗ commit/push failed: {exc}")
-    #     raise typer.Exit(1) from exc
+    def run_fn(on_event: Callable[[dict], None]) -> None:
+        emitter = EventEmitter(
+            repo_root=repo_root,
+            run_id=env.run_id,
+            webhook_url=env.webhook_url,
+            webhook_secret=env.webhook_secret,
+            on_event=on_event,
+        )
+        emitter.emit(
+            et.RUN_STARTED,
+            data={"agents": [a.name for a in agents], "repo": repo, "dry_run": False},
+        )
 
-    emitter.emit(
-        et.RUN_COMPLETED,
-        data={"committed": False, "summary": summary, "agents": len(summaries)},
-    )
+        with GitHubClient(env.github_token, repo) as gh:
+            snapshot = build_snapshot(gh, env.run_id)
+            write_snapshot(repo_root, snapshot)
+            emitter.emit(
+                et.SNAPSHOT_FETCHED,
+                data={
+                    "issues": len(snapshot.issues),
+                    "pull_requests": len(snapshot.pull_requests),
+                    "branches": len(snapshot.branches),
+                },
+            )
+
+            try:
+                bot_login = gh.viewer_login()
+            except Exception as exc:
+                emitter.emit(et.RUN_FAILED, data={"error": str(exc), "stage": "viewer_login"})
+                raise
+
+            registry = build_registry()
+            results = asyncio.run(
+                run_all(
+                    agents=agents,
+                    snapshot=snapshot,
+                    project=project,
+                    repo_root=repo_root,
+                    run_id=env.run_id,
+                    registry=registry,
+                    gh=gh,
+                    bot_login=bot_login,
+                    emitter=emitter,
+                    env_vars=env_vars,
+                    dry_run=False,
+                )
+            )
+
+        summaries = [r for r in results if isinstance(r, RunResultFile)]
+        summary = ", ".join(
+            f"{r.agent}: {r.status}{' #' + str(r.item.number) if r.item else ''}"
+            for r in summaries
+        )
+        emitter.emit(
+            et.RUN_COMPLETED,
+            data={"committed": False, "summary": summary, "agents": len(summaries)},
+        )
+
+    ZenveTUI(run_fn=run_fn).run()

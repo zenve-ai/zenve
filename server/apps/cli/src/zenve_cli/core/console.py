@@ -8,6 +8,7 @@ from rich.panel import Panel
 from rich.rule import Rule
 from rich.text import Text
 from textual.app import App, ComposeResult
+from textual.binding import Binding
 from textual.containers import ScrollableContainer
 from textual.widgets import Static
 
@@ -86,6 +87,8 @@ TOOL_FORMATTERS["bash"] = fmt_bash
 
 
 class ZenveTUI(App):
+    BINDINGS = [Binding("ctrl+q", "quit", "quit")]
+
     CSS = """
     Screen {
         layout: vertical;
@@ -120,8 +123,13 @@ class ZenveTUI(App):
     }
     """
 
-    def __init__(self, events: list[dict]) -> None:
-        self._events = events
+    def __init__(
+        self,
+        events: list[dict] | None = None,
+        run_fn: Callable[[Callable[[dict], None]], None] | None = None,
+    ) -> None:
+        self._events = events or []
+        self._run_fn = run_fn
 
         # Block buffering
         self._block_type: str | None = None
@@ -149,10 +157,34 @@ class ZenveTUI(App):
 
     def on_mount(self) -> None:
         self._update_status()
-        for event in self._events:
-            self._dispatch(event)
-        self._flush_block()
+        if self._run_fn:
+            self.run_worker(self._execute_run, thread=True)
+        else:
+            for event in self._events:
+                self._dispatch(event)
+            self._flush_block()
+            self.query_one("#log", ScrollableContainer).scroll_end(animate=False)
+
+    # ── Live run worker ───────────────────────────────────────────────────────
+
+    def _dispatch_from_thread(self, event: dict) -> None:
+        """Called from the worker thread to safely dispatch an event into the TUI."""
+        self.call_from_thread(self._dispatch_and_scroll, event)
+
+    def _dispatch_and_scroll(self, event: dict) -> None:
+        self._dispatch(event)
         self.query_one("#log", ScrollableContainer).scroll_end(animate=False)
+
+    def _execute_run(self) -> None:
+        """Thread worker: runs the agent pipeline and feeds events into the TUI."""
+        assert self._run_fn is not None
+        try:
+            self._run_fn(self._dispatch_from_thread)
+        except Exception as exc:
+            self.call_from_thread(
+                self._dispatch_and_scroll,
+                {"type": "run.failed", "agent": None, "data": {"error": str(exc)}},
+            )
 
     # ── Block helpers ─────────────────────────────────────────────────────────
 
