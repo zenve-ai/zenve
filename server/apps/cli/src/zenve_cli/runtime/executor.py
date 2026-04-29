@@ -8,12 +8,20 @@ from pathlib import Path
 from typing import Literal
 
 from zenve_adapters import AdapterRegistry
+from zenve_cli.core.claims import add_claim, expired_claims, load_claims, remove_claim
 from zenve_cli.core.discovery import DiscoveredAgent
 from zenve_cli.core.pipeline import next_label
 from zenve_cli.events import types as et
 from zenve_cli.events.emitter import EventEmitter
-from zenve_cli.integrations.github.client import GitHubClient
-from zenve_cli.integrations.github.labels import claim_item, transition
+from zenve_cli.integrations.github.client import GitHubClient, GitHubError
+from zenve_cli.integrations.github.labels import (
+    CLAIMED_LABEL,
+    FAILED_LABEL,
+    claim_item,
+    transition,
+    unclaim_item,
+)
+from zenve_cli.models.claims import Claim
 from zenve_cli.models.run_result import (
     PipelineTransition,
     RunItem,
@@ -88,9 +96,9 @@ def filter_for_agent(snapshot: Snapshot, settings: AgentSettings) -> list[Planne
 
 
 def pick_unclaimed(items: list[PlannedItem]) -> PlannedItem | None:
-    """Return the oldest item that is not already assigned."""
+    """Return the oldest item that does not carry zenve:claimed."""
     for it in items:
-        if not it.assignees:
+        if CLAIMED_LABEL not in it.labels:
             return it
     return None
 
@@ -163,6 +171,47 @@ def apply_pipeline_transition(
     )
 
 
+def reconcile_claims(
+    gh: GitHubClient,
+    snapshot: Snapshot,
+    repo_root: Path,
+) -> None:
+    """Clean up expired and orphaned claims before agents run.
+
+    For each stale claim (expired TTL or present on GitHub but absent from
+    claims.json), removes zenve:claimed from GitHub, removes from claims.json,
+    and strips the label from the in-memory snapshot so pick_unclaimed sees
+    the item as free.
+    """
+    stale = expired_claims(repo_root)
+    stale_numbers = {c.number for c in stale}
+
+    cf = load_claims(repo_root)
+    known_numbers = {c.number for c in cf.claims}
+
+    orphan_numbers: set[int] = set()
+    for issue in snapshot.issues:
+        if CLAIMED_LABEL in issue.labels and issue.number not in known_numbers:
+            orphan_numbers.add(issue.number)
+    for pr in snapshot.pull_requests:
+        if CLAIMED_LABEL in pr.labels and pr.number not in known_numbers:
+            orphan_numbers.add(pr.number)
+
+    to_release = stale_numbers | orphan_numbers
+    if not to_release:
+        return
+
+    for number in to_release:
+        unclaim_item(gh, number)
+        remove_claim(repo_root, number)
+        for issue in snapshot.issues:
+            if issue.number == number:
+                issue.labels = [lbl for lbl in issue.labels if lbl != CLAIMED_LABEL]
+        for pr in snapshot.pull_requests:
+            if pr.number == number:
+                pr.labels = [lbl for lbl in pr.labels if lbl != CLAIMED_LABEL]
+
+
 async def run_agent(
     agent: DiscoveredAgent,
     snapshot: Snapshot,
@@ -171,7 +220,6 @@ async def run_agent(
     run_id: str,
     registry: AdapterRegistry,
     gh: GitHubClient,
-    bot_login: str,
     emitter: EventEmitter,
     env_vars: dict[str, str],
     dry_run: bool = False,
@@ -204,7 +252,7 @@ async def run_agent(
             return None
 
     if item is not None:
-        claimed = True  # claim_item(gh, item.number, bot_login)
+        claimed = claim_item(gh, item.number)
         if not claimed:
             emitter.emit(
                 et.AGENT_NOTHING_TO_DO,
@@ -212,6 +260,16 @@ async def run_agent(
                 data={"reason": "claim_failed", "number": item.number},
             )
             return None
+        add_claim(
+            repo_root,
+            Claim(
+                number=item.number,
+                kind=item.kind,
+                agent_name=agent.name,
+                run_id=run_id,
+                claimed_at=now_iso(),
+            ),
+        )
         emitter.emit(
             et.AGENT_CLAIMED_PR if item.kind == "pull_request" else et.AGENT_CLAIMED_ISSUE,
             agent=agent.name,
@@ -250,6 +308,9 @@ async def run_agent(
             agent=agent.name,
             data={"error": str(exc)},
         )
+        if item is not None:
+            unclaim_item(gh, item.number)
+            remove_claim(repo_root, item.number)
         run_result = RunResultFile(
             run_id=run_id,
             agent=agent.name,
@@ -268,16 +329,25 @@ async def run_agent(
 
     finished_at = now_iso()
 
-    pipeline_transition: PipelineTransition | None = None
-    # if item is not None:
-    #    pipeline_transition = apply_pipeline_transition(gh, project, agent, item, emitter)
-
     status = "completed" if result.exit_code == 0 else "failed"
     error_text = result.error
     if status == "failed" and not error_text and adapter_errors:
         error_text = adapter_errors[-1]
     if status == "failed" and not error_text:
         error_text = f"Adapter exited with code {result.exit_code}"
+
+    pipeline_transition: PipelineTransition | None = None
+    if item is not None:
+        if status == "completed":
+            pipeline_transition = apply_pipeline_transition(gh, project, agent, item, emitter)
+        else:
+            unclaim_item(gh, item.number)
+            try:
+                gh.add_labels(item.number, [FAILED_LABEL])
+            except GitHubError:
+                pass
+        remove_claim(repo_root, item.number)
+
     token_usage = (
         TokenUsage(
             input_tokens=result.token_usage.get("input_tokens", 0),

@@ -23,8 +23,7 @@ from zenve_cli.events.emitter import EventEmitter
 from zenve_cli.integrations.github.client import GitHubClient
 from zenve_cli.integrations.github.snapshot import build_snapshot, write_snapshot
 from zenve_cli.models.run_result import RunResultFile
-from zenve_cli.runtime.commit import GitError
-from zenve_cli.runtime.executor import DryRunResult
+from zenve_cli.runtime.executor import DryRunResult, reconcile_claims
 from zenve_cli.runtime.parallel import run_all
 
 console = Console()
@@ -100,7 +99,6 @@ def cmd(
                     run_id=env.run_id,
                     registry=registry,
                     gh=gh,
-                    bot_login="",
                     emitter=emitter,
                     env_vars=env_vars,
                     dry_run=True,
@@ -180,11 +178,7 @@ def cmd(
                 },
             )
 
-            try:
-                bot_login = gh.viewer_login()
-            except Exception as exc:
-                emitter.emit(et.RUN_FAILED, data={"error": str(exc), "stage": "viewer_login"})
-                raise
+            reconcile_claims(gh, snapshot, repo_root)
 
             registry = build_registry()
             results = asyncio.run(
@@ -196,7 +190,6 @@ def cmd(
                     run_id=env.run_id,
                     registry=registry,
                     gh=gh,
-                    bot_login=bot_login,
                     emitter=emitter,
                     env_vars=env_vars,
                     dry_run=False,

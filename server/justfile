@@ -15,6 +15,13 @@ migrate-gen msg="migration":
 cli *args:
     uv run --package zenve-cli zenve {{args}}
 
+link:
+    #!/bin/sh
+    TARGET="$HOME/.local/bin/zenve"
+    printf '#!/bin/sh\nexec %s "$@"\n' "$(pwd)/.venv/bin/zenve" > "$TARGET"
+    chmod +x "$TARGET"
+    echo "Linked: zenve → $TARGET"
+
 start:
     uv run --package zenve-api api-start
 

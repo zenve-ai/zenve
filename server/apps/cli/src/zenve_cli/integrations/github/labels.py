@@ -2,25 +2,25 @@ from __future__ import annotations
 
 from zenve_cli.integrations.github.client import GitHubClient, GitHubError
 
-IN_PROGRESS_LABEL = "in-progress"
+CLAIMED_LABEL = "zenve:claimed"
+FAILED_LABEL = "zenve:failed"
 
 
-def claim_item(
-    client: GitHubClient,
-    number: int,
-    bot_login: str,
-) -> bool:
-    """Attempt to claim an issue/PR for work.
-
-    Adds `in-progress` label and assigns `bot_login`. Returns True on success,
-    False if any step fails (treat as already-claimed by another runner).
-    """
+def claim_item(client: GitHubClient, number: int) -> bool:
+    """Add zenve:claimed label. Returns True on success, False on GitHubError."""
     try:
-        client.add_labels(number, [IN_PROGRESS_LABEL])
-        client.add_assignees(number, [bot_login])
+        client.add_labels(number, [CLAIMED_LABEL])
     except GitHubError:
         return False
     return True
+
+
+def unclaim_item(client: GitHubClient, number: int) -> None:
+    """Remove zenve:claimed label silently."""
+    try:
+        client.remove_label(number, CLAIMED_LABEL)
+    except GitHubError:
+        pass
 
 
 def transition(
@@ -29,13 +29,13 @@ def transition(
     from_label: str,
     to_label: str | None,
 ) -> None:
-    """Post-run label transition.
+    """Post-run label transition (success path).
 
-    - Remove `in-progress` if present.
-    - Remove current `zenve:*` label (`from_label`).
+    - Remove zenve:claimed.
+    - Remove current agent label (from_label).
     - Add next pipeline label if not None.
     """
-    for lbl in (IN_PROGRESS_LABEL, from_label):
+    for lbl in (CLAIMED_LABEL, from_label):
         try:
             client.remove_label(number, lbl)
         except GitHubError:
