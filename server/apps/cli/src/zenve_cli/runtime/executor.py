@@ -311,6 +311,10 @@ async def run_agent(
         if item is not None:
             unclaim_item(gh, item.number)
             remove_claim(repo_root, item.number)
+            try:
+                gh.post_comment(item.number, f"Run failed\n\n{exc!s}")
+            except GitHubError:
+                pass
         run_result = RunResultFile(
             run_id=run_id,
             agent=agent.name,
@@ -346,6 +350,14 @@ async def run_agent(
                 gh.add_labels(item.number, [FAILED_LABEL])
             except GitHubError:
                 pass
+        if status == "completed":
+            comment_body = f"Run complete\n\n{result.outcome}" if result.outcome else "Run complete"
+        else:
+            comment_body = f"Run failed\n\n{error_text}" if error_text else "Run failed"
+        try:
+            gh.post_comment(item.number, comment_body)
+        except GitHubError:
+            pass
         remove_claim(repo_root, item.number)
 
     token_usage = (

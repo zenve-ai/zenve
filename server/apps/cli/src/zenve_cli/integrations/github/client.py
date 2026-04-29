@@ -115,6 +115,13 @@ class GitHubClient:
             json={"assignees": assignees},
         )
 
+    def post_comment(self, number: int, body: str) -> None:
+        self.request(
+            "POST",
+            f"/repos/{self.repo}/issues/{number}/comments",
+            json={"body": body},
+        )
+
     def viewer_login(self) -> str:
         resp = self.request("GET", "/user")
         return resp.json().get("login", "")
