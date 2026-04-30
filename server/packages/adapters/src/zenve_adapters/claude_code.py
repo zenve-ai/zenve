@@ -66,9 +66,11 @@ class ClaudeCodeAdapter(BaseAdapter):
             f"- agent_slug: {ctx.agent_slug}\n"
             f"- agent_name: {ctx.agent_name}\n"
             f"- project_slug: {ctx.project_slug}\n"
+            f"- project_description: {ctx.project_description}\n"
             f"- project_dir: {ctx.project_dir}\n"
             f"- agent_dir: {ctx.agent_dir}\n"
             f"- run_id: {ctx.run_id}\n"
+            f"- For full project context, read: {ctx.project_dir}/README.md\n"
         )
 
         if ctx.heartbeat:

@@ -23,6 +23,7 @@ from zenve_cli.events.emitter import EventEmitter
 from zenve_cli.integrations.github.client import GitHubClient
 from zenve_cli.integrations.github.snapshot import build_snapshot, write_snapshot
 from zenve_cli.models.run_result import RunResultFile
+from zenve_cli.runtime.commit import GitError, commit_agents
 from zenve_cli.runtime.executor import DryRunResult, reconcile_claims
 from zenve_cli.runtime.parallel import run_all
 
@@ -200,9 +201,23 @@ def cmd(
         summary = ", ".join(
             f"{r.agent}: {r.status}{' #' + str(r.item.number) if r.item else ''}" for r in summaries
         )
+
+        emitter.emit(et.RUN_COMMITTING)
+        committed = False
+        try:
+            committed = commit_agents(
+                repo_root=repo_root,
+                run_id=env.run_id,
+                prefix=project.commit_message_prefix,
+                branch=project.default_branch,
+                summary=summary,
+            )
+        except GitError as exc:
+            emitter.emit(et.RUN_FAILED, data={"error": str(exc)})
+
         emitter.emit(
             et.RUN_COMPLETED,
-            data={"committed": False, "summary": summary, "agents": len(summaries)},
+            data={"committed": committed, "summary": summary, "agents": len(summaries)},
         )
 
     ZenveTUI(run_fn=run_fn).run()
