@@ -1,5 +1,11 @@
 # CLAUDE.md — zenve CLI
 
+See [ARCHITECTURE.md](ARCHITECTURE.md) for the full architecture spec and design rationale.
+
+## Keeping ARCHITECTURE.md Up to Date
+
+**Always update `ARCHITECTURE.md` when making architectural changes** — new modules, removed layers, changed data flow, new integrations, or any structural decision that affects how the system fits together. The file is the authoritative design record; if the code diverges from it, future readers (and Claude) will be misled.
+
 Python CLI (`typer`) that runs autonomous agents against a GitHub repo.
 
 ## Structure
