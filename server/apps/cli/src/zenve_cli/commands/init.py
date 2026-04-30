@@ -219,6 +219,32 @@ def cmd(repo_root: Path = Path("."), description: str | None = None) -> None:
         dest.parent.mkdir(parents=True, exist_ok=True)
         dest.write_bytes(content)
 
+    # Skills step — lazy import to avoid circular dependency
+    from zenve_cli.commands.skill import (
+        collect_skills_wizard,
+        install_skills,
+        installed_skill_names,
+        make_skill_svc,
+    )
+
+    skill_svc = make_skill_svc()
+    try:
+        available_skills = skill_svc.list_skills()
+    except ZenveError:
+        available_skills = []
+
+    if available_skills:
+        selected_skill_ids = collect_skills_wizard(
+            available_skills,
+            installed=installed_skill_names(repo_root),
+        )
+        sep()
+        if selected_skill_ids:
+            console.print("[cyan]◆[/cyan] [white]Installing skills...[/white]")
+            sep()
+            install_skills(repo_root, selected_skill_ids, skill_svc)
+            sep()
+
     agent_names = [slugify(n) for n, _ in agent_specs]
     if update_mode:
         if agent_names:

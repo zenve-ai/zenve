@@ -12,7 +12,7 @@ from zenve_models.errors import (
     RateLimitError,
     ValidationError,
 )
-from zenve_models.github_template import GitHubTemplateSummary
+from zenve_models.github_template import GitHubTemplateSummary, SkillSummary
 
 GITHUB_API = "https://api.github.com"
 
@@ -189,3 +189,44 @@ class GitHubTemplateService:
         (agent_dir / "runs").mkdir(exist_ok=True)
 
         return str(agent_dir)
+
+    def read_skill_frontmatter(self, skill_id: str) -> dict:
+        import base64
+
+        url = f"{GITHUB_API}/repos/{self.repo}/contents/{skill_id}/SKILL.md"
+        try:
+            file_data = self.cached_get(url)
+            content = base64.b64decode(file_data["content"]).decode("utf-8")  # type: ignore[index]
+        except NotFoundError:
+            return {}
+        parts = content.split("---", 2)
+        if len(parts) < 3:
+            return {}
+        return yaml.safe_load(parts[1]) or {}
+
+    def list_skills(self) -> list[SkillSummary]:
+        entries = self.list_repo_dir("")
+        skills = []
+        for entry in entries:
+            if entry.get("type") != "dir":
+                continue
+            skill_id = entry["name"]
+            front = self.read_skill_frontmatter(skill_id)
+            skills.append(
+                SkillSummary(
+                    id=skill_id,
+                    name=front.get("name", skill_id),
+                    description=front.get("description", ""),
+                )
+            )
+        return skills
+
+    def fetch_skill_files(self, skill_id: str) -> dict[str, bytes]:
+        """Return all files from {skill_id}/ recursively as in-memory bytes."""
+        prefix = f"{skill_id}/"
+        blobs = self.list_tree_blobs(prefix)
+        files: dict[str, bytes] = {}
+        for blob in blobs:
+            relative = blob["path"][len(prefix):]
+            files[relative] = self.fetch_blob_bytes(blob["url"])
+        return files

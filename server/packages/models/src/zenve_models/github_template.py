@@ -15,3 +15,9 @@ class GitHubTemplateSummary(BaseModel):
 class AgentCreateFromGitHubTemplate(BaseModel):
     template_id: str
     name: str | None = None
+
+
+class SkillSummary(BaseModel):
+    id: str
+    name: str
+    description: str = ""
