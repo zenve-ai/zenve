@@ -24,7 +24,8 @@ src/zenve_cli/
 ├── runtime/                # Local execution concerns
 │   ├── executor.py         # run_agent() — claim → adapter → label transition
 │   ├── parallel.py         # run_all() — asyncio gather over agents
-│   └── commit.py           # git CLI wrappers (add / commit / push via subprocess)
+│   ├── commit.py           # git CLI wrappers (add / commit / push via subprocess)
+│   └── worktree.py         # git worktree helpers (create / remove / commit-and-push)
 ├── integrations/           # External API clients (one subpackage per provider)
 │   └── github/
 │       ├── client.py       # GitHubClient — thin httpx wrapper over GitHub REST v3
@@ -77,13 +78,15 @@ The CLI never scaffolds `.zenve/` (except via `zenve init`). Expected layout in 
 ### `AgentSettings` (`.zenve/agents/{name}/settings.json`)
 | Field | Default | Description |
 |---|---|---|
-| `name` | required | Agent slug (must match directory name) |
-| `model` | `"claude-sonnet-4-6"` | LLM model |
+| `slug` | required | Agent slug (must match directory name) |
+| `name` | required | Human-readable display name |
 | `adapter_type` | `"claude_code"` | Adapter (`claude_code`, `open_code`) |
 | `enabled` | `true` | Skip if false |
 | `github_label` | required | GitHub label this agent claims |
 | `timeout_seconds` | `300` | Per-agent timeout |
 | `picks_up` | `"issues"` | `issues`, `pull_requests`, `both`, `none` |
+| `tools` | `[]` | Explicit tool allow-list — empty means no tools, no unrestricted fallback |
+| `mode` | `"read_only"` | `"write"` — gets a git worktree + opens a PR on success; `"read_only"` — runs from repo root |
 
 ## Environment Variables
 
@@ -103,10 +106,14 @@ The CLI never scaffolds `.zenve/` (except via `zenve init`). Expected layout in 
 4. `GitHubClient` — fetch issues, PRs, branches → `Snapshot`
 5. `run_all()` — async gather over all agents via `run_agent()`
    - `filter_for_agent()` — match snapshot items by label + `picks_up`
-   - `claim_item()` — assign bot login via GitHub API
-   - `adapter.execute(ctx)` — run the agent subprocess
+   - Emit `agent.misconfigured` if `read_only` agent has write-capable tools
+   - `claim_item()` — add `zenve:claimed` label via GitHub API
+   - If `mode == "write"`: `create_worktree()` on a new branch `zenve/{slug}/{number}-{run_id_short}`
+   - `adapter.execute(ctx)` — run the agent subprocess (cwd = worktree if write, repo root if read_only)
+   - If `mode == "write"` and exit 0: `commit_and_push_worktree()` + `gh.create_pr()`
    - `transition()` — swap GitHub label per pipeline map
    - Write `RunResultFile` to `.zenve/agents/{name}/runs/{run_id}.json`
+   - If `mode == "write"`: `remove_worktree()` (always, success or failure)
 6. `commit_agents()` — `git add .zenve/agents && git commit && git push`
 7. `EventEmitter.emit()` — append to `.zenve/events.log`, fire webhook
 

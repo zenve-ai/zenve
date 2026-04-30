@@ -147,12 +147,13 @@ Any directory inside `.zenve/agents/` is treated as an agent. The CLI discovers 
   "adapter_type": "claude_code",
   "adapter_config": {},
   "skills": [],
-  "tools": [],
+  "tools": ["Read", "Write", "Edit", "Bash"],
   "heartbeat_interval_seconds": 0,
   "enabled": true,
   "github_label": "zenve:dev",
   "timeout_seconds": 300,
-  "picks_up": "issues"
+  "picks_up": "issues",
+  "mode": "write"
 }
 ```
 
@@ -163,18 +164,30 @@ Any directory inside `.zenve/agents/` is treated as an agent. The CLI discovers 
 | `adapter_type` | `"claude_code"` | Which adapter runs this agent (`claude_code`, `open_code`) |
 | `adapter_config` | `{}` | Adapter-specific options passed through to the adapter |
 | `skills` | `[]` | Skill list passed to the adapter |
-| `tools` | `[]` | Tool allow-list passed to the adapter |
+| `tools` | `[]` | Explicit tool allow-list — see **Tool Access** below |
 | `heartbeat_interval_seconds` | `0` | If >0, adapter sends periodic heartbeat events |
 | `enabled` | `true` | `false` skips the agent without removing its folder |
 | `github_label` | required | GitHub label this agent claims |
 | `timeout_seconds` | `300` | Per-agent execution timeout |
 | `picks_up` | `"issues"` | `issues`, `pull_requests`, `both`, `none` |
+| `mode` | `"read_only"` | `"write"` or `"read_only"` — controls git worktree isolation |
 
 `picks_up` controls what the agent looks for in the snapshot:
 - `"issues"` — only open issues
 - `"pull_requests"` — only open PRs
 - `"both"` — issues and PRs
 - `"none"` — always-on agent, runs every cycle regardless (e.g. planner)
+
+### Tool Access
+
+`tools` is an explicit allow-list passed to the adapter as `--allowedTools`. The agent can only call tools in this list.
+
+- **Non-empty list** — agent is restricted to exactly those tools
+- **Empty list `[]`** — agent runs with no tool access at all (text output only)
+
+There is no unrestricted mode. Every agent must declare its tools.
+
+If a `read_only` agent lists write-capable tools (`Write`, `Edit`, `Bash`, `NotebookEdit`), the CLI emits an `agent.misconfigured` warning before the run. The agent still runs — it is the user's responsibility to ensure the tools match the intent.
 
 ---
 
@@ -235,6 +248,8 @@ Every agent — regardless of role — follows the same lifecycle:
 ```
 Agent starts
   │
+  ├── If read_only + write-capable tools → emit agent.misconfigured warning
+  │
   ├── Filter snapshot                 ← only items matching own label + picks_up
   ├── Pick oldest unclaimed item      ← skips items with zenve:claimed label
   │
@@ -244,10 +259,21 @@ Agent starts
   │     GitHub: add zenve:claimed label
   │     Local:  write to .zenve/claims.json
   │
-  ├── Build RunContext                ← agent dir, project dir, snapshot message, env vars
-  ├── Execute adapter                 ← adapter.execute(ctx) → runs SOUL.md + AGENTS.md + HEARTBEAT.md
+  ├── If mode == "write":
+  │     git fetch origin {default_branch}
+  │     git worktree add -b zenve/{slug}/{number}-{run_id_short}
+  │                         ./worktrees/{slug}-{run_id_short}
+  │                         origin/{default_branch}
+  │     (subprocess cwd = worktree path)
+  │
+  ├── Build RunContext                ← agent dir, project dir (or worktree), message, env vars
+  ├── Execute adapter                 ← adapter.execute(ctx) → runs SOUL.md + AGENTS.md + RUN.md
   │
   └── On adapter exit:
+        If mode == "write" and exit 0:
+          git add -A && git commit && git push origin {branch}
+          If changes exist → open PR (title: issue title, body: "Closes #{number}")
+          If push/PR fails → downgrade status to "failed"
         Post comment to issue/PR     ← "Run complete / needs input / failed"
         If completed:
           Remove zenve:claimed + current label
@@ -260,6 +286,7 @@ Agent starts
           Add zenve:failed
         Remove from .zenve/claims.json
         Write run result → runs/{run_id}.json
+        If mode == "write" → git worktree remove (always, success or failure)
 ```
 
 ### Agent Run Outcomes
@@ -453,6 +480,7 @@ The CLI emits structured events throughout the run. Posted to webhook in real ti
 run.started                CLI started — agents discovered, count reported
 snapshot.fetched           Snapshot written — issues/PRs found per agent label
 agent.started              Individual agent process started
+agent.misconfigured        read_only agent has write-capable tools (warning, run continues)
 agent.nothing_to_do        No matching unclaimed items, clean exit
 agent.claimed_issue        Agent claimed an issue
 agent.claimed_pr           Agent claimed a PR
@@ -515,6 +543,51 @@ Each agent writes `.zenve/agents/{name}/runs/{run_id}.json` after completing:
 `status` is one of `completed`, `needs_input`, or `failed`.
 
 Committed back to the repo. Permanent audit trail. No external database needed.
+
+---
+
+## Write Agent Isolation
+
+Agents with `"mode": "write"` need git isolation so parallel runs don't stomp on each other's working tree. Each write agent gets its own `git worktree` before the subprocess starts.
+
+### Worktree Lifecycle
+
+```
+1. git fetch origin {default_branch}
+2. git worktree add -b zenve/{slug}/{issue_number}-{run_id_short}
+                       ./worktrees/{slug}-{run_id_short}
+                       origin/{default_branch}
+3. subprocess cwd = worktree path (agent sees a clean checkout)
+4. adapter.execute() completes
+5. if exit 0:
+     git add -A
+     git commit -m "[zenve] {run_id} — {slug}: #{issue_number}"
+     git push origin {branch}
+     open PR via GitHub API (title: issue title, body: "Closes #{number}")
+     if push or PR fails → status downgraded to "failed"
+6. git worktree remove --force (always, success or failure)
+```
+
+### Branch Naming
+
+```
+zenve/{agent_slug}/{issue_number}-{run_id_short}
+
+Examples:
+  zenve/dev/42-abc123
+  zenve/pm/17-x9f2k1
+```
+
+`run_id_short` = first 6 chars of the run ID. Guarantees no collision across parallel runs.
+
+### Mode Summary
+
+| `mode` | Working dir | Git ops | PR created |
+|---|---|---|---|
+| `read_only` | repo root | none | no |
+| `write` | isolated worktree | fetch → commit → push | yes (on exit 0 with changes) |
+
+`worktrees/` is listed in `.gitignore` — ephemeral checkouts are never committed.
 
 ---
 
@@ -613,3 +686,5 @@ Same CLI, same behavior as inside the VM. Use this to test `.zenve/` configurati
 | Commit-back | Run results only | Code changes via PRs only. Never direct commits to main. |
 | Event streaming | Local file + optional webhook | Zero-config locally. Webhook enables live UI when needed. |
 | TUI | Textual app in `console/` | Live adapter output (tool calls, token usage) without log-tailing. |
+| Write agent isolation | `git worktree` per agent run | Parallel write agents get separate checkouts — no working-tree conflicts. |
+| Tool access | Explicit allow-list, no fallback | `tools: []` = no tools. No `--dangerously-skip-permissions` escape hatch. |
