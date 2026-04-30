@@ -144,3 +144,12 @@ class GitHubClient:
     def viewer_login(self) -> str:
         resp = self.request("GET", "/user")
         return resp.json().get("login", "")
+
+    def create_pr(self, title: str, body: str, head: str, base: str) -> str:
+        """Open a pull request. Returns the PR HTML URL."""
+        resp = self.request(
+            "POST",
+            f"/repos/{self.repo}/pulls",
+            json={"title": title, "body": body, "head": head, "base": base},
+        )
+        return resp.json().get("html_url", "")

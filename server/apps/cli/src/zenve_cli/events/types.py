@@ -8,6 +8,7 @@ RUN_FAILED = "run.failed"
 SNAPSHOT_FETCHED = "snapshot.fetched"
 
 AGENT_STARTED = "agent.started"
+AGENT_MISCONFIGURED = "agent.misconfigured"
 AGENT_NOTHING_TO_DO = "agent.nothing_to_do"
 AGENT_CLAIMED_ISSUE = "agent.claimed_issue"
 AGENT_CLAIMED_PR = "agent.claimed_pr"

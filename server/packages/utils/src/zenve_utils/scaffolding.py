@@ -31,5 +31,6 @@ def build_settings_json(data: AgentCreate, slug: str) -> bytes:
         "heartbeat_interval_seconds": data.heartbeat_interval_seconds,
         "github_label": f"zenve:{slug}",
         "enabled": True,
+        "mode": "read_only",
     }
     return json.dumps(settings, indent=2).encode()

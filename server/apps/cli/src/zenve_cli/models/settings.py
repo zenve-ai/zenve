@@ -36,3 +36,4 @@ class AgentSettings(BaseModel):
     github_label: str
     timeout_seconds: int = 300
     picks_up: PicksUp = "issues"
+    mode: Literal["write", "read_only"] = "read_only"

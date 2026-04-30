@@ -29,3 +29,6 @@ build/
 
 # uv
 uv.lock
+
+# Zenve worktrees (ephemeral, never committed)
+worktrees/

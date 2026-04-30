@@ -261,12 +261,8 @@ class ClaudeCodeAdapter(BaseAdapter):
             args.extend(["--max-tokens", str(config.max_tokens)])
         if config.max_turns:
             args.extend(["--max-turns", str(config.max_turns)])
-        if tools is not None:
-            # Explicit tool list: auto-approve these, deny everything else
+        if tools:
             args.extend(["--allowedTools", ",".join(tools)])
-        else:
-            # No tool restrictions: skip all permission prompts
-            args.append("--dangerously-skip-permissions")
         return args
 
     def parse_token_usage(self, stdout: str) -> dict | None:

@@ -8,13 +8,13 @@ from pathlib import Path
 from typing import Literal
 
 from zenve_adapters import AdapterRegistry
+from zenve_adapters.base import BaseAdapter
 from zenve_cli.core.claims import add_claim, expired_claims, load_claims, remove_claim
 from zenve_cli.core.discovery import DiscoveredAgent
 from zenve_cli.core.pipeline import next_label
 from zenve_cli.events import types as et
 from zenve_cli.events.emitter import EventEmitter
 from zenve_cli.integrations.github.client import GitHubClient, GitHubError
-from zenve_adapters.base import BaseAdapter
 from zenve_cli.integrations.github.labels import (
     CLAIMED_LABEL,
     FAILED_LABEL,
@@ -32,6 +32,8 @@ from zenve_cli.models.run_result import (
 )
 from zenve_cli.models.settings import AgentSettings, ProjectSettings
 from zenve_cli.models.snapshot import Snapshot, SnapshotIssue, SnapshotPR
+from zenve_cli.runtime.commit import GitError
+from zenve_cli.runtime.worktree import commit_and_push_worktree, create_worktree, remove_worktree
 from zenve_models.adapter import RunContext
 
 logger = logging.getLogger(__name__)
@@ -151,13 +153,15 @@ def build_run_context(
     item: PlannedItem | None,
     snapshot: Snapshot,
     env_vars: dict[str, str],
+    project_dir_override: Path | None = None,
 ) -> RunContext:
     config: dict = dict(agent.settings.adapter_config)
     message = build_message(run_id, agent.name, item, snapshot)
+    effective_dir = project_dir_override if project_dir_override is not None else repo_root
 
     return RunContext(
         agent_dir=str(agent.path),
-        project_dir=str(repo_root.resolve()),
+        project_dir=str(effective_dir.resolve()),
         agent_id=agent.settings.slug,
         agent_slug=agent.settings.slug,
         agent_name=agent.settings.name,
@@ -168,7 +172,7 @@ def build_run_context(
         adapter_config=config,
         message=message,
         heartbeat=agent.settings.heartbeat_interval_seconds > 0,
-        tools=agent.settings.tools or None,
+        tools=agent.settings.tools,
         env_vars=env_vars,
     )
 
@@ -281,6 +285,16 @@ async def run_agent(
 
     emitter.emit(et.AGENT_STARTED, agent=agent.name)
 
+    if agent.settings.mode == "read_only":
+        write_tools = {"Write", "Edit", "Bash", "NotebookEdit"}
+        flagged = write_tools & set(agent.settings.tools)
+        if flagged:
+            emitter.emit(
+                et.AGENT_MISCONFIGURED,
+                agent=agent.name,
+                data={"reason": "read_only agent has write-capable tools", "tools": sorted(flagged)},
+            )
+
     if agent.settings.picks_up != "none":
         if not items:
             emitter.emit(et.AGENT_NOTHING_TO_DO, agent=agent.name)
@@ -314,10 +328,38 @@ async def run_agent(
             data={"number": item.number, "title": item.title},
         )
 
+    worktree_path: Path | None = None
+    worktree_branch: str | None = None
+
+    if agent.settings.mode == "write" and item is not None:
+        run_id_short = run_id[:6]
+        worktree_path = repo_root / "worktrees" / f"{agent.settings.slug}-{run_id_short}"
+        worktree_branch = f"zenve/{agent.settings.slug}/{item.number}-{run_id_short}"
+        try:
+            create_worktree(repo_root, worktree_path, worktree_branch, project.default_branch)
+        except GitError as exc:
+            emitter.emit(et.AGENT_FAILED, agent=agent.name, data={"error": str(exc)})
+            unclaim_item(gh, item.number)
+            remove_claim(repo_root, item.number)
+            worktree_path = None
+            run_result = RunResultFile(
+                run_id=run_id,
+                agent=agent.name,
+                started_at=now_iso(),
+                finished_at=now_iso(),
+                duration_seconds=0.0,
+                status="failed",
+                exit_code=1,
+                item=RunItem(type=item.kind, number=item.number, title=item.title),
+                error=str(exc),
+            )
+            write_run_result(agent, run_result)
+            return run_result
+
     started_at = now_iso()
     start_mono = time.monotonic()
 
-    ctx = build_run_context(agent, run_id, project, repo_root, item, snapshot, env_vars)
+    ctx = build_run_context(agent, run_id, project, repo_root, item, snapshot, env_vars, project_dir_override=worktree_path)
 
     adapter_event_map = {
         "output": et.ADAPTER_OUTPUT,
@@ -367,6 +409,11 @@ async def run_agent(
             error=str(exc),
         )
         write_run_result(agent, run_result)
+        if worktree_path is not None:
+            try:
+                remove_worktree(repo_root, worktree_path)
+            except GitError:
+                pass
         return run_result
 
     finished_at = now_iso()
@@ -381,6 +428,30 @@ async def run_agent(
         error_text = adapter_errors[-1]
     if status == "failed" and not error_text:
         error_text = f"Adapter exited with code {result.exit_code}"
+
+    if (
+        agent.settings.mode == "write"
+        and worktree_path is not None
+        and worktree_branch is not None
+        and item is not None
+        and status == "completed"
+    ):
+        try:
+            pushed = commit_and_push_worktree(
+                worktree_path,
+                f"{project.commit_message_prefix} {run_id} — {agent.settings.slug}: #{item.number}",
+                worktree_branch,
+            )
+            if pushed:
+                pr_body = f"Closes #{item.number}" if item.kind == "issue" else f"See #{item.number}"
+                gh.create_pr(
+                    title=item.title,
+                    body=pr_body,
+                    head=worktree_branch,
+                    base=project.default_branch,
+                )
+        except (GitError, GitHubError):
+            status = "failed"
 
     pipeline_transition: PipelineTransition | None = None
     if item is not None:
@@ -452,4 +523,9 @@ async def run_agent(
             **({"error": error_text} if status == "failed" and error_text else {}),
         },
     )
+    if worktree_path is not None:
+        try:
+            remove_worktree(repo_root, worktree_path)
+        except GitError:
+            pass
     return run_result
