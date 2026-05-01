@@ -66,6 +66,12 @@ class ZenveTUI(App):
         self.block_agent: str | None = None
         self.last_agent: str | None = None
 
+        # Loading indicator
+        self.loading_widget: Static | None = None
+        self.loading_frame: int = 0
+        self.run_active: bool = False
+        self._spinner_frames = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"]
+
         # Run state
         self.run_agents: list[str] = []
         self.agent_states: dict[str, str] = {}
@@ -87,6 +93,7 @@ class ZenveTUI(App):
     def on_mount(self) -> None:
         self.update_status()
         if self.run_fn:
+            self.set_interval(0.15, self.tick_loading)
             self.run_worker(self.execute_run, thread=True)
         else:
             for event in self.replay_events:
@@ -99,8 +106,31 @@ class ZenveTUI(App):
     def handle_event_from_thread(self, event: dict) -> None:
         self.call_from_thread(self.handle_event_and_scroll, event)
 
+    def show_loading(self) -> None:
+        frame = self._spinner_frames[self.loading_frame % len(self._spinner_frames)]
+        t = Text(f"{frame} Loading...", style="dim")
+        panel = Panel(t, style=f"on {EVENT_BG}", border_style=EVENT_BG, padding=(0, 1))
+        if self.loading_widget is None:
+            self.loading_widget = Static(panel)
+            self.query_one("#log", ScrollableContainer).mount(self.loading_widget)
+        else:
+            self.loading_widget.update(panel)
+
+    def hide_loading(self) -> None:
+        if self.loading_widget is not None:
+            self.loading_widget.remove()
+            self.loading_widget = None
+
+    def tick_loading(self) -> None:
+        if self.loading_widget is not None:
+            self.loading_frame += 1
+            self.show_loading()
+
     def handle_event_and_scroll(self, event: dict) -> None:
+        self.hide_loading()
         self.handle_event(event)
+        if self.run_active:
+            self.show_loading()
         self.query_one("#log", ScrollableContainer).scroll_end(animate=False)
 
     def execute_run(self) -> None:
@@ -227,6 +257,7 @@ class ZenveTUI(App):
         data = event.get("data", {})
 
         if etype == "run.started":
+            self.run_active = True
             self.run_agents = data.get("agents", [])
             self.agent_states = {a: "pending" for a in self.run_agents}
             self.current_action = ""
@@ -373,6 +404,7 @@ class ZenveTUI(App):
             pass
 
         elif etype == "run.completed":
+            self.run_active = False
             self.flush_block()
             if data.get("committed"):
                 t = Text()
@@ -380,6 +412,7 @@ class ZenveTUI(App):
                 self.append_panel(t, bg=OUTPUT_BG)
 
         elif etype == "run.failed":
+            self.run_active = False
             self.flush_block()
             body = escape(data.get("error", ""))
             self.append_log(
