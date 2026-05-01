@@ -7,28 +7,21 @@ import typer
 from rich.console import Console
 from rich.text import Text
 
-from zenve_cli.commands.init import WIZARD_STYLE, sep
 from zenve_cli.commands.snapshot import resolve_github_token
-from zenve_cli.constants import AGENTS_SKILLS_DIR, CLAUDE_SKILLS_DIR, DEFAULT_SKILLS_REPO
+from zenve_cli.commands.ui import WIZARD_STYLE, sep
+from zenve_cli.constants import DEFAULT_SKILLS_REPO
 from zenve_config.settings import get_settings
 from zenve_models.errors import ZenveError
 from zenve_models.github_template import SkillSummary
+from zenve_services.scaffolding import ScaffoldingService
 from zenve_services.template import GitHubTemplateService
 
 skill_app = typer.Typer(help="Skill management commands")
 console = Console()
 
 
-def agents_skills_dir(repo_root: Path) -> Path:
-    return repo_root / AGENTS_SKILLS_DIR
-
-
-def claude_skills_dir(repo_root: Path) -> Path:
-    return repo_root / CLAUDE_SKILLS_DIR
-
-
 def installed_skill_names(repo_root: Path) -> set[str]:
-    d = agents_skills_dir(repo_root)
+    d = repo_root / ".agents" / "skills"
     if not d.exists():
         return set()
     return {p.name for p in d.iterdir() if p.is_dir() and not p.name.startswith(".")}
@@ -78,11 +71,7 @@ def install_skills(
     svc: GitHubTemplateService,
 ) -> list[str]:
     """Download skills and create .claude/skills/ symlinks. Returns installed IDs."""
-    agent_skills_root = agents_skills_dir(repo_root)
-    claude_skills_root = claude_skills_dir(repo_root)
-    agent_skills_root.mkdir(parents=True, exist_ok=True)
-    claude_skills_root.mkdir(parents=True, exist_ok=True)
-
+    scaffold = ScaffoldingService()
     installed_now: list[str] = []
     for skill_id in selected_ids:
         try:
@@ -92,22 +81,9 @@ def install_skills(
                 f"[dim]│[/dim]  [yellow]⚠[/yellow] [white]{skill_id}[/white] — {exc.message}"
             )
             continue
-
-        skill_out = agent_skills_root / skill_id
-        skill_out.mkdir(parents=True, exist_ok=True)
-        for relpath, content in files.items():
-            dest = skill_out / relpath
-            dest.parent.mkdir(parents=True, exist_ok=True)
-            dest.write_bytes(content)
-
-        link_path = claude_skills_root / skill_id
-        if link_path.exists() or link_path.is_symlink():
-            link_path.unlink()
-        link_path.symlink_to(Path("../../.agents/skills") / skill_id)
-
+        scaffold.write_skill_files(repo_root, skill_id, files)
         installed_now.append(skill_id)
         console.print(f"[dim]│[/dim]  [green]✓[/green] [white]{skill_id}[/white]")
-
     return installed_now
 
 

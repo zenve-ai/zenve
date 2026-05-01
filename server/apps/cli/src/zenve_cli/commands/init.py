@@ -6,33 +6,28 @@ from pathlib import Path
 
 import questionary
 import typer
-from questionary import Choice
 from rich.console import Console
 
+from zenve_cli.commands.agent import collect_agents_wizard
+from zenve_cli.commands.skill import (
+    collect_skills_wizard,
+    install_skills,
+    installed_skill_names,
+    make_skill_svc,
+)
 from zenve_cli.commands.snapshot import git_remote_slug, resolve_github_token
+from zenve_cli.commands.ui import WIZARD_STYLE, sep
 from zenve_cli.constants import DEFAULT_AGENTS_REPO, ZENVE_DIR
 from zenve_cli.runtime.commit import commit_zenve_dir
 from zenve_config.settings import get_settings
-from zenve_models.agent import AgentCreate
 from zenve_models.errors import ZenveError
+from zenve_services.agent import build_agent_files
+from zenve_services.scaffolding import ScaffoldingService
 from zenve_services.template import GitHubTemplateService
-from zenve_utils.scaffolding import build_settings_json, default_files, slugify
+from zenve_utils.scaffolding import slugify
 
 console = Console()
 
-WIZARD_STYLE = questionary.Style(
-    [
-        ("qmark", "fg:#00d4ff bold"),
-        ("question", "fg:#ffffff bold"),
-        ("answer", "fg:#00d4ff bold"),
-        ("pointer", "fg:#00d4ff bold"),
-        ("highlighted", "fg:#00d4ff bold"),
-        ("selected", "fg:#00d4ff"),
-        ("instruction", "fg:#555555"),
-        ("text", "fg:#aaaaaa"),
-        ("disabled", "fg:#444444 italic"),
-    ]
-)
 
 def git_current_branch() -> str:
     try:
@@ -46,48 +41,6 @@ def git_current_branch() -> str:
         return branch if branch and branch != "HEAD" else "main"
     except (subprocess.CalledProcessError, FileNotFoundError):
         return "main"
-
-
-def sep() -> None:
-    """Print the connecting │ line between wizard steps."""
-    console.print("[dim]│[/dim]")
-
-
-def collect_agents_wizard(
-    templates: list, existing_slugs: set[str] | None = None
-) -> list[tuple[str, str | None]]:
-    """Collect agent specs via checkbox."""
-    existing_slugs = existing_slugs or set()
-    choices = []
-    for t in templates:
-        agent_slug = t.slug or slugify(t.name if hasattr(t, "name") and t.name else t.id)
-        if agent_slug in existing_slugs:
-            choices.append(Choice(title=t.id, value=t.id, disabled="installed"))
-        else:
-            choices.append(Choice(title=t.id, value=t.id))
-
-    available = [c for c in choices if not getattr(c, "disabled", None)]
-    if not available:
-        return []
-
-    selected_ids = questionary.checkbox(
-        "Select agents to install",
-        choices=choices,
-        style=WIZARD_STYLE,
-        qmark="◆",
-        instruction="(space to toggle, enter to confirm)",
-    ).ask()
-
-    if selected_ids is None:
-        raise typer.Exit(1)
-
-    agents: list[tuple[str, str | None]] = []
-    for template_id in selected_ids:
-        tmpl = next((t for t in templates if t.id == template_id), None)
-        name = tmpl.name if tmpl else template_id
-        agents.append((name, template_id))
-
-    return agents
 
 
 def cmd(repo_root: Path = Path("."), description: str | None = None) -> None:
@@ -106,10 +59,12 @@ def cmd(repo_root: Path = Path("."), description: str | None = None) -> None:
             existing_agent_slugs = {p.name for p in agents_dir.iterdir() if p.is_dir()}
 
     # Load templates early so the list is ready before prompts begin
-    settings = get_settings().model_copy(update={
-        "github_agents_repo": get_settings().github_agents_repo or DEFAULT_AGENTS_REPO,
-        "github_token": get_settings().github_token or resolve_github_token(),
-    })
+    settings = get_settings().model_copy(
+        update={
+            "github_agents_repo": get_settings().github_agents_repo or DEFAULT_AGENTS_REPO,
+            "github_token": get_settings().github_token or resolve_github_token(),
+        }
+    )
     svc = GitHubTemplateService(settings)
 
     try:
@@ -121,7 +76,9 @@ def cmd(repo_root: Path = Path("."), description: str | None = None) -> None:
         raise typer.Exit(1)  # noqa: B904
 
     if not templates:
-        console.print("[red]✗[/red] No agent templates found in zenve-ai/agents.", highlight=False)
+        console.print(
+            "[red]✗[/red] No agent templates found in zenve-ai/zenve-agents.", highlight=False
+        )
         raise typer.Exit(1)
 
     detected_branch = git_current_branch()
@@ -166,42 +123,22 @@ def cmd(repo_root: Path = Path("."), description: str | None = None) -> None:
     console.print("[cyan]◆[/cyan] [white]Scaffolding project files...[/white]")
     sep()
 
-    all_files: dict[str, bytes] = {}
+    scaffold = ScaffoldingService()
     existing_pipeline: dict = existing_settings.get("pipeline", {}) if update_mode else {}
     pipeline: dict[str, None] = {}
 
     for agent_name, template_id in agent_specs:
-        agent_slug = slugify(agent_name)
-        if template_id:
-            try:
-                files = svc.fetch_template_files(template_id)
-                manifest = svc.get_template(template_id)
-                agent_slug = manifest.slug or agent_slug
-                merged = AgentCreate(
-                    name=agent_name,
-                    template=template_id,
-                    adapter_type=manifest.adapter_type,
-                    adapter_config=manifest.adapter_config,
-                    skills=manifest.skills,
-                    tools=manifest.tools,
-                    heartbeat_interval_seconds=manifest.heartbeat_interval_seconds,
-                    mode=manifest.mode,
-                )
-            except ZenveError as exc:
-                console.print(
-                    f"[yellow]Warning:[/yellow] could not fetch template '{template_id}': {exc.message}"
-                )
-                files = default_files()
-                merged = AgentCreate(name=agent_name)
-        else:
-            files = default_files()
-            merged = AgentCreate(name=agent_name)
-
+        try:
+            agent_slug, files = build_agent_files(agent_name, template_id, svc)
+        except ZenveError as exc:
+            console.print(
+                f"[yellow]Warning:[/yellow] could not fetch template '{template_id}': {exc.message}"
+            )
+            agent_slug, files = build_agent_files(agent_name, None, svc)
         pipeline[f"zenve:{agent_slug}"] = None
-        files["settings.json"] = build_settings_json(merged, agent_slug)
-        for relpath, content in files.items():
-            all_files[f"agents/{agent_slug}/{relpath}"] = content
+        scaffold.write_agent_files(zenve_dir, agent_slug, files)
 
+    # Root settings.json — init-specific (project slug, branch, description from wizard)
     merged_pipeline = existing_pipeline | pipeline
     root_settings = {
         **(existing_settings if update_mode else {}),
@@ -212,21 +149,10 @@ def cmd(repo_root: Path = Path("."), description: str | None = None) -> None:
         "run_timeout_seconds": existing_settings.get("run_timeout_seconds", 600),
         "pipeline": merged_pipeline,
     }
-    all_files["settings.json"] = json.dumps(root_settings, indent=2).encode()
+    (zenve_dir / "settings.json").parent.mkdir(parents=True, exist_ok=True)
+    (zenve_dir / "settings.json").write_bytes(json.dumps(root_settings, indent=2).encode())
 
-    for relpath, content in all_files.items():
-        dest = zenve_dir / relpath
-        dest.parent.mkdir(parents=True, exist_ok=True)
-        dest.write_bytes(content)
-
-    # Skills step — lazy import to avoid circular dependency
-    from zenve_cli.commands.skill import (
-        collect_skills_wizard,
-        install_skills,
-        installed_skill_names,
-        make_skill_svc,
-    )
-
+    # Skills step
     skill_svc = make_skill_svc()
     try:
         available_skills = skill_svc.list_skills()
@@ -270,9 +196,13 @@ def cmd(repo_root: Path = Path("."), description: str | None = None) -> None:
         commit_msg = "[zenve] update" if update_mode else "[zenve] init"
         committed = commit_zenve_dir(repo_root, commit_msg, branch=detected_branch)
         if committed:
-            console.print("[cyan]◆[/cyan] [white]Committed and pushed [cyan].zenve/[/cyan] — activated[/white]")
+            console.print(
+                "[cyan]◆[/cyan] [white]Committed and pushed [cyan].zenve/[/cyan] — activated[/white]"
+            )
         else:
             console.print("[yellow]◆[/yellow] [white]Nothing to commit[/white]")
     else:
-        console.print("[cyan]◆[/cyan] [white]Commit and push [cyan].zenve/[/cyan] to activate[/white]")
+        console.print(
+            "[cyan]◆[/cyan] [white]Commit and push [cyan].zenve/[/cyan] to activate[/white]"
+        )
     console.print()

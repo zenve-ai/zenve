@@ -8,22 +8,19 @@ import typer
 from rich.console import Console
 from rich.text import Text
 
-from zenve_cli.commands.init import (
-    DEFAULT_AGENTS_REPO,
-    WIZARD_STYLE,
-    collect_agents_wizard,
-    sep,
-)
 from zenve_cli.commands.snapshot import resolve_github_token
+from zenve_cli.commands.ui import WIZARD_STYLE, sep
+from zenve_cli.constants import DEFAULT_AGENTS_REPO
 from zenve_cli.core.config import zenve_dir
 from zenve_cli.core.discovery import AGENTS_SUBDIR, discover_agents
 from zenve_cli.models.settings import AgentSettings
 from zenve_cli.runtime.commit import GitError, commit_zenve_dir
 from zenve_config.settings import get_settings
-from zenve_models.agent import AgentCreate
 from zenve_models.errors import ZenveError
+from zenve_services.agent import build_agent_files
+from zenve_services.scaffolding import ScaffoldingService
 from zenve_services.template import GitHubTemplateService
-from zenve_utils.scaffolding import build_settings_json, default_files, slugify
+from zenve_utils.scaffolding import slugify
 
 agent_app = typer.Typer(help="Agent management commands")
 console = Console()
@@ -68,6 +65,45 @@ def set_enabled(repo_root: Path, name: str, enabled: bool) -> None:
         raise typer.Exit(1)
     updated = settings.model_copy(update={"enabled": enabled})
     save_agent_settings(path, updated)
+
+
+def collect_agents_wizard(
+    templates: list, existing_slugs: set[str] | None = None
+) -> list[tuple[str, str | None]]:
+    """Collect agent specs via checkbox."""
+    from questionary import Choice
+
+    existing_slugs = existing_slugs or set()
+    choices = []
+    for t in templates:
+        agent_slug = t.slug or slugify(t.name if hasattr(t, "name") and t.name else t.id)
+        if agent_slug in existing_slugs:
+            choices.append(Choice(title=t.id, value=t.id, disabled="installed"))
+        else:
+            choices.append(Choice(title=t.id, value=t.id))
+
+    available = [c for c in choices if not getattr(c, "disabled", None)]
+    if not available:
+        return []
+
+    selected_ids = questionary.checkbox(
+        "Select agents to install",
+        choices=choices,
+        style=WIZARD_STYLE,
+        qmark="◆",
+        instruction="(space to toggle, enter to confirm)",
+    ).ask()
+
+    if selected_ids is None:
+        raise typer.Exit(1)
+
+    agents: list[tuple[str, str | None]] = []
+    for template_id in selected_ids:
+        tmpl = next((t for t in templates if t.id == template_id), None)
+        name = tmpl.name if tmpl else template_id
+        agents.append((name, template_id))
+
+    return agents
 
 
 @agent_app.command("list")
@@ -230,47 +266,21 @@ def add(
     console.print("[cyan]◆[/cyan] [white]Scaffolding agent files...[/white]")
     sep()
 
+    scaffold = ScaffoldingService()
     pipeline: dict[str, None] = {}
 
     for agent_name, template_id in agent_specs:
-        agent_slug = slugify(agent_name)
-        if template_id:
-            try:
-                files = svc.fetch_template_files(template_id)
-                manifest = svc.get_template(template_id)
-                agent_slug = manifest.slug or agent_slug
-                merged = AgentCreate(
-                    name=agent_name,
-                    template=template_id,
-                    adapter_type=manifest.adapter_type,
-                    adapter_config=manifest.adapter_config,
-                    skills=manifest.skills,
-                    tools=manifest.tools,
-                    heartbeat_interval_seconds=manifest.heartbeat_interval_seconds,
-                    mode=manifest.mode,
-                )
-            except ZenveError as exc:
-                console.print(
-                    f"[yellow]Warning:[/yellow] could not fetch template '{template_id}': {exc.message}"
-                )
-                files = default_files()
-                merged = AgentCreate(name=agent_name)
-        else:
-            files = default_files()
-            merged = AgentCreate(name=agent_name)
-
+        try:
+            agent_slug, files = build_agent_files(agent_name, template_id, svc)
+        except ZenveError as exc:
+            console.print(
+                f"[yellow]Warning:[/yellow] could not fetch template '{template_id}': {exc.message}"
+            )
+            agent_slug, files = build_agent_files(agent_name, None, svc)
         pipeline[f"zenve:{agent_slug}"] = None
-        files["settings.json"] = build_settings_json(merged, agent_slug)
-        agent_out = zdir / "agents" / agent_slug
-        for relpath, content in files.items():
-            dest = agent_out / relpath
-            dest.parent.mkdir(parents=True, exist_ok=True)
-            dest.write_bytes(content)
+        scaffold.write_agent_files(zdir, agent_slug, files)
 
-    # Merge pipeline back into settings.json
-    merged_pipeline = existing_pipeline | pipeline
-    updated_settings = {**existing_settings, "pipeline": merged_pipeline}
-    (zdir / "settings.json").write_bytes(json.dumps(updated_settings, indent=2).encode())
+    scaffold.update_pipeline(zdir, pipeline)
 
     added_slugs = list(pipeline.keys() - set(existing_pipeline.keys()))
     console.print(
@@ -389,45 +399,20 @@ def update(
     console.print("[cyan]◆[/cyan] [white]Updating agent files...[/white]")
     sep()
 
+    scaffold = ScaffoldingService()
     updated_slugs: list[str] = []
 
     for template in selected:
         template_id = template.id
         agent_name = template.name if hasattr(template, "name") and template.name else template_id
-        agent_slug = template.slug or slugify(agent_name)
-
         try:
-            files = svc.fetch_template_files(template_id)
-            manifest = svc.get_template(template_id)
-            merged = AgentCreate(
-                name=agent_name,
-                template=template_id,
-                adapter_type=manifest.adapter_type,
-                adapter_config=manifest.adapter_config,
-                skills=manifest.skills,
-                tools=manifest.tools,
-                heartbeat_interval_seconds=manifest.heartbeat_interval_seconds,
-            )
+            agent_slug, files = build_agent_files(agent_name, template_id, svc)
         except ZenveError as exc:
             console.print(
                 f"[yellow]Warning:[/yellow] could not fetch template '{template_id}': {exc.message}"
             )
             continue
-
-        # Overwrite template files; for settings.json merge to preserve user overrides
-        agent_out = zdir / "agents" / agent_slug
-        existing_settings_path = agent_out / "settings.json"
-        for relpath, content in files.items():
-            if relpath == "settings.json" and existing_settings_path.exists():
-                existing_raw = json.loads(existing_settings_path.read_text(encoding="utf-8"))
-                new_raw = json.loads(build_settings_json(merged, agent_slug))
-                user_override_keys = {"name", "slug", "github_label", "enabled", "model", "picks_up", "timeout_seconds"}
-                merged_raw = {**new_raw, **{k: v for k, v in existing_raw.items() if k in user_override_keys}}
-                content = json.dumps(merged_raw, indent=2).encode()
-            dest = agent_out / relpath
-            dest.parent.mkdir(parents=True, exist_ok=True)
-            dest.write_bytes(content)
-
+        scaffold.write_agent_files_with_merge(zdir, agent_slug, files)
         updated_slugs.append(agent_slug)
         console.print(f"  [green]✓[/green] [white]{agent_slug}[/white]")
 
