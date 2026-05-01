@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import httpx
 
-GITHUB_API = "https://api.github.com"
-DEFAULT_TIMEOUT = 30.0
+from zenve_cli.constants import GITHUB_API
+from zenve_cli.constants import GITHUB_DEFAULT_TIMEOUT as DEFAULT_TIMEOUT
 
 
 class GitHubError(RuntimeError):

@@ -8,6 +8,7 @@ class AgentCreate(BaseModel):
     skills: list[str] = []
     tools: list[str] = ["Read", "Write", "Bash"]
     heartbeat_interval_seconds: int = 0
+    mode: str = "read_only"
     template: str | None = None
 
 

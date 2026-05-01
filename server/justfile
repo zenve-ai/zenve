@@ -15,6 +15,15 @@ migrate-gen msg="migration":
 cli *args:
     uv run --package zenve-cli zenve {{args}}
 
+install-cli:
+    uv tool install --editable apps/cli \
+        --with 'zenve-config @ packages/config' \
+        --with 'zenve-db @ packages/db' \
+        --with 'zenve-models @ packages/models' \
+        --with 'zenve-utils @ packages/utils' \
+        --with 'zenve-services @ packages/services' \
+        --with 'zenve-adapters @ packages/adapters'
+
 link:
     #!/bin/sh
     TARGET="$HOME/.local/bin/zenve"

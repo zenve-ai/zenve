@@ -5,10 +5,8 @@ from pathlib import Path
 
 from pydantic import ValidationError
 
+from zenve_cli.constants import SETTINGS_FILE, ZENVE_DIR
 from zenve_cli.models.settings import ProjectSettings
-
-ZENVE_DIR_NAME = ".zenve"
-SETTINGS_FILE = "settings.json"
 
 
 class ConfigError(RuntimeError):
@@ -16,7 +14,7 @@ class ConfigError(RuntimeError):
 
 
 def zenve_dir(repo_root: Path) -> Path:
-    return repo_root / ZENVE_DIR_NAME
+    return repo_root / ZENVE_DIR
 
 
 def load_project_settings(repo_root: Path) -> ProjectSettings:
@@ -28,13 +26,13 @@ def load_project_settings(repo_root: Path) -> ProjectSettings:
     zdir = zenve_dir(repo_root)
     if not zdir.exists():
         raise ConfigError(
-            f"Missing `{ZENVE_DIR_NAME}/` folder at {repo_root}. "
+            f"Missing `{ZENVE_DIR}/` folder at {repo_root}. "
             "The CLI does not scaffold — author `.zenve/` first."
         )
 
     settings_path = zdir / SETTINGS_FILE
     if not settings_path.exists():
-        raise ConfigError(f"Missing `{ZENVE_DIR_NAME}/{SETTINGS_FILE}` at {settings_path}")
+        raise ConfigError(f"Missing `{ZENVE_DIR}/{SETTINGS_FILE}` at {settings_path}")
 
     try:
         raw = json.loads(settings_path.read_text(encoding="utf-8"))

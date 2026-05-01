@@ -10,6 +10,7 @@ from questionary import Choice
 from rich.console import Console
 
 from zenve_cli.commands.snapshot import git_remote_slug, resolve_github_token
+from zenve_cli.constants import DEFAULT_AGENTS_REPO, ZENVE_DIR
 from zenve_cli.runtime.commit import commit_zenve_dir
 from zenve_config.settings import get_settings
 from zenve_models.agent import AgentCreate
@@ -17,8 +18,6 @@ from zenve_models.errors import ZenveError
 from zenve_services.template import GitHubTemplateService
 from zenve_utils.scaffolding import build_settings_json, default_files, slugify
 
-ZENVE_DIR = ".zenve"
-DEFAULT_AGENTS_REPO = "zenve-ai/agents"
 console = Console()
 
 WIZARD_STYLE = questionary.Style(
@@ -61,7 +60,7 @@ def collect_agents_wizard(
     existing_slugs = existing_slugs or set()
     choices = []
     for t in templates:
-        agent_slug = slugify(t.name if hasattr(t, "name") and t.name else t.id)
+        agent_slug = t.slug or slugify(t.name if hasattr(t, "name") and t.name else t.id)
         if agent_slug in existing_slugs:
             choices.append(Choice(title=t.id, value=t.id, disabled="installed"))
         else:
@@ -173,12 +172,11 @@ def cmd(repo_root: Path = Path("."), description: str | None = None) -> None:
 
     for agent_name, template_id in agent_specs:
         agent_slug = slugify(agent_name)
-        pipeline[f"zenve:{agent_slug}"] = None
-
         if template_id:
             try:
                 files = svc.fetch_template_files(template_id)
                 manifest = svc.get_template(template_id)
+                agent_slug = manifest.slug or agent_slug
                 merged = AgentCreate(
                     name=agent_name,
                     template=template_id,
@@ -187,6 +185,7 @@ def cmd(repo_root: Path = Path("."), description: str | None = None) -> None:
                     skills=manifest.skills,
                     tools=manifest.tools,
                     heartbeat_interval_seconds=manifest.heartbeat_interval_seconds,
+                    mode=manifest.mode,
                 )
             except ZenveError as exc:
                 console.print(
@@ -198,6 +197,7 @@ def cmd(repo_root: Path = Path("."), description: str | None = None) -> None:
             files = default_files()
             merged = AgentCreate(name=agent_name)
 
+        pipeline[f"zenve:{agent_slug}"] = None
         files["settings.json"] = build_settings_json(merged, agent_slug)
         for relpath, content in files.items():
             all_files[f"agents/{agent_slug}/{relpath}"] = content
@@ -245,7 +245,7 @@ def cmd(repo_root: Path = Path("."), description: str | None = None) -> None:
             install_skills(repo_root, selected_skill_ids, skill_svc)
             sep()
 
-    agent_names = [slugify(n) for n, _ in agent_specs]
+    agent_names = list(pipeline.keys())
     if update_mode:
         if agent_names:
             console.print(

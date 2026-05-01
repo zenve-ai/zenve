@@ -9,20 +9,14 @@ from typing import Literal
 
 from zenve_adapters import AdapterRegistry
 from zenve_adapters.base import BaseAdapter
+from zenve_cli.constants import CLAIMED_LABEL, FAILED_LABEL, NEEDS_INPUT_LABEL
 from zenve_cli.core.claims import add_claim, expired_claims, load_claims, remove_claim
 from zenve_cli.core.discovery import DiscoveredAgent
 from zenve_cli.core.pipeline import next_label
 from zenve_cli.events import types as et
 from zenve_cli.events.emitter import EventEmitter
 from zenve_cli.integrations.github.client import GitHubClient, GitHubError
-from zenve_cli.integrations.github.labels import (
-    CLAIMED_LABEL,
-    FAILED_LABEL,
-    NEEDS_INPUT_LABEL,
-    claim_item,
-    transition,
-    unclaim_item,
-)
+from zenve_cli.integrations.github.labels import claim_item, transition, unclaim_item
 from zenve_cli.models.claims import Claim
 from zenve_cli.models.run_result import (
     PipelineTransition,
@@ -113,7 +107,9 @@ def find_snapshot_item(snapshot: Snapshot, item: PlannedItem) -> SnapshotIssue |
     return next((p for p in snapshot.pull_requests if p.number == item.number), None)
 
 
-def build_message(run_id: str, agent_name: str, item: PlannedItem | None, snapshot: Snapshot) -> str:
+def build_message(
+    run_id: str, agent_name: str, item: PlannedItem | None, snapshot: Snapshot
+) -> str:
     lines = [f"Run: {run_id}", f"Agent: {agent_name}"]
 
     if item is None:
@@ -292,7 +288,10 @@ async def run_agent(
             emitter.emit(
                 et.AGENT_MISCONFIGURED,
                 agent=agent.name,
-                data={"reason": "read_only agent has write-capable tools", "tools": sorted(flagged)},
+                data={
+                    "reason": "read_only agent has write-capable tools",
+                    "tools": sorted(flagged),
+                },
             )
 
     if agent.settings.picks_up != "none":
@@ -359,7 +358,16 @@ async def run_agent(
     started_at = now_iso()
     start_mono = time.monotonic()
 
-    ctx = build_run_context(agent, run_id, project, repo_root, item, snapshot, env_vars, project_dir_override=worktree_path)
+    ctx = build_run_context(
+        agent,
+        run_id,
+        project,
+        repo_root,
+        item,
+        snapshot,
+        env_vars,
+        project_dir_override=worktree_path,
+    )
 
     adapter_event_map = {
         "output": et.ADAPTER_OUTPUT,
@@ -443,7 +451,9 @@ async def run_agent(
                 worktree_branch,
             )
             if pushed:
-                pr_body = f"Closes #{item.number}" if item.kind == "issue" else f"See #{item.number}"
+                pr_body = (
+                    f"Closes #{item.number}" if item.kind == "issue" else f"See #{item.number}"
+                )
                 gh.create_pr(
                     title=item.title,
                     body=pr_body,
@@ -472,7 +482,9 @@ async def run_agent(
         if status == "completed":
             comment_body = f"Run complete\n\n{result.outcome}" if result.outcome else "Run complete"
         elif status == "needs_input":
-            comment_body = f"Run needs input\n\n{result.outcome}" if result.outcome else "Run needs input"
+            comment_body = (
+                f"Run needs input\n\n{result.outcome}" if result.outcome else "Run needs input"
+            )
         else:
             comment_body = f"Run failed\n\n{error_text}" if error_text else "Run failed"
         try:

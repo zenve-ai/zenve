@@ -54,6 +54,21 @@ src/zenve_cli/
 - **`integrations/`** — external API clients. Each provider gets its own subdirectory. No subprocess, no git.
 - **`models/`** — Pydantic models only. No logic.
 
+## Commands Are Like API Routes (IMPORTANT)
+
+`commands/` is the CLI equivalent of `apps/api/routes/` in the FastAPI app. The same rules apply:
+
+- **Thin wrappers only** — parse args, call services, print output. No business logic.
+- **Only call `zenve_services`** — never implement logic that belongs in a service.
+- **No helper functions with logic** — if it's not pure UI (prompts, formatting), it belongs in a service or `zenve_utils`.
+- **Never import from `zenve_utils.scaffolding` directly** — that is a service concern.
+- **`init` is a composition** — it calls the same service methods as `zenve agents add` and `zenve skills add`, never re-implements them inline.
+
+**Violations to flag:**
+- Any business logic (loops, conditionals, data construction) inside a `commands/` file
+- `from zenve_utils.scaffolding import ...` inside `commands/`
+- Logic duplicated across two `commands/` files — extract to a service instead
+
 ## `.zenve/` Folder Convention
 
 The CLI never scaffolds `.zenve/` (except via `zenve init`). Expected layout in a user's repo:

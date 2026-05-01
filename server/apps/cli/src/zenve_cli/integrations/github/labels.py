@@ -1,10 +1,7 @@
 from __future__ import annotations
 
+from zenve_cli.constants import CLAIMED_LABEL, FAILED_LABEL, NEEDS_INPUT_LABEL
 from zenve_cli.integrations.github.client import GitHubClient, GitHubError
-
-CLAIMED_LABEL = "zenve:claimed"
-FAILED_LABEL = "zenve:failed"
-NEEDS_INPUT_LABEL = "zenve:needs-input"
 
 
 def claim_item(client: GitHubClient, number: int) -> bool:
@@ -36,7 +33,7 @@ def transition(
     - Remove current agent label (from_label).
     - Add next pipeline label if not None.
     """
-    for lbl in (CLAIMED_LABEL, from_label):
+    for lbl in (CLAIMED_LABEL, from_label, FAILED_LABEL, NEEDS_INPUT_LABEL):
         try:
             client.remove_label(number, lbl)
         except GitHubError:

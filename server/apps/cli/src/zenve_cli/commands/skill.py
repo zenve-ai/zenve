@@ -9,6 +9,7 @@ from rich.text import Text
 
 from zenve_cli.commands.init import WIZARD_STYLE, sep
 from zenve_cli.commands.snapshot import resolve_github_token
+from zenve_cli.constants import AGENTS_SKILLS_DIR, CLAUDE_SKILLS_DIR, DEFAULT_SKILLS_REPO
 from zenve_config.settings import get_settings
 from zenve_models.errors import ZenveError
 from zenve_models.github_template import SkillSummary
@@ -16,10 +17,6 @@ from zenve_services.template import GitHubTemplateService
 
 skill_app = typer.Typer(help="Skill management commands")
 console = Console()
-
-DEFAULT_SKILLS_REPO = "zenve-ai/skills"
-AGENTS_SKILLS_DIR = ".agents/skills"
-CLAUDE_SKILLS_DIR = ".claude/skills"
 
 
 def agents_skills_dir(repo_root: Path) -> Path:
@@ -91,7 +88,9 @@ def install_skills(
         try:
             files = svc.fetch_skill_files(skill_id)
         except ZenveError as exc:
-            console.print(f"  [yellow]⚠[/yellow] [white]{skill_id}[/white] — {exc.message}")
+            console.print(
+                f"[dim]│[/dim]  [yellow]⚠[/yellow] [white]{skill_id}[/white] — {exc.message}"
+            )
             continue
 
         skill_out = agent_skills_root / skill_id
@@ -107,7 +106,7 @@ def install_skills(
         link_path.symlink_to(Path("../../.agents/skills") / skill_id)
 
         installed_now.append(skill_id)
-        console.print(f"  [green]✓[/green] [white]{skill_id}[/white]")
+        console.print(f"[dim]│[/dim]  [green]✓[/green] [white]{skill_id}[/white]")
 
     return installed_now
 
@@ -122,7 +121,7 @@ def list_skills(
         skills = svc.list_skills()
     except ZenveError as exc:
         console.print(f"[red]✗[/red] Could not fetch skills: {exc.message}", highlight=False)
-        raise typer.Exit(1)
+        raise typer.Exit(1)  # noqa: B904
 
     if not skills:
         console.print("[dim]No skills found.[/dim]")
@@ -152,11 +151,11 @@ def add_skills(
         skills = svc.list_skills()
     except ZenveError as exc:
         console.print(f"[red]✗[/red] Could not fetch skills: {exc.message}", highlight=False)
-        raise typer.Exit(1)
+        raise typer.Exit(1)  # noqa: B904
 
     if not skills:
         console.print("[red]✗[/red] No skills found.", highlight=False)
-        raise typer.Exit(1)
+        raise typer.Exit(1)  # noqa: B904
 
     selected_ids = collect_skills_wizard(skills, installed_skill_names(repo_root))
     sep()

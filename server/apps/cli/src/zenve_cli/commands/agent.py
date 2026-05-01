@@ -207,7 +207,7 @@ def add(
         available_templates = [
             t
             for t in templates
-            if slugify(t.name if hasattr(t, "name") and t.name else t.id)
+            if (t.slug or slugify(t.name if hasattr(t, "name") and t.name else t.id))
             not in existing_agent_slugs
         ]
         if not available_templates:
@@ -234,12 +234,11 @@ def add(
 
     for agent_name, template_id in agent_specs:
         agent_slug = slugify(agent_name)
-        pipeline[f"zenve:{agent_slug}"] = None
-
         if template_id:
             try:
                 files = svc.fetch_template_files(template_id)
                 manifest = svc.get_template(template_id)
+                agent_slug = manifest.slug or agent_slug
                 merged = AgentCreate(
                     name=agent_name,
                     template=template_id,
@@ -248,6 +247,7 @@ def add(
                     skills=manifest.skills,
                     tools=manifest.tools,
                     heartbeat_interval_seconds=manifest.heartbeat_interval_seconds,
+                    mode=manifest.mode,
                 )
             except ZenveError as exc:
                 console.print(
@@ -259,6 +259,7 @@ def add(
             files = default_files()
             merged = AgentCreate(name=agent_name)
 
+        pipeline[f"zenve:{agent_slug}"] = None
         files["settings.json"] = build_settings_json(merged, agent_slug)
         agent_out = zdir / "agents" / agent_slug
         for relpath, content in files.items():
@@ -271,7 +272,7 @@ def add(
     updated_settings = {**existing_settings, "pipeline": merged_pipeline}
     (zdir / "settings.json").write_bytes(json.dumps(updated_settings, indent=2).encode())
 
-    added_slugs = [slugify(n) for n, _ in agent_specs]
+    added_slugs = list(pipeline.keys() - set(existing_pipeline.keys()))
     console.print(
         f"[cyan]◆[/cyan] [white]Added {len(added_slugs)} agent(s): {', '.join(added_slugs)}[/white]"
     )
@@ -356,7 +357,7 @@ def update(
     installed_templates = [
         t
         for t in templates
-        if slugify(t.name if hasattr(t, "name") and t.name else t.id) in existing_agent_slugs
+        if (t.slug or slugify(t.name if hasattr(t, "name") and t.name else t.id)) in existing_agent_slugs
     ]
 
     if not installed_templates:
@@ -393,7 +394,7 @@ def update(
     for template in selected:
         template_id = template.id
         agent_name = template.name if hasattr(template, "name") and template.name else template_id
-        agent_slug = slugify(agent_name)
+        agent_slug = template.slug or slugify(agent_name)
 
         try:
             files = svc.fetch_template_files(template_id)

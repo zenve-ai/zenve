@@ -100,6 +100,7 @@ class ClaudeCodeAdapter(BaseAdapter):
             stdin=asyncio.subprocess.PIPE,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
+            limit=10 * 1024 * 1024,  # 10 MB — Claude can output large JSON lines
         )
 
         if proc.stdin:
@@ -257,8 +258,6 @@ class ClaudeCodeAdapter(BaseAdapter):
         args.extend(["--system-prompt", system_prompt])
         if config.model:
             args.extend(["--model", config.model])
-        if config.max_tokens is not None:
-            args.extend(["--max-tokens", str(config.max_tokens)])
         if config.max_turns:
             args.extend(["--max-turns", str(config.max_turns)])
         if tools:

@@ -98,7 +98,7 @@ class GitHubTemplateService:
     def read_manifest(self, template_id: str) -> dict:
         import base64
 
-        url = f"{GITHUB_API}/repos/{self.repo}/contents/agents/{template_id}/manifest.yaml"
+        url = f"{GITHUB_API}/repos/{self.repo}/contents/{template_id}/manifest.yaml"
         try:
             file_data = self.cached_get(url)
             content = base64.b64decode(file_data["content"]).decode("utf-8")  # type: ignore[index]
@@ -107,7 +107,7 @@ class GitHubTemplateService:
             return {}
 
     def list_templates(self) -> list[GitHubTemplateSummary]:
-        entries = self.list_repo_dir("agents")
+        entries = self.list_repo_dir("")
         templates = []
         for entry in entries:
             if entry.get("type") != "dir":
@@ -118,18 +118,20 @@ class GitHubTemplateService:
                 GitHubTemplateSummary(
                     id=template_id,
                     name=manifest.get("name", template_id),
+                    slug=manifest.get("slug"),
                     description=manifest.get("description", ""),
                     adapter_type=manifest.get("adapter_type", "claude_code"),
                     adapter_config=manifest.get("adapter_config", {}),
                     skills=manifest.get("skills", []),
                     tools=manifest.get("tools", ["Read", "Write", "Bash"]),
                     heartbeat_interval_seconds=manifest.get("heartbeat_interval_seconds", 0),
+                    mode=manifest.get("mode", "read_only"),
                 )
             )
         return templates
 
     def get_template(self, template_id: str) -> GitHubTemplateSummary:
-        url = f"{GITHUB_API}/repos/{self.repo}/contents/agents/{template_id}"
+        url = f"{GITHUB_API}/repos/{self.repo}/contents/{template_id}"
         entry = self.cached_get(url)
         if isinstance(entry, dict) and entry.get("type") != "dir":
             raise NotFoundError(f"Template '{template_id}' not found")
@@ -139,6 +141,7 @@ class GitHubTemplateService:
         return GitHubTemplateSummary(
             id=template_id,
             name=manifest.get("name", template_id),
+            slug=manifest.get("slug"),
             description=manifest.get("description", ""),
             adapter_type=manifest.get("adapter_type", "claude_code"),
             adapter_config=manifest.get("adapter_config", {}),
@@ -148,8 +151,8 @@ class GitHubTemplateService:
         )
 
     def fetch_template_files(self, template_id: str) -> dict[str, bytes]:
-        """Return all non-manifest files from agents/{template_id}/ as in-memory bytes."""
-        prefix = f"agents/{template_id}/"
+        """Return all non-manifest files from {template_id}/ as in-memory bytes."""
+        prefix = f"{template_id}/"
         blobs = self.list_tree_blobs(prefix)
         files: dict[str, bytes] = {}
 
@@ -167,7 +170,7 @@ class GitHubTemplateService:
         agent_slug: str,
         base_path: str,
     ) -> str:
-        prefix = f"agents/{template_id}/"
+        prefix = f"{template_id}/"
         blobs = self.list_tree_blobs(prefix)
 
         agent_dir = Path(base_path) / "agents" / agent_slug

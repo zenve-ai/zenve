@@ -5,11 +5,9 @@ import threading
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
+from zenve_cli.constants import CLAIM_TTL_SECONDS, CLAIMS_FILE
 from zenve_cli.core.config import zenve_dir
 from zenve_cli.models.claims import Claim, ClaimsFile
-
-CLAIMS_FILE = "claims.json"
-CLAIM_TTL_SECONDS = 3600
 
 _lock = threading.Lock()
 

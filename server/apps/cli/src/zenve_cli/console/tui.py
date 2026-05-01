@@ -370,11 +370,14 @@ class ZenveTUI(App):
             self.append_panel(t, border_style="red dim")
 
         elif etype == "run.committing":
-            self.flush_block()
-            self.append_panel(Text("committing…", style="dim"))
+            pass
 
         elif etype == "run.completed":
             self.flush_block()
+            if data.get("committed"):
+                t = Text()
+                t.append("✓ committed agent run", style="bold green")
+                self.append_panel(t, bg=OUTPUT_BG)
 
         elif etype == "run.failed":
             self.flush_block()

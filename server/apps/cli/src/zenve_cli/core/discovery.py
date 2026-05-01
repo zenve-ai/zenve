@@ -6,10 +6,9 @@ from pathlib import Path
 
 from pydantic import ValidationError
 
+from zenve_cli.constants import AGENTS_SUBDIR
 from zenve_cli.core.config import zenve_dir
 from zenve_cli.models.settings import AgentSettings
-
-AGENTS_SUBDIR = "agents"
 
 
 class DiscoveryError(RuntimeError):
