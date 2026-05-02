@@ -23,7 +23,7 @@ from zenve_cli.events.emitter import EventEmitter
 from zenve_cli.integrations.github.client import GitHubClient
 from zenve_cli.integrations.github.snapshot import build_snapshot, write_snapshot
 from zenve_cli.models.run_result import RunResultFile
-from zenve_cli.runtime.commit import GitError, commit_agents
+from zenve_cli.runtime.commit import GitError, commit_agents, fetch_origin, is_working_tree_clean, remote_branch_exists
 from zenve_cli.runtime.executor import DryRunResult, reconcile_claims
 from zenve_cli.runtime.parallel import run_all
 
@@ -61,6 +61,23 @@ def cmd(
     repo = git_remote_slug(repo_root)
     if not repo:
         typer.echo("✗ Could not determine repo. Ensure git remote origin is a GitHub URL.")
+        raise typer.Exit(1)
+
+    if not is_working_tree_clean(repo_root):
+        typer.echo("✗ Local repo has uncommitted changes.")
+        typer.echo("  Zenve cannot run safely because generated worktrees/snapshots may be based on stale or mixed state.")
+        typer.echo("")
+        typer.echo("  Commit, stash, or discard your changes, then run again.")
+        raise typer.Exit(1)
+
+    try:
+        fetch_origin(repo_root)
+    except GitError as exc:
+        typer.echo(f"✗ git fetch origin failed: {exc}")
+        raise typer.Exit(1) from exc
+
+    if not remote_branch_exists(repo_root, project.default_branch):
+        typer.echo(f"✗ Remote branch origin/{project.default_branch} not found after fetch.")
         raise typer.Exit(1)
 
     env_vars = {"ZENVE_RUN_ID": env.run_id}

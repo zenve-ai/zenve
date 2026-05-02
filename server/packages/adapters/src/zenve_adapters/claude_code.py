@@ -260,6 +260,8 @@ class ClaudeCodeAdapter(BaseAdapter):
             args.extend(["--model", config.model])
         if config.max_turns:
             args.extend(["--max-turns", str(config.max_turns)])
+        if config.mode:
+            args.extend(["--permission-mode", config.mode])
         if tools:
             args.extend(["--allowedTools", ",".join(tools)])
         return args

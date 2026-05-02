@@ -26,6 +26,26 @@ def has_changes(repo_root: Path) -> bool:
     return bool(out.strip())
 
 
+def is_working_tree_clean(repo_root: Path) -> bool:
+    """Return True if the working tree has no uncommitted changes (staged or unstaged)."""
+    out = run_git(["status", "--porcelain"], repo_root)
+    return not bool(out.strip())
+
+
+def fetch_origin(repo_root: Path) -> None:
+    """Fetch all refs from origin."""
+    run_git(["fetch", "origin"], repo_root)
+
+
+def remote_branch_exists(repo_root: Path, branch: str) -> bool:
+    """Return True if origin/{branch} exists after fetch."""
+    try:
+        run_git(["rev-parse", "--verify", f"origin/{branch}"], repo_root)
+        return True
+    except GitError:
+        return False
+
+
 def commit_zenve_dir(repo_root: Path, message: str, branch: str = "main") -> bool:
     """Stage .zenve/, commit, and push. Returns True if a commit was made."""
     run_git(["add", ".zenve"], repo_root)

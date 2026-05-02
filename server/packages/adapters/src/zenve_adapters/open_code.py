@@ -243,6 +243,8 @@ class OpenCodeAdapter(BaseAdapter):
             "run",
             "--format",
             config.output_format,
+            "--agent",
+            config.mode,
         ]
         if config.model:
             args.extend(["--model", config.model])

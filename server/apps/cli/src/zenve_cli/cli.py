@@ -21,7 +21,7 @@ app.add_typer(skill_app, name="skills")
 
 @app.callback(invoke_without_command=True)
 def main(ctx: typer.Context) -> None:
-    if ctx.invoked_subcommand is not None:
+    if ctx.invoked_subcommand is not None and ctx.invoked_subcommand != "run":
         print_logo()
 
 
