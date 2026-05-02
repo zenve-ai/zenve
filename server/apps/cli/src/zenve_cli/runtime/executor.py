@@ -81,6 +81,11 @@ def filter_for_agent(snapshot: Snapshot, settings: AgentSettings) -> list[Planne
             )
             for i in snapshot.issues
             if settings.github_label in i.labels
+            and not (
+                NEEDS_INPUT_LABEL in i.labels
+                and i.comments
+                and "RUN_NEEDS_INPUT" in i.comments[-1].body
+            )
         )
     if wants_prs:
         items.extend(
@@ -94,6 +99,11 @@ def filter_for_agent(snapshot: Snapshot, settings: AgentSettings) -> list[Planne
             )
             for p in snapshot.pull_requests
             if settings.github_label in p.labels
+            and not (
+                NEEDS_INPUT_LABEL in p.labels
+                and p.comments
+                and "RUN_NEEDS_INPUT" in p.comments[-1].body
+            )
         )
     items.sort(key=lambda it: (it.created_at, it.number))
     return items
@@ -495,6 +505,7 @@ async def run_agent(
 
                 if agent.settings.mode == "artifact_pr":
                     gh.merge_pr(pr.number, merge_method="squash")
+                    gh.delete_branch(worktree_branch)
                     reset_to_remote(repo_root, project.default_branch)
         except (GitError, GitHubError) as exc:
             status = "failed"

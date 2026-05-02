@@ -170,3 +170,9 @@ class GitHubClient:
             f"/repos/{self.repo}/pulls/{number}/merge",
             json={"merge_method": merge_method},
         )
+
+    def delete_branch(self, branch: str) -> None:
+        """Delete a remote branch. Silently ignores 422 (already deleted)."""
+        resp = self._client.delete(f"/repos/{self.repo}/git/refs/heads/{branch}")
+        if resp.is_error and resp.status_code != 422:
+            raise GitHubError(resp.status_code, resp.text)

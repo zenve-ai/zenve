@@ -22,7 +22,7 @@ def run_git(args: list[str], cwd: Path) -> str:
 
 
 def has_changes(repo_root: Path) -> bool:
-    out = run_git(["status", "--porcelain", ".zenve/agents"], repo_root)
+    out = run_git(["status", "--porcelain", ".zenve"], repo_root)
     return bool(out.strip())
 
 
@@ -74,12 +74,11 @@ def commit_agents(
     branch: str = "main",
     summary: str = "",
 ) -> bool:
-    """Stage agent memory + runs, commit with a zenve-prefixed message, push.
+    """Stage the full .zenve/ dir, commit with a zenve-prefixed message, push.
 
     Returns True if a commit was created, False if nothing changed.
-    Never commits `.zenve/snapshot.json`.
     """
-    run_git(["add", ".zenve/agents"], repo_root)
+    run_git(["add", ".zenve"], repo_root)
 
     if not has_changes(repo_root):
         return False
