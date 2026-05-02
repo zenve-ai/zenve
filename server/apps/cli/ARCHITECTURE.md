@@ -153,7 +153,8 @@ Any directory inside `.zenve/agents/` is treated as an agent. The CLI discovers 
   "github_label": "zenve:dev",
   "timeout_seconds": 300,
   "picks_up": "issues",
-  "mode": "write"
+  "mode": "code_pr",
+  "allowed_paths": []
 }
 ```
 
@@ -170,7 +171,8 @@ Any directory inside `.zenve/agents/` is treated as an agent. The CLI discovers 
 | `github_label` | required | GitHub label this agent claims |
 | `timeout_seconds` | `300` | Per-agent execution timeout |
 | `picks_up` | `"issues"` | `issues`, `pull_requests`, `both`, `none` |
-| `mode` | `"read_only"` | `"write"` or `"read_only"` — controls git worktree isolation |
+| `mode` | `"no_pr"` | `"artifact_pr"`, `"code_pr"`, or `"no_pr"` — see **Mode Summary** below |
+| `allowed_paths` | `[]` | fnmatch glob patterns restricting which files an `artifact_pr` agent may change. Empty = no restriction. |
 
 `picks_up` controls what the agent looks for in the snapshot:
 - `"issues"` — only open issues
@@ -187,7 +189,7 @@ Any directory inside `.zenve/agents/` is treated as an agent. The CLI discovers 
 
 There is no unrestricted mode. Every agent must declare its tools.
 
-If a `read_only` agent lists write-capable tools (`Write`, `Edit`, `Bash`, `NotebookEdit`), the CLI emits an `agent.misconfigured` warning before the run. The agent still runs — it is the user's responsibility to ensure the tools match the intent.
+If a `no_pr` agent lists write-capable tools (`Write`, `Edit`, `Bash`, `NotebookEdit`), the CLI emits an `agent.misconfigured` warning before the run. The agent still runs — it is the user's responsibility to ensure the tools match the intent.
 
 ---
 
@@ -248,7 +250,7 @@ Every agent — regardless of role — follows the same lifecycle:
 ```
 Agent starts
   │
-  ├── If read_only + write-capable tools → emit agent.misconfigured warning
+  ├── If no_pr + write-capable tools → emit agent.misconfigured warning
   │
   ├── Filter snapshot                 ← only items matching own label + picks_up
   ├── Pick oldest unclaimed item      ← skips items with zenve:claimed label
@@ -259,7 +261,7 @@ Agent starts
   │     GitHub: add zenve:claimed label
   │     Local:  write to .zenve/claims.json
   │
-  ├── If mode == "write":
+  ├── If mode in ("artifact_pr", "code_pr"):
   │     git fetch origin {default_branch}
   │     git worktree add -b zenve/{slug}/{number}-{run_id_short}
   │                         ./worktrees/{slug}-{run_id_short}
@@ -270,10 +272,16 @@ Agent starts
   ├── Execute adapter                 ← adapter.execute(ctx) → runs SOUL.md + AGENTS.md + RUN.md
   │
   └── On adapter exit:
-        If mode == "write" and exit 0:
-          git add -A && git commit && git push origin {branch}
-          If changes exist → open PR (title: issue title, body: "Closes #{number}")
-          If push/PR fails → downgrade status to "failed"
+        If mode in ("artifact_pr", "code_pr") and exit 0:
+          git add -A; collect changed file list
+          If mode == "artifact_pr" and allowed_paths set, validate every changed
+              path matches at least one glob — else status = "failed", no PR
+          git commit && git push origin {branch}
+          Open PR:
+            artifact_pr → title "[zenve][{slug}] {item.title}", body "Refs #{n}\n\nArtifact PR — auto-merged."
+            code_pr     → title item.title, body "Closes #{n}"
+          If mode == "artifact_pr": PUT /pulls/{n}/merge (squash) → reset_to_remote(repo, default_branch)
+          If push / PR / merge fails → downgrade status to "failed"
         Post comment to issue/PR     ← "Run complete / needs input / failed"
         If completed:
           Remove zenve:claimed + current label
@@ -286,7 +294,7 @@ Agent starts
           Add zenve:failed
         Remove from .zenve/claims.json
         Write run result → runs/{run_id}.json
-        If mode == "write" → git worktree remove (always, success or failure)
+        If a worktree was created → git worktree remove (always, success or failure)
 ```
 
 ### Agent Run Outcomes
@@ -480,7 +488,7 @@ The CLI emits structured events throughout the run. Posted to webhook in real ti
 run.started                CLI started — agents discovered, count reported
 snapshot.fetched           Snapshot written — issues/PRs found per agent label
 agent.started              Individual agent process started
-agent.misconfigured        read_only agent has write-capable tools (warning, run continues)
+agent.misconfigured        no_pr agent has write-capable tools (warning, run continues)
 agent.nothing_to_do        No matching unclaimed items, clean exit
 agent.claimed_issue        Agent claimed an issue
 agent.claimed_pr           Agent claimed a PR
@@ -546,9 +554,11 @@ Committed back to the repo. Permanent audit trail. No external database needed.
 
 ---
 
-## Write Agent Isolation
+## PR Modes & Worktree Isolation
 
-Agents with `"mode": "write"` need git isolation so parallel runs don't stomp on each other's working tree. Each write agent gets its own `git worktree` before the subprocess starts.
+Agents that produce changes (`artifact_pr`, `code_pr`) need git isolation so parallel runs don't stomp on each other's working tree. Each gets its own `git worktree` before the subprocess starts.
+
+`artifact_pr` (pm, arch) and `code_pr` (dev) share the same worktree + commit + push + open-PR flow. `artifact_pr` then **auto-merges** the PR (squash) and resets the local checkout to the new `origin/{default_branch}` so subsequent agents see the merged artifacts. `code_pr` leaves the PR open for human review.
 
 ### Worktree Lifecycle
 
@@ -561,12 +571,26 @@ Agents with `"mode": "write"` need git isolation so parallel runs don't stomp on
 4. adapter.execute() completes
 5. if exit 0:
      git add -A
+     collect changed file list (git diff --cached --name-only)
+     if mode == "artifact_pr" and allowed_paths is non-empty:
+       every changed path must match at least one fnmatch glob
+       — otherwise: status = "failed", no commit, no PR
      git commit -m "[zenve] {run_id} — {slug}: #{issue_number}"
      git push origin {branch}
-     open PR via GitHub API (title: issue title, body: "Closes #{number}")
-     if push or PR fails → status downgraded to "failed"
+     open PR:
+       artifact_pr → title "[zenve][{slug}] {item.title}", body "Refs #{n}\n\nArtifact PR — auto-merged."
+       code_pr     → title item.title, body "Closes #{n}"
+     if mode == "artifact_pr":
+       PUT /repos/{owner}/{repo}/pulls/{number}/merge {merge_method: "squash"}
+       git fetch origin {default_branch}
+       git reset --hard origin/{default_branch}    (in repo root, NOT worktree)
+     if push / PR / merge fails → status downgraded to "failed"
 6. git worktree remove --force (always, success or failure)
 ```
+
+The post-merge sync deliberately omits `git clean -fd`: untracked run-result JSON files of in-flight parallel agents would be wiped. `reset --hard` alone makes merged content visible.
+
+**Concurrency caveat.** `reset_to_remote` runs in the repo root, mid-run, while other agents may still be executing. A `no_pr` agent (e.g. reviewer) running in the repo root will see its working tree mutate when an `artifact_pr` agent finishes elsewhere. In practice this is benign — `no_pr` agents read from `snapshot.json` + open files via tools, and the reset is fast-forward — but it is a new race compared to the previous design, where repo root only changed at end-of-run via `commit_agents()`. Treat `no_pr` agents as tolerant of repo-root churn, or schedule them in pipeline phases that don't overlap with `artifact_pr` runs.
 
 ### Branch Naming
 
@@ -582,10 +606,11 @@ Examples:
 
 ### Mode Summary
 
-| `mode` | Working dir | Git ops | PR created |
-|---|---|---|---|
-| `read_only` | repo root | none | no |
-| `write` | isolated worktree | fetch → commit → push | yes (on exit 0 with changes) |
+| `mode` | Working dir | Git ops | PR | Auto-merge |
+|---|---|---|---|---|
+| `no_pr` | repo root | none | no | — |
+| `code_pr` | isolated worktree | fetch → commit → push | open for review | no |
+| `artifact_pr` | isolated worktree | fetch → commit → push → reset to origin | open & merged in same run | squash |
 
 `worktrees/` is listed in `.gitignore` — ephemeral checkouts are never committed.
 

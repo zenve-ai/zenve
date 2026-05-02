@@ -37,6 +37,16 @@ def fetch_origin(repo_root: Path) -> None:
     run_git(["fetch", "origin"], repo_root)
 
 
+def reset_to_remote(repo_root: Path, branch: str = "main") -> None:
+    """Fast-forward the local checkout to origin/{branch} after an artifact PR merges.
+
+    Deliberately omits `git clean -fd` — untracked run-result JSON files of in-flight
+    parallel agents would be wiped. `reset --hard` alone makes merged content visible.
+    """
+    run_git(["fetch", "origin", branch], repo_root)
+    run_git(["reset", "--hard", f"origin/{branch}"], repo_root)
+
+
 def remote_branch_exists(repo_root: Path, branch: str) -> bool:
     """Return True if origin/{branch} exists after fetch."""
     try:

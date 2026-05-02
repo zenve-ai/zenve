@@ -107,7 +107,8 @@ The CLI never scaffolds `.zenve/` (except via `zenve init`). Expected layout in 
 | `timeout_seconds` | `300` | Per-agent timeout |
 | `picks_up` | `"issues"` | `issues`, `pull_requests`, `both`, `none` |
 | `tools` | `[]` | Explicit tool allow-list — empty means no tools, no unrestricted fallback |
-| `mode` | `"read_only"` | `"write"` — gets a git worktree + opens a PR on success; `"read_only"` — runs from repo root |
+| `mode` | `"no_pr"` | `"artifact_pr"` — worktree + PR + auto-merge (squash); `"code_pr"` — worktree + PR left open for review; `"no_pr"` — runs from repo root, no worktree, no PR |
+| `allowed_paths` | `[]` | Glob patterns (fnmatch) restricting which files an `artifact_pr` agent may change. Empty = no restriction. Files outside cause the run to fail before the PR is opened. |
 
 ## Environment Variables
 
@@ -127,14 +128,15 @@ The CLI never scaffolds `.zenve/` (except via `zenve init`). Expected layout in 
 4. `GitHubClient` — fetch issues, PRs, branches → `Snapshot`
 5. `run_all()` — async gather over all agents via `run_agent()`
    - `filter_for_agent()` — match snapshot items by label + `picks_up`
-   - Emit `agent.misconfigured` if `read_only` agent has write-capable tools
+   - Emit `agent.misconfigured` if `no_pr` agent has write-capable tools
    - `claim_item()` — add `zenve:claimed` label via GitHub API
-   - If `mode == "write"`: `create_worktree()` on a new branch `zenve/{slug}/{number}-{run_id_short}`
-   - `adapter.execute(ctx)` — run the agent subprocess (cwd = worktree if write, repo root if read_only)
-   - If `mode == "write"` and exit 0: `commit_and_push_worktree()` + `gh.create_pr()`
-   - `transition()` — swap GitHub label per pipeline map
+   - If `mode in ("artifact_pr", "code_pr")`: `create_worktree()` on a new branch `zenve/{slug}/{number}-{run_id_short}`
+   - `adapter.execute(ctx)` — run the agent subprocess (cwd = worktree for PR modes, repo root for `no_pr`)
+   - If `mode in ("artifact_pr", "code_pr")` and exit 0: `stage_changes()` → optional `paths_within()` validation (artifact_pr only) → `commit_and_push()` → `gh.create_pr()`
+   - If `mode == "artifact_pr"`: `gh.merge_pr()` (squash) → `reset_to_remote()` to fast-forward local main
+   - `transition()` — swap GitHub label per pipeline map (only on success; for `artifact_pr`, only after merge succeeds)
    - Write `RunResultFile` to `.zenve/agents/{name}/runs/{run_id}.json`
-   - If `mode == "write"`: `remove_worktree()` (always, success or failure)
+   - If a worktree was created: `remove_worktree()` (always, success or failure)
 6. `commit_agents()` — `git add .zenve/agents && git commit && git push`
 7. `EventEmitter.emit()` — append to `.zenve/events.log`, fire webhook
 

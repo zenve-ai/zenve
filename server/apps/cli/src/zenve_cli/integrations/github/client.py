@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
+
 import httpx
 
 from zenve_cli.constants import GITHUB_API
@@ -11,6 +13,12 @@ class GitHubError(RuntimeError):
         self.status_code = status_code
         self.body = body
         super().__init__(f"GitHub API {status_code}: {body}")
+
+
+@dataclass
+class CreatedPR:
+    number: int
+    url: str
 
 
 class GitHubClient:
@@ -145,11 +153,20 @@ class GitHubClient:
         resp = self.request("GET", "/user")
         return resp.json().get("login", "")
 
-    def create_pr(self, title: str, body: str, head: str, base: str) -> str:
-        """Open a pull request. Returns the PR HTML URL."""
+    def create_pr(self, title: str, body: str, head: str, base: str) -> CreatedPR:
+        """Open a pull request. Returns the PR number and HTML URL."""
         resp = self.request(
             "POST",
             f"/repos/{self.repo}/pulls",
             json={"title": title, "body": body, "head": head, "base": base},
         )
-        return resp.json().get("html_url", "")
+        data = resp.json()
+        return CreatedPR(number=data["number"], url=data.get("html_url", ""))
+
+    def merge_pr(self, number: int, merge_method: str = "squash") -> None:
+        """Merge a pull request. Raises GitHubError on conflict (409) or unmergeable (405)."""
+        self.request(
+            "PUT",
+            f"/repos/{self.repo}/pulls/{number}/merge",
+            json={"merge_method": merge_method},
+        )

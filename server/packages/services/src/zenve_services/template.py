@@ -125,7 +125,7 @@ class GitHubTemplateService:
                     skills=manifest.get("skills", []),
                     tools=manifest.get("tools", ["Read", "Write", "Bash"]),
                     heartbeat_interval_seconds=manifest.get("heartbeat_interval_seconds", 0),
-                    mode=manifest.get("mode", "read_only"),
+                    mode=manifest.get("mode", "no_pr"),
                 )
             )
         return templates
@@ -148,7 +148,7 @@ class GitHubTemplateService:
             skills=manifest.get("skills", []),
             tools=manifest.get("tools", ["Read", "Write", "Bash"]),
             heartbeat_interval_seconds=manifest.get("heartbeat_interval_seconds", 0),
-            mode=manifest.get("mode", "read_only"),
+            mode=manifest.get("mode", "no_pr"),
         )
 
     def fetch_template_files(self, template_id: str) -> dict[str, bytes]:
