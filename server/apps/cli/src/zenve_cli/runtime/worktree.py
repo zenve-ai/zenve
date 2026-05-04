@@ -11,6 +11,16 @@ def create_worktree(repo_root: Path, path: Path, branch: str, base: str) -> None
     run_git(["worktree", "add", "-b", branch, str(path), f"origin/{base}"], repo_root)
 
 
+def create_readonly_worktree(repo_root: Path, path: Path, branch: str) -> None:
+    """Create a detached-HEAD worktree at the tip of an existing remote branch.
+
+    Used by review_pr agents — the agent can read the PR's code but no new
+    branch is created and nothing is committed or pushed.
+    """
+    run_git(["fetch", "origin", branch], repo_root)
+    run_git(["worktree", "add", "--detach", str(path), f"origin/{branch}"], repo_root)
+
+
 def remove_worktree(repo_root: Path, path: Path) -> None:
     run_git(["worktree", "remove", "--force", str(path)], repo_root)
 

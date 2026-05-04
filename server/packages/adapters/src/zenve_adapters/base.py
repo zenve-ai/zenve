@@ -78,6 +78,8 @@ class BaseAdapter(ABC):
                 return "failed"
             if line.startswith("RUN_NEEDS_INPUT") or line.startswith("HEARTBEAT_NEEDS_INPUT"):
                 return "needs_input"
+            if line.startswith("RUN_CHANGES_REQUESTED"):
+                return "changes_requested"
         return "completed"
 
     # ------------------------------------------------------------------
