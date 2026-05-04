@@ -5,6 +5,7 @@ from pathlib import Path
 import typer
 
 from zenve_cli.commands import doctor as doctor_cmd
+from zenve_cli.commands import env as env_cmd
 from zenve_cli.commands import init as init_cmd
 from zenve_cli.commands import pipeline as pipeline_cmd
 from zenve_cli.commands import run as run_cmd
@@ -23,6 +24,14 @@ app.add_typer(skill_app, name="skills")
 def main(ctx: typer.Context) -> None:
     if ctx.invoked_subcommand is not None and ctx.invoked_subcommand != "run":
         print_logo()
+
+
+@app.command()
+def env(
+    repo: Path = typer.Option(Path("."), "--repo", help="Path to the repo root"),
+) -> None:
+    """Show resolved environment variables and effective GitHub token."""
+    env_cmd.cmd(repo_root=repo)
 
 
 @app.command()

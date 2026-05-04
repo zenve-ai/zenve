@@ -11,8 +11,9 @@ from zenve_adapters import AdapterRegistry
 from zenve_adapters.base import BaseAdapter
 from zenve_cli.constants import CLAIMED_LABEL, FAILED_LABEL, NEEDS_INPUT_LABEL
 from zenve_cli.core.claims import add_claim, expired_claims, load_claims, remove_claim
+from zenve_cli.core.env import resolve_agent_github_token
 from zenve_cli.core.discovery import DiscoveredAgent
-from zenve_cli.core.pipeline import next_label, prev_label
+from zenve_cli.core.pipeline import next_label, prev_labels
 from zenve_cli.events import types as et
 from zenve_cli.events.emitter import EventEmitter
 from zenve_cli.integrations.github.client import GitHubClient, GitHubError
@@ -270,6 +271,17 @@ def reconcile_claims(
                 pr.labels = [lbl for lbl in pr.labels if lbl != CLAIMED_LABEL]
 
 
+def extract_failed_reason(outcome: str) -> str | None:
+    """Extract the reason from a RUN_FAILED or HEARTBEAT_FAILED signal line."""
+    for line in reversed(outcome.strip().splitlines()[-10:]):
+        line = line.strip()
+        if line.startswith("RUN_FAILED") or line.startswith("HEARTBEAT_FAILED"):
+            parts = line.split(":", 1)
+            if len(parts) == 2 and parts[1].strip():
+                return parts[1].strip()
+    return None
+
+
 def determine_run_status(
     result: RunResult,
     adapter_errors: list[str],
@@ -280,6 +292,8 @@ def determine_run_status(
         run_status = "failed"
     status = run_status if run_status in ("completed", "needs_input", "changes_requested") else "failed"
     error_text = result.error
+    if status == "failed" and not error_text and result.exit_code == 0 and result.outcome:
+        error_text = extract_failed_reason(result.outcome)
     if status == "failed" and not error_text and adapter_errors:
         error_text = adapter_errors[-1]
     if status == "failed" and not error_text:
@@ -377,21 +391,26 @@ def handle_github_post_run(
     if status == "completed":
         pipeline_transition = apply_pipeline_transition(gh, project, agent, item, emitter)
     elif status == "changes_requested":
-        back_label = prev_label(project.pipeline, agent.settings.github_label)
+        back_labels = prev_labels(project.pipeline, agent.settings.github_label)
         unclaim_item(gh, item.number)
-        transition(gh, item.number, agent.settings.github_label, back_label)
+        transition(gh, item.number, agent.settings.github_label, None)
+        if back_labels:
+            try:
+                gh.add_labels(item.number, back_labels)
+            except GitHubError:
+                pass
         emitter.emit(
             et.PIPELINE_TRANSITION,
             agent=agent.name,
             data={
                 "number": item.number,
                 "from": agent.settings.github_label,
-                "to": back_label,
+                "to": back_labels,
             },
         )
         pipeline_transition = PipelineTransition(
             from_label=agent.settings.github_label,
-            to_label=back_label,
+            to_label=back_labels or None,
         )
     elif status == "needs_input":
         unclaim_item(gh, item.number)
@@ -465,6 +484,8 @@ def write_and_emit(
         event_type = et.AGENT_COMPLETED
     elif status == "needs_input":
         event_type = et.AGENT_NEEDS_INPUT
+    elif status == "changes_requested":
+        event_type = et.AGENT_CHANGES_REQUESTED
     else:
         event_type = et.AGENT_FAILED
     emitter.emit(
@@ -498,8 +519,11 @@ async def run_agent(
     if agent.settings.picks_up != "none" and items:
         item = pick_unclaimed(items)
 
+    agent_token = resolve_agent_github_token(agent.settings.slug, env_vars.get("GH_TOKEN", ""))
+    agent_env_vars = {**env_vars, "GH_TOKEN": agent_token} if agent_token else env_vars
+
     if dry_run:
-        ctx = build_run_context(agent, run_id, project, repo_root, item, snapshot, env_vars)
+        ctx = build_run_context(agent, run_id, project, repo_root, item, snapshot, agent_env_vars)
         return DryRunResult(
             agent_name=agent.name,
             picks_up=agent.settings.picks_up,
@@ -604,7 +628,7 @@ async def run_agent(
         repo_root,
         item,
         snapshot,
-        env_vars,
+        agent_env_vars,
         project_dir_override=worktree_path,
     )
 
@@ -679,6 +703,13 @@ async def run_agent(
             except GitError:
                 pass
             worktree_path = None
+            if status == "completed":
+                try:
+                    gh.merge_pr(item.number, merge_method="squash")
+                    gh.delete_branch(worktree_branch)
+                except GitHubError as exc:
+                    status = "failed"
+                    error_text = str(exc)
         else:
             status, error_text = handle_worktree_pr(
                 gh, agent, project, item, worktree_path, worktree_branch, repo_root, status, error_text, run_id

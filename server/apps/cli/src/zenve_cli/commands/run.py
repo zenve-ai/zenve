@@ -50,7 +50,7 @@ def cmd(
 ) -> None:
     """Run all enabled agents against a fresh GitHub snapshot."""
     try:
-        env = load_env()
+        env = load_env(repo_root)
         project = load_project_settings(repo_root)
         agents = discover_agents(repo_root, only=agent)
     except EnvError as exc:
@@ -86,7 +86,7 @@ def cmd(
         typer.echo(f"✗ Remote branch origin/{project.default_branch} not found after fetch.")
         raise typer.Exit(1)
 
-    env_vars = {"ZENVE_RUN_ID": env.run_id}
+    env_vars = {"ZENVE_RUN_ID": env.run_id, "GH_TOKEN": env.github_token}
 
     if dry_run:
         emitter = EventEmitter(

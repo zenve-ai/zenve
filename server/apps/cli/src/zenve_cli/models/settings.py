@@ -35,6 +35,6 @@ class AgentSettings(BaseModel):
     enabled: bool = True
     github_label: str
     timeout_seconds: int = 300
-    picks_up: PicksUp = "issues"
+    picks_up: PicksUp = "both"
     mode: Literal["artifact_pr", "code_pr", "no_pr", "review_pr"] = "no_pr"
     allowed_paths: list[str] = Field(default_factory=list)

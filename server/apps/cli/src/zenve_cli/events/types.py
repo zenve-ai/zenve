@@ -14,6 +14,7 @@ AGENT_CLAIMED_ISSUE = "agent.claimed_issue"
 AGENT_CLAIMED_PR = "agent.claimed_pr"
 AGENT_COMPLETED = "agent.completed"
 AGENT_NEEDS_INPUT = "agent.needs_input"
+AGENT_CHANGES_REQUESTED = "agent.changes_requested"
 AGENT_FAILED = "agent.failed"
 
 PIPELINE_TRANSITION = "pipeline.transition"

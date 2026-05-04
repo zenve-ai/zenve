@@ -17,7 +17,7 @@ class PipelineTransition(BaseModel):
     model_config = {"extra": "ignore"}
 
     from_label: str
-    to_label: str | None
+    to_label: list[str] | None
 
 
 class TokenUsage(BaseModel):

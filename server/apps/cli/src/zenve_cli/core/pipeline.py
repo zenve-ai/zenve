@@ -24,6 +24,11 @@ def prev_label(pipeline: dict[str, str | None], current: str) -> str | None:
     return next((src for src, dst in pipeline.items() if dst == current), None)
 
 
+def prev_labels(pipeline: dict[str, str | None], current: str) -> list[str]:
+    """Return all labels that point to `current`."""
+    return [src for src, dst in pipeline.items() if dst == current]
+
+
 def validate_pipeline(pipeline: dict[str, str | None]) -> PipelineReport:
     """Check a pipeline map for unknown label references and cycles.
 
