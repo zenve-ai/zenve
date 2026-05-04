@@ -21,6 +21,11 @@ def create_readonly_worktree(repo_root: Path, path: Path, branch: str) -> None:
     run_git(["worktree", "add", "--detach", str(path), f"origin/{branch}"], repo_root)
 
 
+def create_writable_worktree(repo_root: Path, path: Path, branch: str) -> None:
+    run_git(["fetch", "origin", branch], repo_root)
+    run_git(["worktree", "add", "-B", branch, str(path), f"origin/{branch}"], repo_root)
+
+
 def remove_worktree(repo_root: Path, path: Path) -> None:
     run_git(["worktree", "remove", "--force", str(path)], repo_root)
 

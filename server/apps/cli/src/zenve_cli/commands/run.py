@@ -23,7 +23,13 @@ from zenve_cli.events.emitter import EventEmitter
 from zenve_cli.integrations.github.client import GitHubClient
 from zenve_cli.integrations.github.snapshot import build_snapshot, write_snapshot
 from zenve_cli.models.run_result import RunResultFile
-from zenve_cli.runtime.commit import GitError, commit_agents, fetch_origin, is_working_tree_clean, remote_branch_exists
+from zenve_cli.runtime.commit import (
+    GitError,
+    commit_agents,
+    fetch_origin,
+    is_working_tree_clean,
+    remote_branch_exists,
+)
 from zenve_cli.runtime.executor import DryRunResult, reconcile_claims
 from zenve_cli.runtime.parallel import run_all
 
