@@ -15,6 +15,36 @@ migrate-gen msg="migration":
 cli *args:
     uv run --package zenve-cli zenve {{args}}
 
+bump-cli bump="patch":
+    #!/usr/bin/env python3
+    import subprocess, re
+    from pathlib import Path
+
+    result = subprocess.run(
+        ["git", "tag", "--sort=-v:refname", "--list", "v*"],
+        capture_output=True, text=True, cwd=".."
+    )
+    tags = [t for t in result.stdout.strip().split("\n") if re.match(r"v\d+\.\d+\.\d+$", t)]
+    if not tags:
+        print("No version tags found"); exit(1)
+
+    major, minor, patch = map(int, tags[0].lstrip("v").split("."))
+    bump = "{{bump}}"
+    if bump == "major":   major += 1; minor = 0; patch = 0
+    elif bump == "minor": minor += 1; patch = 0
+    else:                 patch += 1
+
+    new_version = f"{major}.{minor}.{patch}"
+    print(f"Last tag: {tags[0]}  →  new version: v{new_version}")
+
+    pyproject = Path("apps/cli/pyproject.toml")
+    pyproject.write_text(re.sub(r'(?<=version = ")[^"]+', new_version, pyproject.read_text()))
+
+    init = Path("apps/cli/src/zenve_cli/__init__.py")
+    init.write_text(re.sub(r'(?<=__version__ = ")[^"]+', new_version, init.read_text()))
+
+    print(f"Updated pyproject.toml and __init__.py to {new_version}")
+
 build-binary:
     uv sync --all-packages
     uv run --with pyinstaller pyinstaller apps/cli/zenve.spec --distpath apps/cli/dist --workpath /tmp/pyinstaller_build --noconfirm
