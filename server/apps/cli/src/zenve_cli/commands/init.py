@@ -18,7 +18,7 @@ from zenve_cli.commands.skill import (
 from zenve_cli.commands.snapshot import git_remote_slug, resolve_github_token
 from zenve_cli.commands.ui import WIZARD_STYLE, sep
 from zenve_cli.constants import DEFAULT_AGENTS_REPO, ZENVE_DIR
-from zenve_cli.runtime.commit import commit_zenve_dir
+from zenve_cli.runtime.commit import commit_skills, commit_zenve_dir
 from zenve_config.settings import get_settings
 from zenve_models.errors import ZenveError
 from zenve_services.agent import build_agent_files
@@ -152,6 +152,17 @@ def cmd(repo_root: Path = Path("."), description: str | None = None) -> None:
     (zenve_dir / "settings.json").parent.mkdir(parents=True, exist_ok=True)
     (zenve_dir / "settings.json").write_bytes(json.dumps(root_settings, indent=2).encode())
 
+    # Append zenve runtime files to .gitignore if not already present
+    gitignore_path = repo_root / ".gitignore"
+    gitignore_entries = [".zenve/snapshot.json", ".zenve/events.log"]
+    existing_gitignore = gitignore_path.read_text() if gitignore_path.exists() else ""
+    missing_entries = [e for e in gitignore_entries if e not in existing_gitignore.splitlines()]
+    if missing_entries:
+        with gitignore_path.open("a") as f:
+            if existing_gitignore and not existing_gitignore.endswith("\n"):
+                f.write("\n")
+            f.write("\n".join(missing_entries) + "\n")
+
     # Skills step
     skill_svc = make_skill_svc()
     try:
@@ -170,6 +181,7 @@ def cmd(repo_root: Path = Path("."), description: str | None = None) -> None:
             sep()
             install_skills(repo_root, selected_skill_ids, skill_svc)
             sep()
+            commit_skills(repo_root, "[zenve] install skills", branch=detected_branch)
 
     agent_names = list(pipeline.keys())
     if update_mode:

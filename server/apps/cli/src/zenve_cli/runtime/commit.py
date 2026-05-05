@@ -56,6 +56,23 @@ def remote_branch_exists(repo_root: Path, branch: str) -> bool:
         return False
 
 
+def commit_skills(repo_root: Path, message: str, branch: str = "main") -> bool:
+    """Stage .agents/skills/ and .claude/skills/, commit, and push. Returns True if a commit was made."""
+    paths_to_add = []
+    for p in [".agents/skills", ".claude/skills"]:
+        if (repo_root / p).exists():
+            paths_to_add.append(p)
+    if not paths_to_add:
+        return False
+    run_git(["add", *paths_to_add], repo_root)
+    out = run_git(["diff", "--cached", "--name-only"], repo_root)
+    if not out.strip():
+        return False
+    run_git(["commit", "-m", message], repo_root)
+    run_git(["push", "origin", branch], repo_root)
+    return True
+
+
 def commit_zenve_dir(repo_root: Path, message: str, branch: str = "main") -> bool:
     """Stage .zenve/, commit, and push. Returns True if a commit was made."""
     run_git(["add", ".zenve"], repo_root)

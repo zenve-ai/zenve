@@ -15,6 +15,11 @@ migrate-gen msg="migration":
 cli *args:
     uv run --package zenve-cli zenve {{args}}
 
+build-binary:
+    uv sync --all-packages
+    uv run --with pyinstaller pyinstaller apps/cli/zenve.spec --distpath apps/cli/dist --workpath /tmp/pyinstaller_build --noconfirm
+    @echo "Binary built: apps/cli/dist/zenve"
+
 install-cli:
     uv tool install --editable apps/cli \
         --with 'zenve-config @ packages/config' \
