@@ -61,13 +61,13 @@ def test_build_cli_args_with_tools():
     assert "--dangerously-skip-permissions" not in args
 
 
-def test_build_cli_args_no_tools_skips_permissions():
+def test_build_cli_args_no_tools_adds_no_tool_flags():
     adapter = ClaudeCodeAdapter()
     config = ClaudeCodeConfig()
 
     args = adapter.build_cli_args(config, "hello", "system prompt", tools=None)
 
-    assert "--dangerously-skip-permissions" in args
+    assert "--dangerously-skip-permissions" not in args
     assert "--allowedTools" not in args
 
 

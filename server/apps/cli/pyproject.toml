@@ -14,6 +14,7 @@ dependencies = [
     "zenve-services",
     "zenve-utils",
     "textual>=8.2.4",
+    "croniter>=1.4",
 ]
 
 [project.scripts]

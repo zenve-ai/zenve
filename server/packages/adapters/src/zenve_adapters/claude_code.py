@@ -264,8 +264,6 @@ class ClaudeCodeAdapter(BaseAdapter):
             args.extend(["--permission-mode", config.mode])
         if tools:
             args.extend(["--allowedTools", ",".join(tools)])
-        else:
-            args.append("--dangerously-skip-permissions")
         return args
 
     def parse_token_usage(self, stdout: str) -> dict | None:

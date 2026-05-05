@@ -1,7 +1,10 @@
 from __future__ import annotations
 
+import datetime
 import time
 from collections.abc import Callable
+
+from croniter import croniter
 
 from rich.markup import escape
 from rich.panel import Panel
@@ -62,11 +65,11 @@ class ZenveTUI(App):
         self,
         events: list[dict] | None = None,
         run_fn: Callable[[Callable[[dict], None]], None] | None = None,
-        interval_seconds: int | None = None,
+        schedule: str | None = None,
     ) -> None:
         self.replay_events = events or []
         self.run_fn = run_fn
-        self.interval_seconds = interval_seconds
+        self.schedule = schedule
 
         # Block buffering
         self.block_type: str | None = None
@@ -153,10 +156,12 @@ class ZenveTUI(App):
                     {"type": "run.failed", "agent": None, "data": {"error": str(exc)}},
                 )
 
-            if self.interval_seconds is None:
+            if self.schedule is None:
                 break
 
-            deadline = time.monotonic() + self.interval_seconds
+            now = datetime.datetime.now()
+            next_dt = croniter(self.schedule, now).get_next(datetime.datetime)
+            deadline = time.monotonic() + (next_dt - now).total_seconds()
 
             while time.monotonic() < deadline:
                 remaining = max(0.0, deadline - time.monotonic())

@@ -17,7 +17,7 @@ class ProjectSettings(BaseModel):
     default_branch: str = "main"
     commit_message_prefix: str = "[zenve]"
     run_timeout_seconds: int = 600
-    run_interval_seconds: int | None = None
+    run_schedule: str | None = None
     pipeline: dict[str, str | None] = Field(default_factory=dict)
 
 
