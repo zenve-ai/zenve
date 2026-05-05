@@ -18,10 +18,13 @@ Required:
 
 | Var | Purpose |
 |---|---|
-| `GITHUB_TOKEN` | PAT with `repo` scope |
-| `ZENVE_RUN_ID` | unique ID for this run |
-| `ZENVE_REPO_URL` | full HTTPS clone URL |
-| `ANTHROPIC_API_KEY` | for the Claude Code adapter |
+| `ZENVE_GH_TOKEN` | GitHub PAT with `repo` + `issues` scope (falls back to `gh auth token`) |
+
+Per-agent (optional):
+
+| Var | Purpose |
+|---|---|
+| `ZENVE_GH_{SLUG}` | Agent-specific GitHub token (e.g. `ZENVE_GH_CODE_REVIEW` for slug `code-review`) |
 
 Optional:
 
@@ -30,37 +33,38 @@ Optional:
 | `ZENVE_WEBHOOK_URL` | POST structured events here |
 | `ZENVE_WEBHOOK_SECRET` | HMAC-SHA256 secret for `X-Zenve-Signature` |
 
+> **Note:** Run ID is generated automatically. No `ANTHROPIC_API_KEY` needed at the CLI level — agent adapters pick up their own credentials.
+
 ## Commands
 
 ```
-zenve start                    Run all enabled agents
-zenve start --agent dev        Run only one agent
-zenve start --dry-run          Show plan, no writes
+zenve run                      Run all enabled agents
+zenve run --agent dev          Run only one agent
+zenve run --dry-run            Show plan, no writes
 zenve snapshot                 Fetch GitHub state → .zenve/snapshot.json
 zenve pipeline                 Display + validate the pipeline
 zenve status                   Last run per agent
-zenve agent list               List agents and enabled/disabled status
-zenve agent logs <name>        Run history for an agent
-zenve agent enable <name>      Enable an agent
-zenve agent disable <name>     Disable an agent
+zenve init                     Scaffold .zenve/ interactively
+zenve doctor                   Check repo setup
+zenve agents list              List agents and enabled/disabled status
+zenve agents logs <name>       Run history for an agent
+zenve agents enable <name>     Enable an agent
+zenve agents disable <name>    Disable an agent
+zenve skills list              List available skills
 ```
 
 All commands accept `--repo PATH` (default `.`).
 
 ## Repo layout expected
 
-The CLI does **not** scaffold. Author `.zenve/` by hand:
+The CLI does **not** scaffold `.zenve/` by hand — use `zenve init` instead. Expected layout:
 
 ```
 .zenve/
   settings.json              project config + pipeline map
   agents/
     {name}/
-      settings.json          label, model, picks_up, enabled
-      SOUL.md
-      AGENTS.md
-      HEARTBEAT.md
-      memory/                persisted between runs
+      settings.json          label, adapter, model, picks_up, mode
       runs/                  run result files (committed)
 ```
 
@@ -70,32 +74,32 @@ The CLI does **not** scaffold. Author `.zenve/` by hand:
 
 ```bash
 cd my-project
-export GITHUB_TOKEN=ghp_...
-export ANTHROPIC_API_KEY=sk-ant-...
-export ZENVE_RUN_ID=local_$(date +%s)
-export ZENVE_REPO_URL=https://github.com/owner/my-project
+export ZENVE_GH_TOKEN=ghp_...   # or: gh auth login
 
-uv run --package zenve-cli zenve start --dry-run
-uv run --package zenve-cli zenve start
+uv run --package zenve-cli zenve doctor
+uv run --package zenve-cli zenve run --dry-run
+uv run --package zenve-cli zenve run
 ```
 
 Or via the `justfile` at `server/`:
 
 ```bash
-just cli start --dry-run
+just cli run --dry-run
 ```
 
 ## Execution model
 
-1. Validate env.
+1. Resolve GitHub token (`ZENVE_GH_TOKEN` or `gh auth token`).
 2. Load `.zenve/settings.json` and scan `.zenve/agents/*` (skip `enabled: false`).
 3. Fetch a fresh GitHub snapshot → `.zenve/snapshot.json`.
 4. `asyncio.gather` over all enabled agents:
    - Filter snapshot by `github_label` + `picks_up`.
-   - Claim the oldest unclaimed item (assign viewer + `in-progress` label).
+   - Claim the oldest unclaimed item (`zenve:claimed` label via GitHub API).
+   - If `mode` is `artifact_pr` or `code_pr`: create a git worktree on a new branch.
    - Invoke the adapter (`claude_code` / `open_code`) against the agent dir.
-   - Write `.zenve/agents/{name}/runs/{run_id}.json`.
+   - On success: commit + push changes, open a PR (and auto-merge if `artifact_pr`).
    - Post-exit label transition using the pipeline map.
+   - Write `.zenve/agents/{name}/runs/{run_id}.json`.
 5. `git add .zenve/agents`; commit with `[zenve]` prefix; push.
 
 `--dry-run` skips claim, adapter execution, label writes, and commit.
@@ -105,3 +109,32 @@ just cli start --dry-run
 Every stage emits a structured event to `.zenve/events.log` (one JSON per line) and, if `ZENVE_WEBHOOK_URL` is set, POSTs the same JSON signed with `X-Zenve-Signature: sha256=<hmac>`.
 
 See [ARCHITECTURE.md](./ARCHITECTURE.md#event-streaming) for the event-type list.
+
+## Release workflow
+
+When tagging a new release:
+
+```bash
+# Generate/update CHANGELOG.md
+git-cliff --output CHANGELOG.md
+
+# Commit the changelog
+git add CHANGELOG.md
+git commit -m "chore: update changelog for v1.0.0"
+
+# Tag and push
+git tag v1.0.0
+git push && git push --tags
+```
+
+To preview only the next release (unreleased commits):
+
+```bash
+git-cliff --unreleased
+```
+
+To create a GitHub release with the changelog body:
+
+```bash
+git-cliff --unreleased --strip header | gh release create v1.0.0 --notes-file -
+```

@@ -1,8 +1,11 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Annotated, Optional
 
 import typer
+
+from zenve_cli import __version__
 
 from zenve_cli.commands import doctor as doctor_cmd
 from zenve_cli.commands import env as env_cmd
@@ -20,8 +23,17 @@ app.add_typer(agent_app, name="agents")
 app.add_typer(skill_app, name="skills")
 
 
+def version_callback(value: bool) -> None:
+    if value:
+        print_logo(__version__)
+        raise typer.Exit()
+
+
 @app.callback(invoke_without_command=True)
-def main(ctx: typer.Context) -> None:
+def main(
+    ctx: typer.Context,
+    version: Annotated[Optional[bool], typer.Option("--version", callback=version_callback, is_eager=True, help="Show version and exit")] = None,
+) -> None:
     if ctx.invoked_subcommand is not None and ctx.invoked_subcommand != "run":
         print_logo()
 

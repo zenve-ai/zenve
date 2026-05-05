@@ -19,7 +19,7 @@ case "$OS" in
   Darwin)
     case "$ARCH" in
       arm64) ASSET="zenve-macos-arm64" ;;
-      x86_64) ASSET="zenve-macos-x86_64" ;;
+      x86_64) echo "Intel Macs are not supported. Please use an Apple Silicon Mac (M1/M2/M3)." && exit 1 ;;
       *) echo "Unsupported architecture: $ARCH" && exit 1 ;;
     esac
     ;;
