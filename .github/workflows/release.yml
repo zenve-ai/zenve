@@ -5,6 +5,9 @@ on:
     tags:
       - "v*.*.*"
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   build:
     name: Build ${{ matrix.asset }}
@@ -17,8 +20,8 @@ jobs:
             asset: zenve-linux-x86_64
           - os: macos-latest
             asset: zenve-macos-arm64
-          - os: macos-13
-            asset: zenve-macos-x86_64
+          # - os: macos-13
+          #   asset: zenve-macos-x86_64
           - os: windows-latest
             asset: zenve-windows-x86_64.exe
 
@@ -94,5 +97,4 @@ jobs:
             |---|---|
             | Linux x86_64 | `zenve-linux-x86_64` |
             | macOS arm64 (M1/M2/M3) | `zenve-macos-arm64` |
-            | macOS x86_64 (Intel) | `zenve-macos-x86_64` |
             | Windows x86_64 | `zenve-windows-x86_64.exe` |
