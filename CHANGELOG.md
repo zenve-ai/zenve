@@ -1,4 +1,10 @@
 # Changelog
+## [Unreleased]
+
+### Documentation
+
+- **cli**: Update README to reflect new features
+
 ## [0.1.2] - 2026-05-05
 
 ### Refactoring
