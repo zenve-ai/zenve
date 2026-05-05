@@ -210,7 +210,7 @@ class ClaudeCodeAdapter(BaseAdapter):
                 msg = self.extract_error_message(payload)
                 last_error_message = msg
                 last_error_payload = payload
-                event = ("error", msg, {"type": "error", "payload": payload})
+                event = ("error", msg, {"type": "error"})
 
             if event:
                 ctx.on_event(*event)
@@ -264,6 +264,8 @@ class ClaudeCodeAdapter(BaseAdapter):
             args.extend(["--permission-mode", config.mode])
         if tools:
             args.extend(["--allowedTools", ",".join(tools)])
+        else:
+            args.append("--dangerously-skip-permissions")
         return args
 
     def parse_token_usage(self, stdout: str) -> dict | None:
