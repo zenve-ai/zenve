@@ -1,6 +1,10 @@
 from __future__ import annotations
 
+import datetime
+import time
 from collections.abc import Callable
+
+from croniter import croniter
 
 from rich.markup import escape
 from rich.panel import Panel
@@ -33,6 +37,11 @@ class ZenveTUI(App):
         color: #808080;
     }
 
+    #countdown {
+        padding: 0 2 0 2;
+        color: #808080;
+    }
+
     #agents {
         padding: 0 2 1 2;
         border-bottom: solid #3a3a3a;
@@ -56,9 +65,11 @@ class ZenveTUI(App):
         self,
         events: list[dict] | None = None,
         run_fn: Callable[[Callable[[dict], None]], None] | None = None,
+        schedule: str | None = None,
     ) -> None:
         self.replay_events = events or []
         self.run_fn = run_fn
+        self.schedule = schedule
 
         # Block buffering
         self.block_type: str | None = None
@@ -85,6 +96,7 @@ class ZenveTUI(App):
     def compose(self) -> ComposeResult:
         yield Static(LOGO, markup=False, id="logo")
         yield Static("", id="info")
+        yield Static("", id="countdown")
         yield Static("", id="agents")
         with ScrollableContainer(id="log"):
             pass
@@ -135,13 +147,55 @@ class ZenveTUI(App):
 
     def execute_run(self) -> None:
         assert self.run_fn is not None
-        try:
-            self.run_fn(self.handle_event_from_thread)
-        except Exception as exc:
-            self.call_from_thread(
-                self.handle_event_and_scroll,
-                {"type": "run.failed", "agent": None, "data": {"error": str(exc)}},
-            )
+        while True:
+            try:
+                self.run_fn(self.handle_event_from_thread)
+            except Exception as exc:
+                self.call_from_thread(
+                    self.handle_event_and_scroll,
+                    {"type": "run.failed", "agent": None, "data": {"error": str(exc)}},
+                )
+
+            if self.schedule is None:
+                break
+
+            now = datetime.datetime.now()
+            next_dt = croniter(self.schedule, now).get_next(datetime.datetime)
+            deadline = time.monotonic() + (next_dt - now).total_seconds()
+
+            while time.monotonic() < deadline:
+                remaining = max(0.0, deadline - time.monotonic())
+                mins, secs = divmod(int(remaining), 60)
+                self.call_from_thread(self._update_countdown, f"{mins}:{secs:02d}")
+                time.sleep(1)
+
+            self.call_from_thread(self._reset_for_new_run)
+
+    def _update_countdown(self, time_str: str) -> None:
+        t = Text()
+        t.append("next run in  ", style="dim")
+        t.append(time_str, style="cyan")
+        self.query_one("#countdown", Static).update(t)
+
+    def _reset_for_new_run(self) -> None:
+        log = self.query_one("#log", ScrollableContainer)
+        for child in list(log.children):
+            child.remove()
+        self.loading_widget = None
+        self.block_type = None
+        self.block_lines = []
+        self.block_agent = None
+        self.last_agent = None
+        self.run_agents = []
+        self.agent_states = {}
+        self.run_active = False
+        self.current_action = ""
+        self.run_id = ""
+        self.snapshot = {}
+        self.update_info()
+        self.update_agents()
+        self.update_status()
+        self.query_one("#countdown", Static).update("")
 
     # ── Block helpers ─────────────────────────────────────────────────────────
 

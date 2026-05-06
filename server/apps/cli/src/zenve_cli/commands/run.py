@@ -243,4 +243,4 @@ def cmd(
             data={"committed": committed, "summary": summary, "agents": len(summaries)},
         )
 
-    ZenveTUI(run_fn=run_fn).run()
+    ZenveTUI(run_fn=run_fn, schedule=project.run_schedule).run()

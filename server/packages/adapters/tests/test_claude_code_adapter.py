@@ -61,13 +61,13 @@ def test_build_cli_args_with_tools():
     assert "--dangerously-skip-permissions" not in args
 
 
-def test_build_cli_args_no_tools_skips_permissions():
+def test_build_cli_args_no_tools_adds_no_tool_flags():
     adapter = ClaudeCodeAdapter()
     config = ClaudeCodeConfig()
 
     args = adapter.build_cli_args(config, "hello", "system prompt", tools=None)
 
-    assert "--dangerously-skip-permissions" in args
+    assert "--dangerously-skip-permissions" not in args
     assert "--allowedTools" not in args
 
 
@@ -299,7 +299,7 @@ async def test_on_event_error():
     with patch("asyncio.create_subprocess_exec", new=AsyncMock(return_value=proc)):
         await ClaudeCodeAdapter().execute(ctx)
 
-    assert events == [("error", "rate limit exceeded", {"type": "error"})]
+    assert events == [("error", "rate limit exceeded", {"type": "error", "payload": {"message": "rate limit exceeded"}})]
 
 
 @pytest.mark.asyncio
