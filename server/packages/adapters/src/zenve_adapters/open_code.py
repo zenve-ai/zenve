@@ -203,7 +203,7 @@ class OpenCodeAdapter(BaseAdapter):
                         msg = str(error)
                     last_error_message = msg
                     last_error_payload = parsed
-                    event = ("error", msg, {"type": "error"})
+                    event = ("error", msg, {"type": "error", "payload": parsed})
 
                 if event:
                     ctx.on_event(*event)
@@ -243,6 +243,8 @@ class OpenCodeAdapter(BaseAdapter):
             "run",
             "--format",
             config.output_format,
+            "--agent",
+            config.mode,
         ]
         if config.model:
             args.extend(["--model", config.model])

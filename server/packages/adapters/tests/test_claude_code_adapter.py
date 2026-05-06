@@ -299,7 +299,7 @@ async def test_on_event_error():
     with patch("asyncio.create_subprocess_exec", new=AsyncMock(return_value=proc)):
         await ClaudeCodeAdapter().execute(ctx)
 
-    assert events == [("error", "rate limit exceeded", {"type": "error"})]
+    assert events == [("error", "rate limit exceeded", {"type": "error", "payload": {"message": "rate limit exceeded"}})]
 
 
 @pytest.mark.asyncio

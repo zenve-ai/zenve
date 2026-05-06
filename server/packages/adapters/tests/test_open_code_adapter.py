@@ -45,7 +45,7 @@ def test_build_cli_args_defaults():
 
     args = adapter.build_cli_args(config)
 
-    assert args == ["opencode", "run", "--format", "json"]
+    assert args == ["opencode", "run", "--format", "json", "--agent", "build"]
     assert "--model" not in args
 
 
@@ -330,7 +330,7 @@ async def test_on_event_error():
     with patch("asyncio.create_subprocess_exec", new=AsyncMock(return_value=proc)):
         await OpenCodeAdapter().execute(ctx)
 
-    assert events == [("error", "rate limit exceeded", {"type": "error"})]
+    assert events == [("error", "rate limit exceeded", {"type": "error", "payload": {"type": "error", "error": "rate limit exceeded"}})]
 
 
 @pytest.mark.asyncio
@@ -347,7 +347,7 @@ async def test_on_event_error_nested():
     with patch("asyncio.create_subprocess_exec", new=AsyncMock(return_value=proc)):
         await OpenCodeAdapter().execute(ctx)
 
-    assert events == [("error", "model unavailable", {"type": "error"})]
+    assert events == [("error", "model unavailable", {"type": "error", "payload": {"type": "error", "error": {"message": "model unavailable"}}})]
 
 
 @pytest.mark.asyncio

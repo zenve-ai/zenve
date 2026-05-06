@@ -210,7 +210,7 @@ class ClaudeCodeAdapter(BaseAdapter):
                 msg = self.extract_error_message(payload)
                 last_error_message = msg
                 last_error_payload = payload
-                event = ("error", msg, {"type": "error"})
+                event = ("error", msg, {"type": "error", "payload": payload})
 
             if event:
                 ctx.on_event(*event)
