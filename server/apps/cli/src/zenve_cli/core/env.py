@@ -4,6 +4,7 @@ import os
 import subprocess
 import uuid
 from dataclasses import dataclass
+from pathlib import Path
 
 from dotenv import load_dotenv
 
@@ -51,9 +52,7 @@ def new_run_id() -> str:
     return uuid.uuid4().hex[:12]
 
 
-def load_env(repo_root: "Path | None" = None) -> Env:
-    from pathlib import Path
-
+def load_env(repo_root: Path | None = None) -> Env:
     load_dotenv(dotenv_path=Path(repo_root or ".") / ".env")
     token = resolve_github_token()
     if not token:

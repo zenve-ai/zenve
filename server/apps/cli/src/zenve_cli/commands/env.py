@@ -22,7 +22,7 @@ def cmd(repo_root: Path) -> None:
     dotenv_vars = set(dotenv_values(dotenv_path).keys()) if dotenv_path.exists() else set()
 
     from zenve_cli.core.discovery import discover_agents
-    from zenve_cli.core.env import load_env, resolve_agent_github_token
+    from zenve_cli.core.env import load_env
 
     try:
         env = load_env(repo_root)
