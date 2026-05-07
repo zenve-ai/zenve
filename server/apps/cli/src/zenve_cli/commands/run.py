@@ -26,8 +26,10 @@ from zenve_cli.models.run_result import RunResultFile
 from zenve_cli.runtime.commit import (
     GitError,
     commit_agents,
+    commit_zenve_dir,
     fetch_origin,
-    is_working_tree_clean,
+    has_dirty_outside_zenve,
+    has_dirty_zenve,
     remote_branch_exists,
 )
 from zenve_cli.runtime.executor import DryRunResult, reconcile_claims
@@ -49,42 +51,75 @@ def cmd(
     dry_run: bool = False,
 ) -> None:
     """Run all enabled agents against a fresh GitHub snapshot."""
+    status = console.status("[cyan]starting zenve…[/cyan]", spinner="dots")
+    status.start()
     try:
+        status.update("[cyan]loading env & config…[/cyan]")
         env = load_env(repo_root)
         project = load_project_settings(repo_root)
+        status.update("[cyan]discovering agents…[/cyan]")
         agents = discover_agents(repo_root, only=agent)
     except EnvError as exc:
+        status.stop()
         typer.echo(f"✗ {exc}")
         raise typer.Exit(1) from exc
     except (ConfigError, DiscoveryError) as exc:
+        status.stop()
         typer.echo(f"✗ {exc}")
         raise typer.Exit(1) from exc
 
     if not agents:
+        status.stop()
         typer.echo("No enabled agents to run.")
         raise typer.Exit(0)
 
+    status.update("[cyan]checking git remote…[/cyan]")
     repo = git_remote_slug(repo_root)
     if not repo:
+        status.stop()
         typer.echo("✗ Could not determine repo. Ensure git remote origin is a GitHub URL.")
         raise typer.Exit(1)
 
-    if not is_working_tree_clean(repo_root):
-        typer.echo("✗ Local repo has uncommitted changes.")
+    if has_dirty_outside_zenve(repo_root):
+        status.stop()
+        typer.echo("✗ Local repo has uncommitted changes outside .zenve/.")
         typer.echo("  Zenve cannot run safely because generated worktrees/snapshots may be based on stale or mixed state.")
         typer.echo("")
         typer.echo("  Commit, stash, or discard your changes, then run again.")
         raise typer.Exit(1)
 
+    if has_dirty_zenve(repo_root):
+        status.stop()
+        if not typer.confirm("Local .zenve/ has uncommitted changes. Commit and push them before running?", default=True):
+            typer.echo("✗ Aborted. Commit, stash, or discard your .zenve/ changes, then run again.")
+            raise typer.Exit(1)
+        status.start()
+        status.update("[cyan]committing .zenve/ changes…[/cyan]")
+        try:
+            commit_zenve_dir(
+                repo_root,
+                f"{project.commit_message_prefix} update .zenve config",
+                branch=project.default_branch,
+            )
+        except GitError as exc:
+            status.stop()
+            typer.echo(f"✗ Failed to commit .zenve/ changes: {exc}")
+            raise typer.Exit(1) from exc
+
+    status.update("[cyan]fetching origin…[/cyan]")
     try:
         fetch_origin(repo_root)
     except GitError as exc:
+        status.stop()
         typer.echo(f"✗ git fetch origin failed: {exc}")
         raise typer.Exit(1) from exc
 
     if not remote_branch_exists(repo_root, project.default_branch):
+        status.stop()
         typer.echo(f"✗ Remote branch origin/{project.default_branch} not found after fetch.")
         raise typer.Exit(1)
+
+    status.stop()
 
     env_vars = {"ZENVE_RUN_ID": env.run_id, "GH_TOKEN": env.github_token}
 

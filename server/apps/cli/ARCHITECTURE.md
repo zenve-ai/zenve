@@ -632,6 +632,15 @@ git push origin main
 
 Code changes always go through PRs. Zenve never commits directly to main.
 
+### Pre-run Working-Tree Check
+
+`zenve run` splits the working tree into two zones before fetching:
+
+- **Outside `.zenve/`** — must be clean. Any uncommitted change (staged or unstaged) aborts the run. This protects the worktree-based agents and the post-merge `reset --hard origin/{branch}` from running against mixed local state.
+- **Inside `.zenve/`** — uncommitted changes (e.g. an edited `settings.json`) are allowed. The CLI prompts for confirmation, then commits and pushes them as `[zenve] update .zenve config` via `commit_zenve_dir()` *before* `fetch_origin`. Without this up-front commit, the post-merge `reset --hard` triggered by an `artifact_pr` agent would silently wipe the local edits.
+
+Decline the prompt and the run aborts — same outcome as before, just with a path forward that doesn't require manually committing config tweaks.
+
 ---
 
 ## CLI Commands

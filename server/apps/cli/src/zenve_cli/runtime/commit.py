@@ -26,10 +26,16 @@ def has_changes(repo_root: Path) -> bool:
     return bool(out.strip())
 
 
-def is_working_tree_clean(repo_root: Path) -> bool:
-    """Return True if the working tree has no uncommitted changes (staged or unstaged)."""
-    out = run_git(["status", "--porcelain"], repo_root)
-    return not bool(out.strip())
+def has_dirty_zenve(repo_root: Path) -> bool:
+    """Return True if `.zenve/` has uncommitted changes (staged or unstaged)."""
+    out = run_git(["status", "--porcelain", "--", ".zenve"], repo_root)
+    return bool(out.strip())
+
+
+def has_dirty_outside_zenve(repo_root: Path) -> bool:
+    """Return True if any uncommitted change exists outside `.zenve/`."""
+    out = run_git(["status", "--porcelain", "--", ":(exclude).zenve", "."], repo_root)
+    return bool(out.strip())
 
 
 def fetch_origin(repo_root: Path) -> None:
