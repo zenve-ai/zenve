@@ -10,7 +10,7 @@ from rich.text import Text
 
 from zenve_cli.commands.snapshot import resolve_github_token
 from zenve_cli.commands.ui import WIZARD_STYLE, sep
-from zenve_cli.constants import DEFAULT_AGENTS_REPO
+from zenve_cli.constants import DEFAULT_AGENTS_PATH, DEFAULT_REGISTRY_REPO
 from zenve_cli.core.config import zenve_dir
 from zenve_cli.core.discovery import AGENTS_SUBDIR, discover_agents
 from zenve_cli.models.settings import AgentSettings
@@ -220,11 +220,11 @@ def add(
     # Fetch templates
     settings = get_settings().model_copy(
         update={
-            "github_agents_repo": get_settings().github_agents_repo or DEFAULT_AGENTS_REPO,
+            "github_agents_repo": get_settings().github_agents_repo or DEFAULT_REGISTRY_REPO,
             "github_token": get_settings().github_token or resolve_github_token(),
         }
     )
-    svc = GitHubTemplateService(settings)
+    svc = GitHubTemplateService(settings, base_path=DEFAULT_AGENTS_PATH)
 
     try:
         templates = svc.list_templates()
@@ -349,11 +349,11 @@ def update(
     # Fetch templates
     settings = get_settings().model_copy(
         update={
-            "github_agents_repo": get_settings().github_agents_repo or DEFAULT_AGENTS_REPO,
+            "github_agents_repo": get_settings().github_agents_repo or DEFAULT_REGISTRY_REPO,
             "github_token": get_settings().github_token or resolve_github_token(),
         }
     )
-    svc = GitHubTemplateService(settings)
+    svc = GitHubTemplateService(settings, base_path=DEFAULT_AGENTS_PATH)
 
     try:
         templates = svc.list_templates()

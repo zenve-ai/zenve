@@ -11,8 +11,9 @@ AGENTS_SKILLS_DIR = ".agents/skills"
 CLAUDE_SKILLS_DIR = ".claude/skills"
 
 # --- Remote repos ---
-DEFAULT_AGENTS_REPO = "zenve-ai/zenve-agents"
-DEFAULT_SKILLS_REPO = "zenve-ai/zenve-skills"
+DEFAULT_REGISTRY_REPO = "zenve-ai/zenve-registry"
+DEFAULT_AGENTS_PATH = "agents"
+DEFAULT_SKILLS_PATH = "skills"
 
 # --- GitHub API ---
 GITHUB_API = "https://api.github.com"

@@ -21,9 +21,21 @@ CACHE_TTL = 300.0
 
 
 class GitHubTemplateService:
-    def __init__(self, settings: Settings) -> None:
+    def __init__(self, settings: Settings, base_path: str = "") -> None:
         self.repo = settings.github_agents_repo
         self.token = settings.github_token
+        self.base_path = base_path.strip("/")
+
+    def full_path(self, path: str) -> str:
+        path = path.strip("/")
+        if not self.base_path:
+            return path
+        return f"{self.base_path}/{path}" if path else self.base_path
+
+    def full_prefix(self, prefix: str) -> str:
+        if not self.base_path:
+            return prefix
+        return f"{self.base_path}/{prefix}"
 
     def is_enabled(self) -> bool:
         return bool(self.repo)
@@ -58,7 +70,7 @@ class GitHubTemplateService:
         return data
 
     def list_repo_dir(self, path: str) -> list[dict]:
-        url = f"{GITHUB_API}/repos/{self.repo}/contents/{path}"
+        url = f"{GITHUB_API}/repos/{self.repo}/contents/{self.full_path(path)}"
         result = self.cached_get(url)
         if not isinstance(result, list):
             raise NotFoundError(f"Path '{path}' is not a directory")
@@ -75,10 +87,11 @@ class GitHubTemplateService:
         tree_url = f"{GITHUB_API}/repos/{self.repo}/git/trees/{tree_sha}"
         tree_data = self.cached_get(tree_url, params={"recursive": "1"})
         tree = tree_data["tree"]  # type: ignore[index]
+        full = self.full_prefix(prefix)
         return [
             item
             for item in tree
-            if item.get("type") == "blob" and item.get("path", "").startswith(prefix)
+            if item.get("type") == "blob" and item.get("path", "").startswith(full)
         ]
 
     def fetch_blob_bytes(self, blob_url: str) -> bytes:
@@ -98,7 +111,7 @@ class GitHubTemplateService:
     def read_manifest(self, template_id: str) -> dict:
         import base64
 
-        url = f"{GITHUB_API}/repos/{self.repo}/contents/{template_id}/manifest.yaml"
+        url = f"{GITHUB_API}/repos/{self.repo}/contents/{self.full_path(template_id)}/manifest.yaml"
         try:
             file_data = self.cached_get(url)
             content = base64.b64decode(file_data["content"]).decode("utf-8")  # type: ignore[index]
@@ -131,7 +144,7 @@ class GitHubTemplateService:
         return templates
 
     def get_template(self, template_id: str) -> GitHubTemplateSummary:
-        url = f"{GITHUB_API}/repos/{self.repo}/contents/{template_id}"
+        url = f"{GITHUB_API}/repos/{self.repo}/contents/{self.full_path(template_id)}"
         entry = self.cached_get(url)
         if isinstance(entry, dict) and entry.get("type") != "dir":
             raise NotFoundError(f"Template '{template_id}' not found")
@@ -154,11 +167,12 @@ class GitHubTemplateService:
     def fetch_template_files(self, template_id: str) -> dict[str, bytes]:
         """Return all non-manifest files from {template_id}/ as in-memory bytes."""
         prefix = f"{template_id}/"
+        full_prefix = self.full_prefix(prefix)
         blobs = self.list_tree_blobs(prefix)
         files: dict[str, bytes] = {}
 
         for blob in blobs:
-            relative = blob["path"][len(prefix) :]
+            relative = blob["path"][len(full_prefix) :]
             if relative in ("manifest.yaml", "manifest.json"):
                 continue
             files[relative] = self.fetch_blob_bytes(blob["url"])
@@ -172,6 +186,7 @@ class GitHubTemplateService:
         base_path: str,
     ) -> str:
         prefix = f"{template_id}/"
+        full_prefix = self.full_prefix(prefix)
         blobs = self.list_tree_blobs(prefix)
 
         agent_dir = Path(base_path) / "agents" / agent_slug
@@ -181,7 +196,7 @@ class GitHubTemplateService:
 
         for blob in blobs:
             blob_path = blob["path"]
-            relative = blob_path[len(prefix) :]
+            relative = blob_path[len(full_prefix) :]
             if relative == "manifest.yaml":
                 continue
             dest = agent_dir / relative
@@ -197,7 +212,7 @@ class GitHubTemplateService:
     def read_skill_frontmatter(self, skill_id: str) -> dict:
         import base64
 
-        url = f"{GITHUB_API}/repos/{self.repo}/contents/{skill_id}/SKILL.md"
+        url = f"{GITHUB_API}/repos/{self.repo}/contents/{self.full_path(skill_id)}/SKILL.md"
         try:
             file_data = self.cached_get(url)
             content = base64.b64decode(file_data["content"]).decode("utf-8")  # type: ignore[index]
@@ -228,9 +243,10 @@ class GitHubTemplateService:
     def fetch_skill_files(self, skill_id: str) -> dict[str, bytes]:
         """Return all files from {skill_id}/ recursively as in-memory bytes."""
         prefix = f"{skill_id}/"
+        full_prefix = self.full_prefix(prefix)
         blobs = self.list_tree_blobs(prefix)
         files: dict[str, bytes] = {}
         for blob in blobs:
-            relative = blob["path"][len(prefix):]
+            relative = blob["path"][len(full_prefix):]
             files[relative] = self.fetch_blob_bytes(blob["url"])
         return files

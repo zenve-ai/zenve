@@ -17,7 +17,7 @@ from zenve_cli.commands.skill import (
 )
 from zenve_cli.commands.snapshot import git_remote_slug, resolve_github_token
 from zenve_cli.commands.ui import WIZARD_STYLE, sep
-from zenve_cli.constants import DEFAULT_AGENTS_REPO, ZENVE_DIR
+from zenve_cli.constants import DEFAULT_AGENTS_PATH, DEFAULT_REGISTRY_REPO, ZENVE_DIR
 from zenve_cli.runtime.commit import commit_skills, commit_zenve_dir
 from zenve_config.settings import get_settings
 from zenve_models.errors import ZenveError
@@ -61,11 +61,11 @@ def cmd(repo_root: Path = Path("."), description: str | None = None) -> None:
     # Load templates early so the list is ready before prompts begin
     settings = get_settings().model_copy(
         update={
-            "github_agents_repo": get_settings().github_agents_repo or DEFAULT_AGENTS_REPO,
+            "github_agents_repo": get_settings().github_agents_repo or DEFAULT_REGISTRY_REPO,
             "github_token": get_settings().github_token or resolve_github_token(),
         }
     )
-    svc = GitHubTemplateService(settings)
+    svc = GitHubTemplateService(settings, base_path=DEFAULT_AGENTS_PATH)
 
     try:
         templates = svc.list_templates()
@@ -77,7 +77,8 @@ def cmd(repo_root: Path = Path("."), description: str | None = None) -> None:
 
     if not templates:
         console.print(
-            "[red]✗[/red] No agent templates found in zenve-ai/zenve-agents.", highlight=False
+            f"[red]✗[/red] No agent templates found in {settings.github_agents_repo}/{DEFAULT_AGENTS_PATH}.",
+            highlight=False,
         )
         raise typer.Exit(1)
 

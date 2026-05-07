@@ -9,7 +9,7 @@ from rich.text import Text
 
 from zenve_cli.commands.snapshot import resolve_github_token
 from zenve_cli.commands.ui import WIZARD_STYLE, sep
-from zenve_cli.constants import DEFAULT_SKILLS_REPO
+from zenve_cli.constants import DEFAULT_REGISTRY_REPO, DEFAULT_SKILLS_PATH
 from zenve_config.settings import get_settings
 from zenve_models.errors import ZenveError
 from zenve_models.github_template import SkillSummary
@@ -30,11 +30,11 @@ def installed_skill_names(repo_root: Path) -> set[str]:
 def make_skill_svc() -> GitHubTemplateService:
     settings = get_settings().model_copy(
         update={
-            "github_agents_repo": DEFAULT_SKILLS_REPO,
+            "github_agents_repo": get_settings().github_agents_repo or DEFAULT_REGISTRY_REPO,
             "github_token": get_settings().github_token or resolve_github_token(),
         }
     )
-    return GitHubTemplateService(settings)
+    return GitHubTemplateService(settings, base_path=DEFAULT_SKILLS_PATH)
 
 
 def collect_skills_wizard(

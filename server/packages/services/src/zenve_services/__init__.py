@@ -34,7 +34,7 @@ def get_api_key_service(db: Session = Depends(get_db)) -> ApiKeyService:
 def get_template_service(
     settings: Settings = Depends(get_settings),
 ) -> GitHubTemplateService:
-    return GitHubTemplateService(settings)
+    return GitHubTemplateService(settings, base_path="agents")
 
 
 def get_repo_writer_service() -> RepoWriterService:
