@@ -370,8 +370,9 @@ def handle_worktree_pr(
                 if not error_text:
                     error_text = str(exc)
     finally:
+        delete_branch = worktree_branch if item.kind == "issue" else None
         try:
-            remove_worktree(repo_root, worktree_path)
+            remove_worktree(repo_root, worktree_path, branch=delete_branch)
         except GitError:
             pass
     return status, error_text
@@ -683,8 +684,13 @@ async def run_agent(
         )
         write_run_result(agent, run_result)
         if worktree_path is not None:
+            delete_branch = (
+                worktree_branch
+                if item is not None and item.kind == "issue" and worktree_branch
+                else None
+            )
             try:
-                remove_worktree(repo_root, worktree_path)
+                remove_worktree(repo_root, worktree_path, branch=delete_branch)
             except GitError:
                 pass
         return run_result

@@ -8,7 +8,18 @@ from zenve_cli.runtime.commit import GitError, run_git  # noqa: F401
 
 def create_worktree(repo_root: Path, path: Path, branch: str, base: str) -> None:
     run_git(["fetch", "origin", base], repo_root)
-    run_git(["worktree", "add", "-b", branch, str(path), f"origin/{base}"], repo_root)
+    try:
+        run_git(["worktree", "add", "-b", branch, str(path), f"origin/{base}"], repo_root)
+    except GitError:
+        delete_local_branch(repo_root, branch)
+        run_git(["worktree", "add", "-b", branch, str(path), f"origin/{base}"], repo_root)
+
+
+def delete_local_branch(repo_root: Path, branch: str) -> None:
+    try:
+        run_git(["branch", "-D", branch], repo_root)
+    except GitError:
+        pass
 
 
 def create_readonly_worktree(repo_root: Path, path: Path, branch: str) -> None:
@@ -26,8 +37,10 @@ def create_writable_worktree(repo_root: Path, path: Path, branch: str) -> None:
     run_git(["worktree", "add", "-B", branch, str(path), f"origin/{branch}"], repo_root)
 
 
-def remove_worktree(repo_root: Path, path: Path) -> None:
+def remove_worktree(repo_root: Path, path: Path, branch: str | None = None) -> None:
     run_git(["worktree", "remove", "--force", str(path)], repo_root)
+    if branch:
+        delete_local_branch(repo_root, branch)
 
 
 def stage_changes(path: Path) -> list[str]:
