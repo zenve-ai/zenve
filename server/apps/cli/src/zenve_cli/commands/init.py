@@ -22,6 +22,7 @@ from zenve_cli.runtime.commit import commit_skills, commit_zenve_dir
 from zenve_config.settings import get_settings
 from zenve_models.errors import ZenveError
 from zenve_services.agent import build_agent_files
+from zenve_services.agent_lock import AgentLockService
 from zenve_services.scaffolding import ScaffoldingService
 from zenve_services.template import GitHubTemplateService
 from zenve_utils.scaffolding import slugify
@@ -156,10 +157,14 @@ def cmd(repo_root: Path = Path("."), description: str | None = None) -> None:
     sep()
 
     scaffold = ScaffoldingService()
+    lock = AgentLockService(zenve_dir)
+    commit_sha = svc.get_head_sha()
+    source = svc.repo or DEFAULT_REGISTRY_REPO
     existing_pipeline: dict = existing_settings.get("pipeline", {}) if update_mode else {}
     pipeline: dict[str, None] = {}
 
     for agent_name, template_id in agent_specs:
+        used_template_id: str | None = template_id
         try:
             agent_slug, files = build_agent_files(agent_name, template_id, svc)
         except ZenveError as exc:
@@ -167,8 +172,17 @@ def cmd(repo_root: Path = Path("."), description: str | None = None) -> None:
                 f"[yellow]Warning:[/yellow] could not fetch template '{template_id}': {exc.message}"
             )
             agent_slug, files = build_agent_files(agent_name, None, svc)
+            used_template_id = None
         pipeline[f"zenve:{agent_slug}"] = None
         scaffold.write_agent_files(zenve_dir, agent_slug, files)
+        if used_template_id is not None:
+            lock.record_install(
+                slug=agent_slug,
+                template_id=used_template_id,
+                files=files,
+                source=source,
+                commit_sha=commit_sha,
+            )
 
     # Root settings.json — init-specific (project slug, branch, description from wizard)
     merged_pipeline = existing_pipeline | pipeline

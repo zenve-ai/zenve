@@ -18,12 +18,40 @@ from zenve_cli.runtime.commit import GitError, commit_zenve_dir
 from zenve_config.settings import get_settings
 from zenve_models.errors import ZenveError
 from zenve_services.agent import build_agent_files
+from zenve_services.agent_lock import AgentLockService
 from zenve_services.scaffolding import ScaffoldingService
 from zenve_services.template import GitHubTemplateService
 from zenve_utils.scaffolding import slugify
 
 agent_app = typer.Typer(help="Agent management commands")
 console = Console()
+
+
+def _make_template_service() -> GitHubTemplateService:
+    settings = get_settings().model_copy(
+        update={
+            "github_agents_repo": get_settings().github_agents_repo or DEFAULT_REGISTRY_REPO,
+            "github_token": get_settings().github_token or resolve_github_token(),
+        }
+    )
+    return GitHubTemplateService(settings, base_path=DEFAULT_AGENTS_PATH)
+
+
+def _resolve_template_slug(t) -> str:
+    return t.slug or slugify(t.name if getattr(t, "name", None) else t.id)
+
+
+def _do_commit(repo_root: Path, message: str, branch: str) -> None:
+    try:
+        committed = commit_zenve_dir(repo_root, message, branch=branch)
+        if committed:
+            console.print(
+                "[cyan]◆[/cyan] [white]Committed and pushed [cyan].zenve/[/cyan][/white]"
+            )
+        else:
+            console.print("[yellow]◆[/yellow] [white]Nothing to commit[/white]")
+    except GitError as exc:
+        console.print(f"[red]✗[/red] Git error: {exc}")
 
 
 def iter_agent_dirs(repo_root: Path) -> list[Path]:
@@ -192,8 +220,8 @@ def disable(name: str, repo_root: Path = typer.Option(Path("."), "--repo")) -> N
 @agent_app.command("add")
 def add(
     repo_root: Path = typer.Option(Path("."), "--repo"),
-    override: bool = typer.Option(
-        False, "--override", help="Show and re-install already-installed agents"
+    agent: str | None = typer.Option(
+        None, "--agent", help="Install a specific template by slug (skips wizard)"
     ),
 ) -> None:
     """Add new agents to an already-initialized project."""
@@ -204,27 +232,18 @@ def add(
         )
         raise typer.Exit(1)
 
-    # Load existing settings and pipeline
     try:
         existing_settings: dict = json.loads((zdir / "settings.json").read_bytes())
     except Exception:
         existing_settings = {}
     existing_pipeline: dict = existing_settings.get("pipeline", {})
 
-    # Collect already-installed agent slugs
     agents_dir = zdir / "agents"
     existing_agent_slugs: set[str] = set()
     if agents_dir.exists():
         existing_agent_slugs = {p.name for p in agents_dir.iterdir() if p.is_dir()}
 
-    # Fetch templates
-    settings = get_settings().model_copy(
-        update={
-            "github_agents_repo": get_settings().github_agents_repo or DEFAULT_REGISTRY_REPO,
-            "github_token": get_settings().github_token or resolve_github_token(),
-        }
-    )
-    svc = GitHubTemplateService(settings, base_path=DEFAULT_AGENTS_PATH)
+    svc = _make_template_service()
 
     try:
         templates = svc.list_templates()
@@ -238,35 +257,50 @@ def add(
         console.print("[red]✗[/red] No agent templates found.", highlight=False)
         raise typer.Exit(1)
 
-    # Check if all templates are already installed (and override not requested)
-    if not override:
+    # --agent SLUG: non-interactive single install
+    if agent is not None:
+        match = next(
+            (t for t in templates if t.id == agent or _resolve_template_slug(t) == agent),
+            None,
+        )
+        if match is None:
+            console.print(
+                f"[red]✗[/red] No template found for slug [bold]{agent}[/bold]."
+            )
+            raise typer.Exit(1)
+        target_slug = _resolve_template_slug(match)
+        if target_slug in existing_agent_slugs:
+            console.print(
+                f"[yellow]◆[/yellow] Agent [bold]{target_slug}[/bold] is already installed. "
+                f"Use [bold]zenve agents update --agent {target_slug}[/bold] to re-fetch."
+            )
+            raise typer.Exit(0)
+        agent_specs = [(match.name if getattr(match, "name", None) else match.id, match.id)]
+    else:
         available_templates = [
-            t
-            for t in templates
-            if (t.slug or slugify(t.name if hasattr(t, "name") and t.name else t.id))
-            not in existing_agent_slugs
+            t for t in templates if _resolve_template_slug(t) not in existing_agent_slugs
         ]
         if not available_templates:
             console.print(
-                "[dim]All available agents are already installed. Use [bold]--override[/bold] to re-install.[/dim]"
+                "[dim]All available agents are already installed. "
+                "Use [bold]zenve agents update[/bold] to re-fetch.[/dim]"
             )
             raise typer.Exit(0)
 
-    # Run agent selector wizard
-    agent_specs = collect_agents_wizard(
-        templates,
-        existing_slugs=None if override else existing_agent_slugs,
-    )
+        agent_specs = collect_agents_wizard(templates, existing_slugs=existing_agent_slugs)
+        sep()
+        if not agent_specs:
+            console.print("[dim]No agents selected.[/dim]")
+            raise typer.Exit(0)
 
-    if not agent_specs:
-        console.print("[dim]No agents selected.[/dim]")
-        raise typer.Exit(0)
-
-    # Scaffold selected agents
+    # Scaffold + record lock
     console.print("[cyan]◆[/cyan] [white]Scaffolding agent files...[/white]")
     sep()
 
     scaffold = ScaffoldingService()
+    lock = AgentLockService(zdir)
+    commit_sha = svc.get_head_sha()
+    source = svc.repo or DEFAULT_REGISTRY_REPO
     pipeline: dict[str, None] = {}
 
     for agent_name, template_id in agent_specs:
@@ -277,14 +311,26 @@ def add(
                 f"[yellow]Warning:[/yellow] could not fetch template '{template_id}': {exc.message}"
             )
             agent_slug, files = build_agent_files(agent_name, None, svc)
+            template_id = None
         pipeline[f"zenve:{agent_slug}"] = None
         scaffold.write_agent_files(zdir, agent_slug, files)
+        if template_id is not None:
+            lock.record_install(
+                slug=agent_slug,
+                template_id=template_id,
+                files=files,
+                source=source,
+                commit_sha=commit_sha,
+            )
+        console.print(f"  [green]✓[/green] [white]{agent_slug}[/white]")
 
     scaffold.update_pipeline(zdir, pipeline)
 
     added_slugs = list(pipeline.keys() - set(existing_pipeline.keys()))
+    sep()
     console.print(
-        f"[cyan]◆[/cyan] [white]Added {len(added_slugs)} agent(s): {', '.join(added_slugs)}[/white]"
+        f"[cyan]◆[/cyan] [white]Added {len(added_slugs)} agent(s): "
+        f"{', '.join(added_slugs)}[/white]"
     )
     sep()
 
@@ -298,20 +344,11 @@ def add(
 
     if do_commit:
         branch = existing_settings.get("default_branch", "main")
-        try:
-            committed = commit_zenve_dir(
-                repo_root,
-                f"[zenve] add {len(added_slugs)} agent(s): {', '.join(added_slugs)}",
-                branch=branch,
-            )
-            if committed:
-                console.print(
-                    "[cyan]◆[/cyan] [white]Committed and pushed [cyan].zenve/[/cyan] — activated[/white]"
-                )
-            else:
-                console.print("[yellow]◆[/yellow] [white]Nothing to commit[/white]")
-        except GitError as exc:
-            console.print(f"[red]✗[/red] Git error: {exc}")
+        _do_commit(
+            repo_root,
+            f"[zenve] add {len(added_slugs)} agent(s): {', '.join(added_slugs)}",
+            branch=branch,
+        )
     else:
         console.print(
             "[cyan]◆[/cyan] [white]Commit and push [cyan].zenve/[/cyan] to activate[/white]"
@@ -319,11 +356,30 @@ def add(
     console.print()
 
 
+_STATUS_LABEL = {
+    "clean": ("clean", "dim green"),
+    "modified": ("modified", "yellow"),
+    "unknown": ("not in lock", "magenta"),
+    "missing": ("missing", "red"),
+}
+
+
 @agent_app.command("update")
 def update(
     repo_root: Path = typer.Option(Path("."), "--repo"),
+    agent: str | None = typer.Option(
+        None, "--agent", help="Update a specific agent by slug (skips wizard)"
+    ),
+    force: bool = typer.Option(
+        False, "--force", help="Overwrite even if local files were modified"
+    ),
 ) -> None:
-    """Re-fetch installed agents from GitHub templates (pick which ones to update)."""
+    """Re-fetch installed agents from registry templates.
+
+    Per-agent merge: clean agents are overwritten silently; modified agents
+    prompt for confirmation (the entire agent dir is overwritten as a unit).
+    settings.json is always merged to preserve user-tunable keys.
+    """
     zdir = zenve_dir(repo_root)
     if not zdir.exists():
         console.print(
@@ -340,20 +396,13 @@ def update(
         console.print("[dim]No installed agents found.[/dim]")
         raise typer.Exit(0)
 
-    # Load existing settings
     try:
         existing_settings: dict = json.loads((zdir / "settings.json").read_bytes())
     except Exception:
         existing_settings = {}
 
-    # Fetch templates
-    settings = get_settings().model_copy(
-        update={
-            "github_agents_repo": get_settings().github_agents_repo or DEFAULT_REGISTRY_REPO,
-            "github_token": get_settings().github_token or resolve_github_token(),
-        }
-    )
-    svc = GitHubTemplateService(settings, base_path=DEFAULT_AGENTS_PATH)
+    svc = _make_template_service()
+    lock = AgentLockService(zdir)
 
     try:
         templates = svc.list_templates()
@@ -363,48 +412,93 @@ def update(
         )
         raise typer.Exit(1)  # noqa: B904
 
-    # Filter to only templates that match installed agents
-    installed_templates = [
-        t
-        for t in templates
-        if (t.slug or slugify(t.name if hasattr(t, "name") and t.name else t.id)) in existing_agent_slugs
-    ]
+    # Map: installed slug -> template
+    installed_templates: dict[str, object] = {}
+    for t in templates:
+        slug = _resolve_template_slug(t)
+        if slug in existing_agent_slugs:
+            installed_templates[slug] = t
 
     if not installed_templates:
         console.print("[dim]No installed agents match any available template.[/dim]")
         raise typer.Exit(0)
 
-    # Let user pick which installed agents to update
-    choices = [
-        questionary.Choice(
-            title=t.name if hasattr(t, "name") and t.name else t.id,
-            value=t,
-        )
-        for t in installed_templates
-    ]
+    # Resolve selection
+    if agent is not None:
+        if agent not in installed_templates:
+            console.print(
+                f"[red]✗[/red] Agent [bold]{agent}[/bold] is not installed or has no matching template."
+            )
+            raise typer.Exit(1)
+        selected_slugs = [agent]
+    else:
+        choices = []
+        for slug, t in installed_templates.items():
+            status = lock.status(slug)
+            label, style = _STATUS_LABEL[status]
+            title = Text()
+            title.append(slug, style="white")
+            title.append("  ")
+            title.append(f"({label})", style=style)
+            choices.append(questionary.Choice(title=title.plain, value=slug))
 
-    selected = questionary.checkbox(
-        "Select agents to update",
-        choices=choices,
-        style=WIZARD_STYLE,
-        qmark="◆",
-    ).ask()
+        selected_slugs = questionary.checkbox(
+            "Select agents to update",
+            choices=choices,
+            style=WIZARD_STYLE,
+            qmark="◆",
+        ).ask()
+        sep()
 
-    sep()
+        if not selected_slugs:
+            console.print("[dim]No agents selected.[/dim]")
+            raise typer.Exit(0)
 
-    if not selected:
-        console.print("[dim]No agents selected.[/dim]")
+    # Filter by status with prompts (unless --force)
+    to_update: list[str] = []
+    for slug in selected_slugs:
+        status = lock.status(slug)
+        if status == "clean" or force:
+            to_update.append(slug)
+            continue
+        if status == "modified":
+            ok = questionary.confirm(
+                f"{slug} has local modifications — overwrite the entire agent?",
+                default=False,
+                style=WIZARD_STYLE,
+                qmark="◆",
+            ).ask()
+        elif status == "unknown":
+            ok = questionary.confirm(
+                f"{slug} is not in agents-lock.json — overwrite anyway?",
+                default=False,
+                style=WIZARD_STYLE,
+                qmark="◆",
+            ).ask()
+        else:  # missing
+            ok = False
+        if ok:
+            to_update.append(slug)
+        else:
+            console.print(f"  [dim]↷[/dim] [dim]{slug} skipped[/dim]")
+
+    if not to_update:
+        console.print("[dim]Nothing to update.[/dim]")
         raise typer.Exit(0)
 
+    sep()
     console.print("[cyan]◆[/cyan] [white]Updating agent files...[/white]")
     sep()
 
     scaffold = ScaffoldingService()
+    commit_sha = svc.get_head_sha()
+    source = svc.repo or DEFAULT_REGISTRY_REPO
     updated_slugs: list[str] = []
 
-    for template in selected:
+    for slug in to_update:
+        template = installed_templates[slug]
         template_id = template.id
-        agent_name = template.name if hasattr(template, "name") and template.name else template_id
+        agent_name = template.name if getattr(template, "name", None) else template_id
         try:
             agent_slug, files = build_agent_files(agent_name, template_id, svc)
         except ZenveError as exc:
@@ -413,12 +507,20 @@ def update(
             )
             continue
         scaffold.write_agent_files_with_merge(zdir, agent_slug, files)
+        lock.record_install(
+            slug=agent_slug,
+            template_id=template_id,
+            files=files,
+            source=source,
+            commit_sha=commit_sha,
+        )
         updated_slugs.append(agent_slug)
         console.print(f"  [green]✓[/green] [white]{agent_slug}[/white]")
 
     sep()
     console.print(
-        f"[cyan]◆[/cyan] [white]Updated {len(updated_slugs)} agent(s): {', '.join(updated_slugs)}[/white]"
+        f"[cyan]◆[/cyan] [white]Updated {len(updated_slugs)} agent(s): "
+        f"{', '.join(updated_slugs)}[/white]"
     )
     sep()
 
@@ -432,20 +534,11 @@ def update(
 
     if do_commit:
         branch = existing_settings.get("default_branch", "main")
-        try:
-            committed = commit_zenve_dir(
-                repo_root,
-                f"[zenve] update {len(updated_slugs)} agent(s): {', '.join(updated_slugs)}",
-                branch=branch,
-            )
-            if committed:
-                console.print(
-                    "[cyan]◆[/cyan] [white]Committed and pushed [cyan].zenve/[/cyan][/white]"
-                )
-            else:
-                console.print("[yellow]◆[/yellow] [white]Nothing to commit[/white]")
-        except GitError as exc:
-            console.print(f"[red]✗[/red] Git error: {exc}")
+        _do_commit(
+            repo_root,
+            f"[zenve] update {len(updated_slugs)} agent(s): {', '.join(updated_slugs)}",
+            branch=branch,
+        )
     else:
         console.print(
             "[cyan]◆[/cyan] [white]Commit and push [cyan].zenve/[/cyan] to activate[/white]"
