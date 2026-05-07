@@ -184,6 +184,7 @@ def build_run_context(
         agent_name=agent.settings.name,
         project_slug=project.project,
         project_description=project.description,
+        project_stack=list(project.stack),
         run_id=run_id,
         adapter_type=agent.settings.adapter_type,
         adapter_config=config,

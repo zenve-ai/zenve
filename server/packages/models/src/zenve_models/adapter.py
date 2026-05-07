@@ -86,6 +86,7 @@ class RunContext:
     message: str | None
     heartbeat: bool
     project_description: str = ""
+    project_stack: list[str] = field(default_factory=list)
     tools: list[str] | None = None  # None = all tools allowed
     env_vars: dict = field(default_factory=dict)
     on_event: Callable[[str, str | None, dict | None], None] = field(default=lambda *a, **kw: None)

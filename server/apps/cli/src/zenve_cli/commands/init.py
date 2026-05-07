@@ -28,6 +28,34 @@ from zenve_utils.scaffolding import slugify
 
 console = Console()
 
+STACK_CHOICES = [
+    "react",
+    "python",
+    "fastapi",
+    "node",
+    "typescript",
+    "swift",
+    "kotlin",
+    "ruby",
+    "go",
+    "java",
+]
+
+
+def collect_stack_wizard(default: list[str] | None = None) -> list[str]:
+    default_set = set(default or [])
+    choices = [
+        questionary.Choice(title=s, value=s, checked=s in default_set) for s in STACK_CHOICES
+    ]
+    selected = questionary.checkbox(
+        "Project stack",
+        choices=choices,
+        style=WIZARD_STYLE,
+        qmark="◆",
+        instruction="(space to toggle, enter to confirm)",
+    ).ask()
+    return selected or []
+
 
 def git_current_branch() -> str:
     try:
@@ -115,6 +143,9 @@ def cmd(repo_root: Path = Path("."), description: str | None = None) -> None:
         if description is None:
             raise typer.Exit(1)
 
+    stack = collect_stack_wizard(existing_settings.get("stack") or [])
+    sep()
+
     agent_specs = collect_agents_wizard(templates, existing_agent_slugs if update_mode else None)
     if not agent_specs and not update_mode:
         console.print("[red]✗[/red] No agents selected.", highlight=False)
@@ -149,6 +180,7 @@ def cmd(repo_root: Path = Path("."), description: str | None = None) -> None:
         "commit_message_prefix": existing_settings.get("commit_message_prefix", "[zenve]"),
         "run_timeout_seconds": existing_settings.get("run_timeout_seconds", 600),
         "pipeline": merged_pipeline,
+        "stack": stack,
     }
     (zenve_dir / "settings.json").parent.mkdir(parents=True, exist_ok=True)
     (zenve_dir / "settings.json").write_bytes(json.dumps(root_settings, indent=2).encode())

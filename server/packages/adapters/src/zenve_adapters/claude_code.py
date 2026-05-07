@@ -67,6 +67,7 @@ class ClaudeCodeAdapter(BaseAdapter):
             f"- agent_name: {ctx.agent_name}\n"
             f"- project_slug: {ctx.project_slug}\n"
             f"- project_description: {ctx.project_description}\n"
+            f"- project_stack: {', '.join(ctx.project_stack) if ctx.project_stack else '(unspecified)'}\n"
             f"- project_dir: {ctx.project_dir}\n"
             f"- agent_dir: {ctx.agent_dir}\n"
             f"- run_id: {ctx.run_id}\n"
