@@ -30,7 +30,7 @@ class ClaudeCodeConfig(AdapterConfigBase):
 
     model: str = "claude-sonnet-4-6"
     max_tokens: int | None = None
-    max_turns: int = 10
+    max_turns: int = 20
     mode: str = "default"
 
 
