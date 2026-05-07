@@ -195,6 +195,20 @@ class ClaudeCodeAdapter(BaseAdapter):
 
             elif event_type == "result":
                 outcome = parsed.get("result") or None
+                subtype = parsed.get("subtype")
+                is_error = bool(parsed.get("is_error", False))
+                if is_error or (subtype and subtype != "success"):
+                    msg = f"claude result error: subtype={subtype or 'unknown'}"
+                    if outcome:
+                        msg = f"{msg} | result={str(outcome)[:300]}"
+                    last_error_message = msg
+                    last_error_payload = {
+                        "subtype": subtype,
+                        "is_error": is_error,
+                        "result": outcome,
+                    }
+                    logger.error("[run:%s] %s", ctx.run_id, msg)
+                    ctx.on_event("error", msg, {"type": "result_error", "payload": last_error_payload})
                 usage = parsed.get("usage", {})
                 if usage:
                     token_usage = {
@@ -221,15 +235,39 @@ class ClaudeCodeAdapter(BaseAdapter):
 
         duration = time.monotonic() - start
         stderr = stderr_bytes.decode(errors="replace")
+        return_code = proc.returncode or 0
+
+        if return_code != 0:
+            logger.error(
+                "[run:%s] claude exited with code %s | last_error=%s | stderr=%s",
+                ctx.run_id,
+                return_code,
+                last_error_message,
+                stderr.strip()[:1000] or "(empty)",
+            )
+            stderr_text = stderr.strip()
+            if stderr_text and stderr_text != last_error_message:
+                ctx.on_event(
+                    "error",
+                    stderr_text[:1000],
+                    {"type": "stderr", "return_code": return_code},
+                )
+            elif not last_error_message:
+                ctx.on_event(
+                    "error",
+                    f"claude exited with code {return_code}",
+                    {"type": "exit", "return_code": return_code},
+                )
+
         error = self.compose_error_text(
-            return_code=proc.returncode or 0,
+            return_code=return_code,
             stderr=stderr,
             last_error_message=last_error_message,
             last_error_payload=last_error_payload,
         )
 
         return RunResult(
-            exit_code=proc.returncode or 0,
+            exit_code=return_code,
             stdout="\n".join(full_stdout_lines),
             stderr=stderr,
             duration_seconds=duration,
