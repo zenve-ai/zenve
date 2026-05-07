@@ -76,14 +76,25 @@ class GitHubTemplateService:
             raise NotFoundError(f"Path '{path}' is not a directory")
         return result
 
+    def get_head_sha(self) -> str | None:
+        """Return the HEAD commit SHA of the registry's default branch (main, then master)."""
+        for branch in ("main", "master"):
+            try:
+                ref_data = self.cached_get(
+                    f"{GITHUB_API}/repos/{self.repo}/git/ref/heads/{branch}"
+                )
+            except NotFoundError:
+                continue
+            try:
+                return ref_data["object"]["sha"]  # type: ignore[index]
+            except (KeyError, TypeError):
+                return None
+        return None
+
     def list_tree_blobs(self, prefix: str) -> list[dict]:
-        ref_url = f"{GITHUB_API}/repos/{self.repo}/git/ref/heads/main"
-        try:
-            ref_data = self.cached_get(ref_url)
-        except NotFoundError:
-            ref_url = f"{GITHUB_API}/repos/{self.repo}/git/ref/heads/master"
-            ref_data = self.cached_get(ref_url)
-        tree_sha = ref_data["object"]["sha"]  # type: ignore[index]
+        tree_sha = self.get_head_sha()
+        if tree_sha is None:
+            raise NotFoundError(f"No default branch found in repo {self.repo}")
         tree_url = f"{GITHUB_API}/repos/{self.repo}/git/trees/{tree_sha}"
         tree_data = self.cached_get(tree_url, params={"recursive": "1"})
         tree = tree_data["tree"]  # type: ignore[index]
