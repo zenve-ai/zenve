@@ -11,8 +11,8 @@ from zenve_adapters import AdapterRegistry
 from zenve_adapters.base import BaseAdapter
 from zenve_cli.constants import CLAIMED_LABEL, FAILED_LABEL, NEEDS_INPUT_LABEL
 from zenve_cli.core.claims import add_claim, expired_claims, load_claims, remove_claim
-from zenve_cli.core.env import resolve_agent_github_token
 from zenve_cli.core.discovery import DiscoveredAgent
+from zenve_cli.core.env import resolve_agent_github_token
 from zenve_cli.core.pipeline import next_label, prev_labels
 from zenve_cli.events import types as et
 from zenve_cli.events.emitter import EventEmitter
@@ -226,7 +226,7 @@ def apply_pipeline_transition(
     )
     return PipelineTransition(
         from_label=agent.settings.github_label,
-        to_label=to_label,
+        to_label=[to_label] if to_label else None,
     )
 
 
@@ -476,6 +476,7 @@ def write_and_emit(
         else None,
         pipeline_transition=pipeline_transition,
         token_usage=token_usage,
+        output=result.outcome,
         error=error_text,
     )
     write_run_result(agent, run_result)

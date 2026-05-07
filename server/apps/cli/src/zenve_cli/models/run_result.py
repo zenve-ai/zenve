@@ -41,7 +41,7 @@ class RunResultFile(BaseModel):
     status: str
     exit_code: int
     item: RunItem | None = None
-    output: dict = {}
+    output: str | None = None
     pipeline_transition: PipelineTransition | None = None
     token_usage: TokenUsage | None = None
     error: str | None = None
