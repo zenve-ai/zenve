@@ -423,6 +423,19 @@ def update(
         console.print("[dim]No installed agents match any available template.[/dim]")
         raise typer.Exit(0)
 
+    head_sha = svc.get_head_sha()
+
+    def is_up_to_date(slug: str) -> bool:
+        if head_sha is None:
+            return False
+        entry = lock.get_entry(slug)
+        if not entry:
+            return False
+        return (
+            lock.status(slug) == "clean"
+            and entry.get("sourceCommitSha") == head_sha
+        )
+
     # Resolve selection
     if agent is not None:
         if agent not in installed_templates:
@@ -430,17 +443,37 @@ def update(
                 f"[red]✗[/red] Agent [bold]{agent}[/bold] is not installed or has no matching template."
             )
             raise typer.Exit(1)
+        if is_up_to_date(agent) and not force:
+            console.print(
+                f"[dim]◆[/dim] [white]{agent}[/white] [dim]is already up to date "
+                f"({head_sha[:7] if head_sha else '?'}). Use --force to re-fetch.[/dim]"
+            )
+            raise typer.Exit(0)
         selected_slugs = [agent]
     else:
         choices = []
         for slug, t in installed_templates.items():
             status = lock.status(slug)
-            label, style = _STATUS_LABEL[status]
+            up_to_date = is_up_to_date(slug)
+            if up_to_date:
+                label, style = "up to date", "dim green"
+            else:
+                label, style = _STATUS_LABEL[status]
             title = Text()
             title.append(slug, style="white")
             title.append("  ")
             title.append(f"({label})", style=style)
-            choices.append(questionary.Choice(title=title.plain, value=slug))
+            choices.append(
+                questionary.Choice(
+                    title=title.plain,
+                    value=slug,
+                    disabled="up to date" if up_to_date and not force else None,
+                )
+            )
+
+        if all(getattr(c, "disabled", None) for c in choices):
+            console.print("[dim]All installed agents are already up to date.[/dim]")
+            raise typer.Exit(0)
 
         selected_slugs = questionary.checkbox(
             "Select agents to update",
