@@ -1,11 +1,11 @@
 from __future__ import annotations
 
 import datetime
+import threading
 import time
 from collections.abc import Callable
 
 from croniter import croniter
-
 from rich.markup import escape
 from rich.panel import Panel
 from rich.text import Text
@@ -20,7 +20,10 @@ from .theme import AGENT_COLOR, EVENT_BG, OUTPUT_BG, TOOLS_BG
 
 
 class ZenveTUI(App):
-    BINDINGS = [Binding("ctrl+q", "quit", "quit")]
+    BINDINGS = [
+        Binding("ctrl+q", "quit", "quit"),
+        Binding("ctrl+r", "run_now", "run now"),
+    ]
 
     CSS = """
     Screen {
@@ -77,6 +80,9 @@ class ZenveTUI(App):
         self.block_agent: str | None = None
         self.last_agent: str | None = None
 
+        # Run-now trigger — set by ctrl+r to skip the countdown sleep
+        self.run_now_event = threading.Event()
+
         # Loading indicator
         self.loading_widget: Static | None = None
         self.loading_frame: int = 0
@@ -112,6 +118,10 @@ class ZenveTUI(App):
                 self.handle_event(event)
             self.flush_block()
             self.query_one("#log", ScrollableContainer).scroll_end(animate=False)
+
+    def action_run_now(self) -> None:
+        if self.schedule and not self.run_active:
+            self.run_now_event.set()
 
     # ── Live run worker ───────────────────────────────────────────────────────
 
@@ -167,7 +177,9 @@ class ZenveTUI(App):
                 remaining = max(0.0, deadline - time.monotonic())
                 mins, secs = divmod(int(remaining), 60)
                 self.call_from_thread(self._update_countdown, f"{mins}:{secs:02d}")
-                time.sleep(1)
+                if self.run_now_event.wait(timeout=1):
+                    self.run_now_event.clear()
+                    break
 
             self.call_from_thread(self._reset_for_new_run)
 
@@ -300,7 +312,20 @@ class ZenveTUI(App):
         t = Text()
         if self.current_action:
             t.append(self.current_action, style=f"dim {AGENT_COLOR}")
-        t.append("  ctrl+q quit", style="dim")
+            t.append("   ")
+
+        def keybind(key: str, label: str, *, last: bool = False) -> None:
+            t.append(" ")
+            t.append(key, style="bold cyan")
+            t.append(" ", style="dim")
+            t.append(label, style="dim")
+            t.append(" ")
+            if not last:
+                t.append("│", style="#3a3a3a")
+
+        if self.schedule:
+            keybind("ctrl+r", "run now")
+        keybind("ctrl+q", "quit", last=True)
         self.query_one("#status", Static).update(t)
 
     # ── Event dispatcher ──────────────────────────────────────────────────────
