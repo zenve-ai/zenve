@@ -16,28 +16,29 @@ import asyncio
 import tempfile
 from pathlib import Path
 
+from zenve_adapters.claude_code import ClaudeCodeAdapter
 from zenve_adapters.open_code import OpenCodeAdapter
 from zenve_models.adapter import RunContext
 
 SOUL_MD = """\
-You are a helpful assistant that answers questions concisely.
+You are a python architect that makes plans.
 """
 
 AGENTS_MD = """\
 # Instructions
-Answer the user's question directly and briefly.
+You are a planning agent you plan even the smallest task. Make sure you add the path to the plan as your last message.
 """
 
 MESSAGE = """\
-Check if hello.py exists, then if not create it and write a simple python function that prints 'Hello, World!'
+Make a plan to check if hello.py exists, then if not create it and write a simple python function that prints 'Hello, World!'
 """
 
 
 async def main() -> None:
-    # adapter = ClaudeCodeAdapter()
-    adapter = (
-        OpenCodeAdapter()
-    )  # <-- switch to this adapter to test with OpenCode instead of Claude
+    adapter = ClaudeCodeAdapter()
+    # adapter = (
+    #     OpenCodeAdapter()
+    # )  # <-- switch to this adapter to test with OpenCode instead of Claude
 
     # Confirm the claude CLI is available before running.
     if not await adapter.health_check():
@@ -68,14 +69,11 @@ async def main() -> None:
             project_dir=str(project_dir),
             project_slug="logzai",
             run_id="run-001",
-            adapter_type="open_code",
-            adapter_config={
-                "model": "openai/gpt-5.4",
-                "max_turns": 10,
-            },
+            adapter_type="claude_code",
+            adapter_config={"model": "claude-sonnet-4-6", "max_turns": 10, "mode": "plan"},
             message=MESSAGE,
             heartbeat=False,
-            tools=["Read", "Write", "Edit", "Bash"],
+            tools=["Read", "Edit", "Bash", "ExitPlanMode"],
             on_event=on_event,
         )
 
@@ -85,6 +83,7 @@ async def main() -> None:
 
     print(f"\nExit code : {result.exit_code}")
     print(f"Duration  : {result.duration_seconds:.2f}s")
+    # print(f"Result   : {result}")
 
     if result.token_usage:
         print(f"Tokens    : {result.token_usage}")
