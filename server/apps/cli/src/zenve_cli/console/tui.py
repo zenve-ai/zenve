@@ -11,7 +11,7 @@ from rich.panel import Panel
 from rich.text import Text
 from textual.app import App, ComposeResult
 from textual.binding import Binding
-from textual.containers import ScrollableContainer
+from textual.containers import Horizontal, ScrollableContainer
 from textual.widgets import Static
 
 from .formatters import TOOL_FORMATTERS, make_tool_text
@@ -40,11 +40,6 @@ class ZenveTUI(App):
         color: #808080;
     }
 
-    #countdown {
-        padding: 0 2 0 2;
-        color: #808080;
-    }
-
     #agents {
         padding: 0 2 1 2;
         border-bottom: solid #3a3a3a;
@@ -61,6 +56,16 @@ class ZenveTUI(App):
         height: 1;
         background: $panel;
         padding: 0 2;
+    }
+
+    #status-left {
+        width: 1fr;
+        height: 1;
+    }
+
+    #status-right {
+        width: auto;
+        height: 1;
     }
     """
 
@@ -86,6 +91,7 @@ class ZenveTUI(App):
         # Loading indicator
         self.loading_widget: Static | None = None
         self.loading_frame: int = 0
+        self.loading_started_at: float | None = None
         self.run_active: bool = False
         self._spinner_frames = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"]
 
@@ -102,11 +108,12 @@ class ZenveTUI(App):
     def compose(self) -> ComposeResult:
         yield Static(LOGO, markup=False, id="logo")
         yield Static("", id="info")
-        yield Static("", id="countdown")
         yield Static("", id="agents")
         with ScrollableContainer(id="log"):
             pass
-        yield Static("", id="status")
+        with Horizontal(id="status"):
+            yield Static("", id="status-left")
+            yield Static("", id="status-right")
 
     def on_mount(self) -> None:
         self.update_status()
@@ -130,7 +137,10 @@ class ZenveTUI(App):
 
     def show_loading(self) -> None:
         frame = self._spinner_frames[self.loading_frame % len(self._spinner_frames)]
-        t = Text(f"{frame} Loading...", style="dim")
+        if self.loading_started_at is None:
+            self.loading_started_at = time.monotonic()
+        elapsed = int(time.monotonic() - self.loading_started_at)
+        t = Text(f"{frame} Loading ({elapsed}s)", style="dim")
         panel = Panel(t, style=f"on {EVENT_BG}", border_style=EVENT_BG, padding=(0, 1))
         if self.loading_widget is None:
             self.loading_widget = Static(panel)
@@ -185,15 +195,16 @@ class ZenveTUI(App):
 
     def _update_countdown(self, time_str: str) -> None:
         t = Text()
-        t.append("next run in  ", style="dim")
+        t.append("next run in ", style="dim")
         t.append(time_str, style="cyan")
-        self.query_one("#countdown", Static).update(t)
+        self.query_one("#status-right", Static).update(t)
 
     def _reset_for_new_run(self) -> None:
         log = self.query_one("#log", ScrollableContainer)
         for child in list(log.children):
             child.remove()
         self.loading_widget = None
+        self.loading_started_at = None
         self.block_type = None
         self.block_lines = []
         self.block_agent = None
@@ -207,7 +218,7 @@ class ZenveTUI(App):
         self.update_info()
         self.update_agents()
         self.update_status()
-        self.query_one("#countdown", Static).update("")
+        self.query_one("#status-right", Static).update("")
 
     # ── Block helpers ─────────────────────────────────────────────────────────
 
@@ -323,10 +334,10 @@ class ZenveTUI(App):
             if not last:
                 t.append("│", style="#3a3a3a")
 
-        if self.schedule:
+        if self.schedule and not self.run_active:
             keybind("ctrl+r", "run now")
         keybind("ctrl+q", "quit", last=True)
-        self.query_one("#status", Static).update(t)
+        self.query_one("#status-left", Static).update(t)
 
     # ── Event dispatcher ──────────────────────────────────────────────────────
 
@@ -406,6 +417,7 @@ class ZenveTUI(App):
             self.update_status()
             for line in msg.splitlines() or [""]:
                 self.add_to_block("output", Text(line))
+            self.loading_started_at = None
 
         elif etype == "adapter.tool_call":
             if agent and agent != self.last_agent:
@@ -485,6 +497,7 @@ class ZenveTUI(App):
         elif etype == "run.completed":
             self.run_active = False
             self.flush_block()
+            self.update_status()
             if data.get("committed"):
                 t = Text()
                 t.append("✓ committed agent run", style="bold green")
@@ -493,6 +506,7 @@ class ZenveTUI(App):
         elif etype == "run.failed":
             self.run_active = False
             self.flush_block()
+            self.update_status()
             body = escape(data.get("error", ""))
             self.append_log(
                 Static(
