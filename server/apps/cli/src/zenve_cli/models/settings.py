@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 PicksUp = Literal["issues", "pull_requests", "both", "none"]
 
@@ -40,3 +40,9 @@ class AgentSettings(BaseModel):
     picks_up: PicksUp = "both"
     mode: Literal["artifact_pr", "code_pr", "no_pr", "review_pr"] = "no_pr"
     allowed_paths: list[str] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def review_pr_only_picks_up_prs(self) -> AgentSettings:
+        if self.mode == "review_pr" and self.picks_up != "pull_requests":
+            self.picks_up = "pull_requests"
+        return self
