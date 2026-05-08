@@ -1,9 +1,40 @@
 # Changelog
 ## [Unreleased]
 
+### Bug Fixes
+
+- **cli**: Persist agent outcome and wrap pipeline to_label as list
+- **cli**: Point registry to zenve-registry/{agents,skills} subpaths
+- **cli**: Refactor status bar and add loading elapsed timer
+- **adapters**: Emit error events on claude result errors and non-zero exit
+- **cli**: Clean up local branch when removing worktree
+- **cli**: Pipeline transition for code_pr
+- **cli**: Fast-forward local main after review_pr squash-merge
+
+### Chores
+
+- **cli**: Add bump-cli recipe to justfile
+- **cli**: Bump version to 0.1.3
+- **cli**: Tidy imports and modernize type annotations
+- **server**: Rename justfile cli recipes to cli-* prefix
+- **examples**: Switch run_adapter to ClaudeCodeAdapter plan mode
+- **adapters**: Bump claude_code default max_turns to 20
+
 ### Documentation
 
 - **cli**: Update README to reflect new features
+- Update changelog with unreleased section
+
+### Features
+
+- Run Schedule added
+- **cli**: Guard run with .zenve/-aware dirty-tree check
+- **cli/tui**: Add ctrl+r run-now keybind to skip countdown
+- **cli**: Add project stack to settings and run context
+- **services**: Add AgentLockService and template HEAD sha helper
+- **cli**: Track installed agents in lock and support --agent flag
+- **cli**: Skip up-to-date agents in agents update wizard
+- **cli**: Force review_pr agents to picks_up=pull_requests
 
 ## [0.1.2] - 2026-05-05
 
