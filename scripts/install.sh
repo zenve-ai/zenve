@@ -54,10 +54,11 @@ chmod +x "$TMP"
 
 DEST="$INSTALL_DIR/$BIN_NAME"
 
-if [ -w "$INSTALL_DIR" ]; then
+if [ -d "$INSTALL_DIR" ] && [ -w "$INSTALL_DIR" ]; then
   mv "$TMP" "$DEST"
 else
   echo "Writing to $INSTALL_DIR requires sudo..."
+  sudo mkdir -p "$INSTALL_DIR"
   sudo mv "$TMP" "$DEST"
 fi
 
