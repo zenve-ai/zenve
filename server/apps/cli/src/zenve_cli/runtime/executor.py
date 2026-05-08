@@ -732,6 +732,7 @@ async def run_agent(
                 try:
                     gh.merge_pr(item.number, merge_method="squash")
                     gh.delete_branch(worktree_branch)
+                    reset_to_remote(repo_root, project.default_branch)
                 except GitHubError as exc:
                     status = "failed"
                     error_text = str(exc)
