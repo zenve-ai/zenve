@@ -11,7 +11,9 @@ from zenve_services.membership import MembershipService
 from zenve_services.project import ProjectService
 from zenve_services.repo_reader import RepoReaderService
 from zenve_services.repo_writer import RepoWriterService
+from zenve_services.run_service import RunService
 from zenve_services.template import GitHubTemplateService
+from zenve_services.workspace_service import WorkspaceService
 from zenve_services.ws_manager import WebSocketManager
 
 
@@ -59,3 +61,11 @@ def get_github_service(db: Session = Depends(get_db)) -> GitHubService:
 
 def get_ws_manager(request: Request) -> WebSocketManager:
     return request.app.state.ws_manager
+
+
+def get_workspace_service(request: Request) -> WorkspaceService:
+    return request.app.state.workspace_service
+
+
+def get_run_service(request: Request) -> RunService:
+    return request.app.state.run_service

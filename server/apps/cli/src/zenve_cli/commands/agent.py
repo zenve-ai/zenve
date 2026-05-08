@@ -47,10 +47,10 @@ def _do_commit(repo_root: Path, message: str, branch: str) -> None:
         committed = commit_zenve_dir(repo_root, message, branch=branch)
         if committed:
             console.print(
-                "[cyan]◆[/cyan] [white]Committed and pushed [cyan].zenve/[/cyan][/white]"
+                "[cyan]◆[/cyan] Committed and pushed [cyan].zenve/[/cyan]"
             )
         else:
-            console.print("[yellow]◆[/yellow] [white]Nothing to commit[/white]")
+            console.print("[yellow]◆[/yellow] Nothing to commit")
     except GitError as exc:
         console.print(f"[red]✗[/red] Git error: {exc}")
 
@@ -150,7 +150,7 @@ def list_agents(repo_root: Path = typer.Option(Path("."), "--repo")) -> None:
         # Slug header
         slug_line = Text()
         slug_line.append("  ◆ ", style="bold cyan")
-        slug_line.append(d.name, style="bold white")
+        slug_line.append(d.name, style="bold")
         console.print(slug_line)
 
         if s is None:
@@ -160,7 +160,7 @@ def list_agents(repo_root: Path = typer.Option(Path("."), "--repo")) -> None:
 
         label_w = 12
 
-        def row(label: str, value: str, value_style: str = "white", _w: int = label_w) -> None:
+        def row(label: str, value: str, value_style: str = "default", _w: int = label_w) -> None:
             line = Text()
             line.append(f"    {label:<{_w}}", style="dim")
             line.append(value, style=value_style)
@@ -176,7 +176,7 @@ def list_agents(repo_root: Path = typer.Option(Path("."), "--repo")) -> None:
 
         row("picks up", s.picks_up, "yellow")
         row("label", s.github_label, "cyan")
-        row("model", str(s.adapter_config.get("model", "")), "dim white")
+        row("model", str(s.adapter_config.get("model", "")), "dim")
 
         console.print()
 
@@ -295,7 +295,7 @@ def add(
             raise typer.Exit(0)
 
     # Scaffold + record lock
-    console.print("[cyan]◆[/cyan] [white]Scaffolding agent files...[/white]")
+    console.print("[cyan]◆[/cyan] Scaffolding agent files...")
     sep()
 
     scaffold = ScaffoldingService()
@@ -323,15 +323,15 @@ def add(
                 source=source,
                 commit_sha=commit_sha,
             )
-        console.print(f"  [green]✓[/green] [white]{agent_slug}[/white]")
+        console.print(f"  [green]✓[/green] {agent_slug}")
 
     scaffold.update_pipeline(zdir, pipeline)
 
     added_slugs = list(pipeline.keys() - set(existing_pipeline.keys()))
     sep()
     console.print(
-        f"[cyan]◆[/cyan] [white]Added {len(added_slugs)} agent(s): "
-        f"{', '.join(added_slugs)}[/white]"
+        f"[cyan]◆[/cyan] Added {len(added_slugs)} agent(s): "
+        f"{', '.join(added_slugs)}"
     )
     sep()
 
@@ -352,7 +352,7 @@ def add(
         )
     else:
         console.print(
-            "[cyan]◆[/cyan] [white]Commit and push [cyan].zenve/[/cyan] to activate[/white]"
+            "[cyan]◆[/cyan] Commit and push [cyan].zenve/[/cyan] to activate"
         )
     console.print()
 
@@ -446,7 +446,7 @@ def update(
             raise typer.Exit(1)
         if is_up_to_date(agent) and not force:
             console.print(
-                f"[dim]◆[/dim] [white]{agent}[/white] [dim]is already up to date "
+                f"[dim]◆[/dim] {agent} [dim]is already up to date "
                 f"({head_sha[:7] if head_sha else '?'}). Use --force to re-fetch.[/dim]"
             )
             raise typer.Exit(0)
@@ -461,7 +461,7 @@ def update(
             else:
                 label, style = _STATUS_LABEL[status]
             title = Text()
-            title.append(slug, style="white")
+            title.append(slug, style="default")
             title.append("  ")
             title.append(f"({label})", style=style)
             choices.append(
@@ -521,7 +521,7 @@ def update(
         raise typer.Exit(0)
 
     sep()
-    console.print("[cyan]◆[/cyan] [white]Updating agent files...[/white]")
+    console.print("[cyan]◆[/cyan] Updating agent files...")
     sep()
 
     scaffold = ScaffoldingService()
@@ -549,12 +549,12 @@ def update(
             commit_sha=commit_sha,
         )
         updated_slugs.append(agent_slug)
-        console.print(f"  [green]✓[/green] [white]{agent_slug}[/white]")
+        console.print(f"  [green]✓[/green] {agent_slug}")
 
     sep()
     console.print(
-        f"[cyan]◆[/cyan] [white]Updated {len(updated_slugs)} agent(s): "
-        f"{', '.join(updated_slugs)}[/white]"
+        f"[cyan]◆[/cyan] Updated {len(updated_slugs)} agent(s): "
+        f"{', '.join(updated_slugs)}"
     )
     sep()
 
@@ -575,6 +575,6 @@ def update(
         )
     else:
         console.print(
-            "[cyan]◆[/cyan] [white]Commit and push [cyan].zenve/[/cyan] to activate[/white]"
+            "[cyan]◆[/cyan] Commit and push [cyan].zenve/[/cyan] to activate"
         )
     console.print()

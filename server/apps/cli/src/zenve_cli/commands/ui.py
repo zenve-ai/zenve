@@ -8,14 +8,14 @@ console = Console()
 WIZARD_STYLE = questionary.Style(
     [
         ("qmark", "fg:#00d4ff bold"),
-        ("question", "fg:#ffffff bold"),
+        ("question", "bold"),
         ("answer", "fg:#00d4ff bold"),
         ("pointer", "fg:#00d4ff bold"),
         ("highlighted", "fg:#00d4ff bold"),
         ("selected", "fg:#00d4ff"),
-        ("instruction", "fg:#555555"),
-        ("text", "fg:#aaaaaa"),
-        ("disabled", "fg:#444444 italic"),
+        ("instruction", "fg:#888888"),
+        ("text", ""),
+        ("disabled", "fg:#888888 italic"),
     ]
 )
 

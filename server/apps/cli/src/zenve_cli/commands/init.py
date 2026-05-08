@@ -123,11 +123,11 @@ def cmd(repo_root: Path = Path("."), description: str | None = None) -> None:
 
     if update_mode:
         console.print(
-            "[cyan]◆[/cyan] [white]Updating existing [cyan].zenve/[/cyan] configuration[/white]"
+            "[cyan]◆[/cyan] Updating existing [cyan].zenve/[/cyan] configuration"
         )
         sep()
 
-    console.print(f"[cyan]◆[/cyan] [white]Repository  [cyan]{remote_repo}[/cyan][/white]")
+    console.print(f"[cyan]◆[/cyan] Repository  [cyan]{remote_repo}[/cyan]")
     sep()
 
     # Derive slug from repo name
@@ -153,7 +153,7 @@ def cmd(repo_root: Path = Path("."), description: str | None = None) -> None:
         raise typer.Exit(1)
 
     # Scaffolding
-    console.print("[cyan]◆[/cyan] [white]Scaffolding project files...[/white]")
+    console.print("[cyan]◆[/cyan] Scaffolding project files...")
     sep()
 
     scaffold = ScaffoldingService()
@@ -224,7 +224,7 @@ def cmd(repo_root: Path = Path("."), description: str | None = None) -> None:
         )
         sep()
         if selected_skill_ids:
-            console.print("[cyan]◆[/cyan] [white]Installing skills...[/white]")
+            console.print("[cyan]◆[/cyan] Installing skills...")
             sep()
             install_skills(repo_root, selected_skill_ids, skill_svc)
             sep()
@@ -234,13 +234,13 @@ def cmd(repo_root: Path = Path("."), description: str | None = None) -> None:
     if update_mode:
         if agent_names:
             console.print(
-                f"[cyan]◆[/cyan] [white]Updated settings and added {len(agent_names)} new agent(s): {', '.join(agent_names)}[/white]"
+                f"[cyan]◆[/cyan] Updated settings and added {len(agent_names)} new agent(s): {', '.join(agent_names)}"
             )
         else:
-            console.print("[cyan]◆[/cyan] [white]Updated settings (no new agents added)[/white]")
+            console.print("[cyan]◆[/cyan] Updated settings (no new agents added)")
     else:
         console.print(
-            f"[cyan]◆[/cyan] [white]Initialized with {len(agent_names)} agent(s): {', '.join(agent_names)}[/white]"
+            f"[cyan]◆[/cyan] Initialized with {len(agent_names)} agent(s): {', '.join(agent_names)}"
         )
     sep()
     do_commit = questionary.confirm(
@@ -256,12 +256,12 @@ def cmd(repo_root: Path = Path("."), description: str | None = None) -> None:
         committed = commit_zenve_dir(repo_root, commit_msg, branch=detected_branch)
         if committed:
             console.print(
-                "[cyan]◆[/cyan] [white]Committed and pushed [cyan].zenve/[/cyan] — activated[/white]"
+                "[cyan]◆[/cyan] Committed and pushed [cyan].zenve/[/cyan] — activated"
             )
         else:
-            console.print("[yellow]◆[/yellow] [white]Nothing to commit[/white]")
+            console.print("[yellow]◆[/yellow] Nothing to commit")
     else:
         console.print(
-            "[cyan]◆[/cyan] [white]Commit and push [cyan].zenve/[/cyan] to activate[/white]"
+            "[cyan]◆[/cyan] Commit and push [cyan].zenve/[/cyan] to activate"
         )
     console.print()

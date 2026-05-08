@@ -19,6 +19,7 @@ only-include = ["README.md"]
 members = [
     "apps/api",
     "apps/cli",
+    "apps/runtime",
     "packages/*",
 ]
 
@@ -30,6 +31,7 @@ zenve-utils = { workspace = true }
 zenve-services = { workspace = true }
 zenve-adapters = { workspace = true }
 zenve-cli = { workspace = true }
+zenve-runtime = { workspace = true }
 
 [dependency-groups]
 dev = [

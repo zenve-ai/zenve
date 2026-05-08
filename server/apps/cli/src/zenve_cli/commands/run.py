@@ -167,7 +167,7 @@ def cmd(
         dry_lookup = {r.agent_name: r for r in results if isinstance(r, DryRunResult)}
         label_w = 12
 
-        def row(label: str, value: str, value_style: str = "white") -> None:
+        def row(label: str, value: str, value_style: str = "default") -> None:
             line = Text()
             line.append(f"    {label:<{label_w}}", style="dim")
             line.append(value, style=value_style)
@@ -177,7 +177,7 @@ def cmd(
         for ag in agents:
             slug_line = Text()
             slug_line.append("  ◆ ", style="bold cyan")
-            slug_line.append(ag.name, style="bold white")
+            slug_line.append(ag.name, style="bold")
             console.print(slug_line)
 
             dr = dry_lookup.get(ag.name)
@@ -188,7 +188,7 @@ def cmd(
 
             row("name", ag.settings.name)
             row("label", dr.label, "cyan")
-            row("model", str(ag.settings.adapter_config.get("model", "")), "dim white")
+            row("model", str(ag.settings.adapter_config.get("model", "")), "dim")
 
             if dr.item is not None:
                 pick_text = f"{dr.item.kind} #{dr.item.number}: {dr.item.title}"

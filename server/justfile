@@ -1,6 +1,9 @@
 dev:
     API_RELOAD=true uv run --package zenve-api api-start
 
+runtime:
+    RUNTIME_RELOAD=true uv run --package zenve-runtime runtime-start
+
 # Database migrations (Alembic)
 
 migrate:
@@ -76,6 +79,9 @@ install:
 
 add-to-api package:
     uv add --package zenve-api {{package}}
+
+add-to-runtime package:
+    uv add --package zenve-runtime {{package}}
 
 add-to-pkg pkg package:
     uv add --package {{pkg}} {{package}}

@@ -78,12 +78,12 @@ def install_skills(
             files = svc.fetch_skill_files(skill_id)
         except ZenveError as exc:
             console.print(
-                f"[dim]│[/dim]  [yellow]⚠[/yellow] [white]{skill_id}[/white] — {exc.message}"
+                f"[dim]│[/dim]  [yellow]⚠[/yellow] {skill_id} — {exc.message}"
             )
             continue
         scaffold.write_skill_files(repo_root, skill_id, files)
         installed_now.append(skill_id)
-        console.print(f"[dim]│[/dim]  [green]✓[/green] [white]{skill_id}[/white]")
+        console.print(f"[dim]│[/dim]  [green]✓[/green] {skill_id}")
     return installed_now
 
 
@@ -108,7 +108,7 @@ def list_skills(
     for skill in skills:
         line = Text()
         line.append("  ◆ ", style="bold cyan")
-        line.append(skill.id, style="bold white")
+        line.append(skill.id, style="bold")
         if skill.id in installed:
             line.append("  installed", style="dim green")
         console.print(line)
@@ -140,13 +140,13 @@ def add_skills(
         console.print("[dim]No skills selected.[/dim]")
         raise typer.Exit(0)
 
-    console.print("[cyan]◆[/cyan] [white]Installing skills...[/white]")
+    console.print("[cyan]◆[/cyan] Installing skills...")
     sep()
 
     installed_now = install_skills(repo_root, selected_ids, svc)
 
     sep()
     console.print(
-        f"[cyan]◆[/cyan] [white]Installed {len(installed_now)} skill(s): {', '.join(installed_now)}[/white]"
+        f"[cyan]◆[/cyan] Installed {len(installed_now)} skill(s): {', '.join(installed_now)}"
     )
     console.print()

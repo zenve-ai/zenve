@@ -5,6 +5,7 @@ Architecture and development rules for this FastAPI monorepo.
 ## Sub-project docs
 
 - [apps/cli/CLAUDE.md](apps/cli/CLAUDE.md) — CLI app: structure, layer rules, `.zenve/` convention, env vars, run flow
+- [apps/runtime/CLAUDE.md](apps/runtime/CLAUDE.md) — Runtime daemon: local FastAPI server (port 8001) exposing workspaces and runs over HTTP
 
 ## Monorepo Structure
 
