@@ -17,7 +17,7 @@ import tempfile
 from pathlib import Path
 
 from zenve_adapters.claude_code import ClaudeCodeAdapter
-from zenve_adapters.open_code import OpenCodeAdapter
+from zenve_adapters.open_code import OpenCodeAdapter  # noqa: F401
 from zenve_models.adapter import RunContext
 
 SOUL_MD = """\

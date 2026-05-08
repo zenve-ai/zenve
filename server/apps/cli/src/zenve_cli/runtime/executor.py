@@ -213,14 +213,25 @@ def apply_pipeline_transition(
     agent: DiscoveredAgent,
     item: PlannedItem,
     emitter: EventEmitter,
+    created_pr_number: int | None = None,
 ) -> PipelineTransition | None:
     to_label = next_label(project.pipeline, agent.settings.github_label)
-    transition(gh, item.number, agent.settings.github_label, to_label)
+    if created_pr_number is not None:
+        transition(gh, item.number, agent.settings.github_label, None)
+        if to_label is not None:
+            try:
+                gh.add_labels(created_pr_number, [to_label])
+            except GitHubError:
+                pass
+        target_number = created_pr_number
+    else:
+        transition(gh, item.number, agent.settings.github_label, to_label)
+        target_number = item.number
     emitter.emit(
         et.PIPELINE_END if to_label is None else et.PIPELINE_TRANSITION,
         agent=agent.name,
         data={
-            "number": item.number,
+            "number": target_number,
             "from": agent.settings.github_label,
             "to": to_label,
         },
@@ -313,7 +324,8 @@ def handle_worktree_pr(
     status: str,
     error_text: str | None,
     run_id: str = "",
-) -> tuple[str, str | None]:
+) -> tuple[str, str | None, int | None]:
+    created_pr_number: int | None = None
     try:
         if status == "completed":
             try:
@@ -365,6 +377,7 @@ def handle_worktree_pr(
                             head=worktree_branch,
                             base=project.default_branch,
                         )
+                        created_pr_number = pr.number
             except (GitError, GitHubError) as exc:
                 status = "failed"
                 if not error_text:
@@ -375,7 +388,7 @@ def handle_worktree_pr(
             remove_worktree(repo_root, worktree_path, branch=delete_branch)
         except GitError:
             pass
-    return status, error_text
+    return status, error_text, created_pr_number
 
 
 def handle_github_post_run(
@@ -388,10 +401,13 @@ def handle_github_post_run(
     error_text: str | None,
     emitter: EventEmitter,
     repo_root: Path,
+    created_pr_number: int | None = None,
 ) -> PipelineTransition | None:
     pipeline_transition: PipelineTransition | None = None
     if status == "completed":
-        pipeline_transition = apply_pipeline_transition(gh, project, agent, item, emitter)
+        pipeline_transition = apply_pipeline_transition(
+            gh, project, agent, item, emitter, created_pr_number=created_pr_number
+        )
     elif status == "changes_requested":
         back_labels = prev_labels(project.pipeline, agent.settings.github_label)
         unclaim_item(gh, item.number)
@@ -699,6 +715,7 @@ async def run_agent(
 
     status, error_text = determine_run_status(result, adapter_errors)
 
+    created_pr_number: int | None = None
     if (
         agent.settings.mode in ("artifact_pr", "code_pr", "review_pr")
         and worktree_path is not None
@@ -719,7 +736,7 @@ async def run_agent(
                     status = "failed"
                     error_text = str(exc)
         else:
-            status, error_text = handle_worktree_pr(
+            status, error_text, created_pr_number = handle_worktree_pr(
                 gh, agent, project, item, worktree_path, worktree_branch, repo_root, status, error_text, run_id
             )
             worktree_path = None  # already cleaned up inside
@@ -727,7 +744,8 @@ async def run_agent(
     pipeline_transition: PipelineTransition | None = None
     if item is not None:
         pipeline_transition = handle_github_post_run(
-            gh, item, agent, project, status, result.outcome, error_text, emitter, repo_root
+            gh, item, agent, project, status, result.outcome, error_text, emitter, repo_root,
+            created_pr_number=created_pr_number,
         )
 
     return write_and_emit(

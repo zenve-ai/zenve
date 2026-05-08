@@ -17,6 +17,7 @@ from zenve_cli.models.settings import AgentSettings
 from zenve_cli.runtime.commit import GitError, commit_zenve_dir
 from zenve_config.settings import get_settings
 from zenve_models.errors import ZenveError
+from zenve_models.github_template import GitHubTemplateSummary
 from zenve_services.agent import build_agent_files
 from zenve_services.agent_lock import AgentLockService
 from zenve_services.scaffolding import ScaffoldingService
@@ -413,7 +414,7 @@ def update(
         raise typer.Exit(1)  # noqa: B904
 
     # Map: installed slug -> template
-    installed_templates: dict[str, object] = {}
+    installed_templates: dict[str, GitHubTemplateSummary] = {}
     for t in templates:
         slug = _resolve_template_slug(t)
         if slug in existing_agent_slugs:
@@ -452,7 +453,7 @@ def update(
         selected_slugs = [agent]
     else:
         choices = []
-        for slug, t in installed_templates.items():
+        for slug in installed_templates:
             status = lock.status(slug)
             up_to_date = is_up_to_date(slug)
             if up_to_date:

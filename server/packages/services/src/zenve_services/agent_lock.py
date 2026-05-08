@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Literal
 
@@ -81,7 +81,7 @@ class AgentLockService:
             "template": template_id,
             "source": source,
             "sourceCommitSha": commit_sha,
-            "installedAt": datetime.now(timezone.utc)
+            "installedAt": datetime.now(UTC)
             .isoformat(timespec="seconds")
             .replace("+00:00", "Z"),
             "files": hash_template_files(files),
