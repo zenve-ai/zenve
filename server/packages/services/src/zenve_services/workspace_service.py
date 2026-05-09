@@ -65,9 +65,16 @@ class WorkspaceService:
         path = Path(body.path).expanduser().resolve()
         if not path.exists() or not path.is_dir():
             raise ValidationError(f"Path does not exist or is not a directory: {path}")
-        settings_path = path / ZENVE_DIR / SETTINGS_FILE
+        zenve_path = path / ZENVE_DIR
+        if not zenve_path.exists():
+            raise ValidationError(
+                f"No {ZENVE_DIR}/ at {path}. Run `zenve init` here first, or point at a different repo."
+            )
+        settings_path = zenve_path / SETTINGS_FILE
         if not settings_path.exists():
-            raise ValidationError(f"Missing {ZENVE_DIR}/{SETTINGS_FILE} at {path}")
+            raise ValidationError(
+                f"{ZENVE_DIR}/ exists at {path} but is missing {SETTINGS_FILE} — re-run `zenve init`."
+            )
 
         with self.lock:
             for w in self.workspaces:

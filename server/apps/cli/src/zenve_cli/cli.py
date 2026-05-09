@@ -15,11 +15,13 @@ from zenve_cli.commands import snapshot as snapshot_cmd
 from zenve_cli.commands import status as status_cmd
 from zenve_cli.commands.agent import agent_app
 from zenve_cli.commands.skill import skill_app
+from zenve_cli.commands.workspace import workspace_app
 from zenve_cli.console import print_logo
 
 app = typer.Typer(name="zenve", help="Zenve CLI — autonomous agents in your repo")
 app.add_typer(agent_app, name="agents")
 app.add_typer(skill_app, name="skills")
+app.add_typer(workspace_app, name="workspace")
 
 
 def version_callback(value: bool) -> None:

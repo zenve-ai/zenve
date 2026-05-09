@@ -265,6 +265,34 @@ def cmd(repo_root: Path = Path("."), description: str | None = None) -> None:
             "[cyan]◆[/cyan] Commit and push [cyan].zenve/[/cyan] to activate"
         )
 
+    register_with_runtime(repo_root)
     console.print()
 
 
+def register_with_runtime(repo_root: Path) -> None:
+    """Best-effort registration of the workspace with the local runtime."""
+    import httpx
+
+    from zenve_cli.runtime.client import runtime_url
+
+    abs_path = repo_root.expanduser().resolve()
+    url = f"{runtime_url()}/api/v1/workspaces"
+    try:
+        with httpx.Client(timeout=5.0) as client:
+            resp = client.post(url, json={"path": str(abs_path)})
+    except httpx.ConnectError:
+        console.print(
+            "[yellow]◆[/yellow] Runtime not running — run [cyan]zenve workspace add .[/cyan] later to register"
+        )
+        return
+
+    if resp.status_code == 201:
+        console.print("[cyan]◆[/cyan] Registered with runtime")
+    elif resp.status_code == 409:
+        console.print("[cyan]◆[/cyan] Already registered with runtime")
+    else:
+        try:
+            detail = resp.json().get("detail", resp.text)
+        except Exception:
+            detail = resp.text
+        console.print(f"[yellow]◆[/yellow] Could not register ({resp.status_code}): {detail}")
