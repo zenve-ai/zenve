@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from zenve_cli.constants import CLAIMED_LABEL, FAILED_LABEL, NEEDS_INPUT_LABEL
-from zenve_cli.integrations.github.client import GitHubClient, GitHubError
+from zenve_engine.constants import CLAIMED_LABEL, FAILED_LABEL, NEEDS_INPUT_LABEL
+from zenve_engine.github.client import GitHubClient, GitHubError
 
 
 def claim_item(client: GitHubClient, number: int) -> bool:

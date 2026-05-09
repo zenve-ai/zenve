@@ -15,15 +15,14 @@ from zenve_adapters.claude_code import ClaudeCodeAdapter
 from zenve_adapters.open_code import OpenCodeAdapter
 from zenve_cli.commands.snapshot import git_remote_slug
 from zenve_cli.console import ZenveTUI
-from zenve_cli.core.config import ConfigError, load_project_settings
-from zenve_cli.core.discovery import DiscoveryError, discover_agents
-from zenve_cli.core.env import EnvError, load_env
-from zenve_cli.events import types as et
-from zenve_cli.events.emitter import EventEmitter
-from zenve_cli.integrations.github.client import GitHubClient
-from zenve_cli.integrations.github.snapshot import build_snapshot, write_snapshot
-from zenve_cli.models.run_result import RunResultFile
-from zenve_cli.runtime.commit import (
+from zenve_engine.config import ConfigError, load_project_settings
+from zenve_engine.discovery import DiscoveryError, discover_agents
+from zenve_engine.env import EnvError, load_env
+from zenve_engine.events import types as et
+from zenve_engine.events.emitter import EventEmitter
+from zenve_engine.exec.executor import DryRunResult, reconcile_claims
+from zenve_engine.exec.parallel import run_all
+from zenve_engine.git.commit import (
     GitError,
     commit_agents,
     commit_zenve_dir,
@@ -32,8 +31,9 @@ from zenve_cli.runtime.commit import (
     has_dirty_zenve,
     remote_branch_exists,
 )
-from zenve_cli.runtime.executor import DryRunResult, reconcile_claims
-from zenve_cli.runtime.parallel import run_all
+from zenve_engine.github.client import GitHubClient
+from zenve_engine.github.snapshot import build_snapshot, write_snapshot
+from zenve_engine.models.run_result import RunResultFile
 
 console = Console()
 

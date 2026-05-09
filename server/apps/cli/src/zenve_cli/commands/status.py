@@ -5,8 +5,8 @@ from pathlib import Path
 
 import typer
 
-from zenve_cli.core.config import ConfigError, zenve_dir
-from zenve_cli.core.discovery import DiscoveryError, discover_agents
+from zenve_engine.config import ConfigError, zenve_dir
+from zenve_engine.discovery import DiscoveryError, discover_agents
 
 
 def latest_run(agent_path: Path) -> dict | None:

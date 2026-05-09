@@ -21,8 +21,8 @@ def cmd(repo_root: Path) -> None:
     dotenv_path = repo_root / ".env"
     dotenv_vars = set(dotenv_values(dotenv_path).keys()) if dotenv_path.exists() else set()
 
-    from zenve_cli.core.discovery import discover_agents
-    from zenve_cli.core.env import load_env
+    from zenve_engine.discovery import discover_agents
+    from zenve_engine.env import load_env
 
     try:
         env = load_env(repo_root)

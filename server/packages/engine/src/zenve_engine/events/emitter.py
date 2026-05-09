@@ -11,8 +11,8 @@ from pathlib import Path
 
 import httpx
 
-from zenve_cli.constants import EVENTS_LOG_FILE
-from zenve_cli.core.config import zenve_dir
+from zenve_engine.config import zenve_dir
+from zenve_engine.constants import EVENTS_LOG_FILE
 
 logger = logging.getLogger(__name__)
 

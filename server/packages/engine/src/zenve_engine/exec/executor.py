@@ -9,26 +9,14 @@ from typing import Literal
 
 from zenve_adapters import AdapterRegistry
 from zenve_adapters.base import BaseAdapter
-from zenve_cli.constants import CLAIMED_LABEL, FAILED_LABEL, NEEDS_INPUT_LABEL
-from zenve_cli.core.claims import add_claim, expired_claims, load_claims, remove_claim
-from zenve_cli.core.discovery import DiscoveredAgent
-from zenve_cli.core.env import resolve_agent_github_token
-from zenve_cli.core.pipeline import next_label, prev_labels
-from zenve_cli.events import types as et
-from zenve_cli.events.emitter import EventEmitter
-from zenve_cli.integrations.github.client import GitHubClient, GitHubError
-from zenve_cli.integrations.github.labels import claim_item, transition, unclaim_item
-from zenve_cli.models.claims import Claim
-from zenve_cli.models.run_result import (
-    PipelineTransition,
-    RunItem,
-    RunResultFile,
-    TokenUsage,
-)
-from zenve_cli.models.settings import AgentSettings, ProjectSettings
-from zenve_cli.models.snapshot import Snapshot, SnapshotIssue, SnapshotPR
-from zenve_cli.runtime.commit import GitError, reset_to_remote
-from zenve_cli.runtime.worktree import (
+from zenve_engine.claims import add_claim, expired_claims, load_claims, remove_claim
+from zenve_engine.constants import CLAIMED_LABEL, FAILED_LABEL, NEEDS_INPUT_LABEL
+from zenve_engine.discovery import DiscoveredAgent
+from zenve_engine.env import resolve_agent_github_token
+from zenve_engine.events import types as et
+from zenve_engine.events.emitter import EventEmitter
+from zenve_engine.git.commit import GitError, reset_to_remote
+from zenve_engine.git.worktree import (
     commit_and_push,
     create_readonly_worktree,
     create_worktree,
@@ -37,6 +25,18 @@ from zenve_cli.runtime.worktree import (
     remove_worktree,
     stage_changes,
 )
+from zenve_engine.github.client import GitHubClient, GitHubError
+from zenve_engine.github.labels import claim_item, transition, unclaim_item
+from zenve_engine.models.claims import Claim
+from zenve_engine.models.run_result import (
+    PipelineTransition,
+    RunItem,
+    RunResultFile,
+    TokenUsage,
+)
+from zenve_engine.models.settings import AgentSettings, ProjectSettings
+from zenve_engine.models.snapshot import Snapshot, SnapshotIssue, SnapshotPR
+from zenve_engine.pipeline import next_label, prev_labels
 from zenve_models.adapter import RunContext, RunResult
 
 logger = logging.getLogger(__name__)

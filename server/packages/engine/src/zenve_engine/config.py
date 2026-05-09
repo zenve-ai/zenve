@@ -5,8 +5,8 @@ from pathlib import Path
 
 from pydantic import ValidationError
 
-from zenve_cli.constants import SETTINGS_FILE, ZENVE_DIR
-from zenve_cli.models.settings import ProjectSettings
+from zenve_engine.constants import SETTINGS_FILE, ZENVE_DIR
+from zenve_engine.models.settings import ProjectSettings
 
 
 class ConfigError(RuntimeError):

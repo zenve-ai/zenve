@@ -4,13 +4,13 @@ import asyncio
 from pathlib import Path
 
 from zenve_adapters import AdapterRegistry
-from zenve_cli.core.discovery import DiscoveredAgent
-from zenve_cli.events.emitter import EventEmitter
-from zenve_cli.integrations.github.client import GitHubClient
-from zenve_cli.models.run_result import RunResultFile
-from zenve_cli.models.settings import ProjectSettings
-from zenve_cli.models.snapshot import Snapshot
-from zenve_cli.runtime.executor import DryRunResult, run_agent
+from zenve_engine.discovery import DiscoveredAgent
+from zenve_engine.events.emitter import EventEmitter
+from zenve_engine.exec.executor import DryRunResult, run_agent
+from zenve_engine.github.client import GitHubClient
+from zenve_engine.models.run_result import RunResultFile
+from zenve_engine.models.settings import ProjectSettings
+from zenve_engine.models.snapshot import Snapshot
 
 
 async def run_all(

@@ -10,49 +10,52 @@ Python CLI (`typer`) that runs autonomous agents against a GitHub repo.
 
 ## Structure
 
+The run engine (config, discovery, events, GitHub client, git/worktree helpers, models, executor, parallel) lives in **`packages/engine`** (`zenve_engine`). The CLI is a thin presentation layer over it.
+
 ```
 src/zenve_cli/
 ├── cli.py                  # Typer app + command registration
 ├── commands/               # One file per CLI command (thin wrappers)
-│   ├── start.py            # zenve run — main entry point
-│   ├── snapshot.py         # zenve snapshot
+│   ├── run.py              # zenve run — TUI + dirty-tree checks, calls zenve_engine
+│   ├── snapshot.py         # zenve snapshot — calls zenve_engine.snapshot()
 │   ├── pipeline.py         # zenve pipeline
 │   ├── status.py           # zenve status
 │   ├── init.py             # zenve init — scaffold .zenve/
 │   ├── doctor.py           # zenve doctor — validate repo setup
-│   └── agent.py            # zenve agents … (sub-typer)
-├── core/                   # Pure config/discovery helpers
-│   ├── config.py           # load_project_settings() → ProjectSettings
-│   ├── discovery.py        # discover_agents() → list[DiscoveredAgent]
-│   ├── env.py              # load_env() → Env (reads env vars)
-│   ├── pipeline.py         # next_label() pipeline transitions
-│   └── console.py          # print_logo()
-├── runtime/                # Local execution concerns
-│   ├── executor.py         # run_agent() — claim → adapter → label transition
-│   ├── parallel.py         # run_all() — asyncio gather over agents
-│   ├── commit.py           # git CLI wrappers (add / commit / push via subprocess)
-│   └── worktree.py         # git worktree helpers (create / remove / commit-and-push)
-├── integrations/           # External API clients (one subpackage per provider)
-│   └── github/
-│       ├── client.py       # GitHubClient — thin httpx wrapper over GitHub REST v3
-│       ├── labels.py       # claim_item(), transition() — label management
-│       └── snapshot.py     # build_snapshot(), write_snapshot()
-├── events/
-│   ├── emitter.py          # EventEmitter — writes .zenve/events.log + optional webhook
-│   └── types.py            # Event type constants
-└── models/
-    ├── settings.py         # ProjectSettings, AgentSettings (Pydantic)
-    ├── snapshot.py         # Snapshot model
-    └── run_result.py       # RunResultFile, RunItem, TokenUsage, PipelineTransition
+│   ├── agent.py            # zenve agents … (sub-typer)
+│   ├── env.py              # zenve env
+│   ├── skill.py            # zenve skills …
+│   ├── workspace.py        # zenve workspaces … (talks to runtime daemon)
+│   └── ui.py               # questionary wizard styles
+├── console/                # Presentation: logo, theme, formatters, TUI
+└── runtime/
+    └── client.py           # httpx client to the runtime daemon (NOT the engine)
 ```
+
+Engine modules previously here have moved to `zenve_engine`:
+
+| Was | Now |
+|---|---|
+| `zenve_cli.constants` | `zenve_engine.constants` |
+| `zenve_cli.core.config` | `zenve_engine.config` |
+| `zenve_cli.core.discovery` | `zenve_engine.discovery` |
+| `zenve_cli.core.pipeline` | `zenve_engine.pipeline` |
+| `zenve_cli.core.claims` | `zenve_engine.claims` |
+| `zenve_cli.core.env` | `zenve_engine.env` |
+| `zenve_cli.events.*` | `zenve_engine.events.*` |
+| `zenve_cli.integrations.github.*` | `zenve_engine.github.*` |
+| `zenve_cli.models.*` | `zenve_engine.models.*` |
+| `zenve_cli.runtime.commit` | `zenve_engine.git.commit` |
+| `zenve_cli.runtime.worktree` | `zenve_engine.git.worktree` |
+| `zenve_cli.runtime.executor` | `zenve_engine.exec.executor` |
+| `zenve_cli.runtime.parallel` | `zenve_engine.exec.parallel` |
 
 ## Layer Rules
 
-- **`commands/`** — thin wrappers only. Parse CLI args, call `core/` + `runtime/`, print output. No business logic.
-- **`core/`** — stateless config/discovery. No I/O beyond reading `.zenve/`. No GitHub calls.
-- **`runtime/`** — local execution: subprocess git, async agent runs. No GitHub REST API calls.
-- **`integrations/`** — external API clients. Each provider gets its own subdirectory. No subprocess, no git.
-- **`models/`** — Pydantic models only. No logic.
+- **`commands/`** — thin wrappers only. Parse CLI args, call `zenve_engine`, render output. No business logic.
+- **`console/`** — pure presentation: logo, TUI, formatters, theme.
+- **`runtime/client.py`** — talks to the runtime daemon over HTTP.
+- **No engine logic in CLI.** Anything that reads `.zenve/`, calls GitHub, runs git, or executes adapters belongs in `zenve_engine`.
 
 ## Commands Are Like API Routes (IMPORTANT)
 

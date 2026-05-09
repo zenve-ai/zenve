@@ -3,7 +3,7 @@ from __future__ import annotations
 import fnmatch
 from pathlib import Path
 
-from zenve_cli.runtime.commit import GitError, run_git  # noqa: F401
+from zenve_engine.git.commit import GitError, run_git  # noqa: F401
 
 
 def create_worktree(repo_root: Path, path: Path, branch: str, base: str) -> None:

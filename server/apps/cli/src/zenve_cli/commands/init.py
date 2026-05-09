@@ -17,9 +17,9 @@ from zenve_cli.commands.skill import (
 )
 from zenve_cli.commands.snapshot import git_remote_slug, resolve_github_token
 from zenve_cli.commands.ui import WIZARD_STYLE, sep
-from zenve_cli.constants import DEFAULT_AGENTS_PATH, DEFAULT_REGISTRY_REPO, ZENVE_DIR
-from zenve_cli.runtime.commit import commit_skills, commit_zenve_dir
 from zenve_config.settings import get_settings
+from zenve_engine.constants import DEFAULT_AGENTS_PATH, DEFAULT_REGISTRY_REPO, ZENVE_DIR
+from zenve_engine.git.commit import commit_skills, commit_zenve_dir
 from zenve_models.errors import ZenveError
 from zenve_services.agent import build_agent_files
 from zenve_services.agent_lock import AgentLockService
@@ -264,4 +264,7 @@ def cmd(repo_root: Path = Path("."), description: str | None = None) -> None:
         console.print(
             "[cyan]◆[/cyan] Commit and push [cyan].zenve/[/cyan] to activate"
         )
+
     console.print()
+
+

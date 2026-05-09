@@ -11,8 +11,8 @@ from rich.console import Console
 from zenve_adapters.claude_code import ClaudeCodeAdapter
 from zenve_adapters.open_code import OpenCodeAdapter
 from zenve_cli.commands.snapshot import git_remote_slug
-from zenve_cli.core.config import ConfigError, load_project_settings, zenve_dir
-from zenve_cli.core.discovery import DiscoveryError, discover_agents
+from zenve_engine.config import ConfigError, load_project_settings, zenve_dir
+from zenve_engine.discovery import DiscoveryError, discover_agents
 
 console = Console()
 

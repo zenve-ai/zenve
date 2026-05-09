@@ -4,10 +4,10 @@ import json
 from datetime import UTC, datetime
 from pathlib import Path
 
-from zenve_cli.constants import SNAPSHOT_FILE
-from zenve_cli.core.config import zenve_dir
-from zenve_cli.integrations.github.client import GitHubClient
-from zenve_cli.models.snapshot import Snapshot, SnapshotComment, SnapshotIssue, SnapshotPR
+from zenve_engine.config import zenve_dir
+from zenve_engine.constants import SNAPSHOT_FILE
+from zenve_engine.github.client import GitHubClient
+from zenve_engine.models.snapshot import Snapshot, SnapshotComment, SnapshotIssue, SnapshotPR
 
 
 def label_names(labels: list[dict]) -> list[str]:

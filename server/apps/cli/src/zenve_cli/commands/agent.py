@@ -10,12 +10,12 @@ from rich.text import Text
 
 from zenve_cli.commands.snapshot import resolve_github_token
 from zenve_cli.commands.ui import WIZARD_STYLE, sep
-from zenve_cli.constants import DEFAULT_AGENTS_PATH, DEFAULT_REGISTRY_REPO
-from zenve_cli.core.config import zenve_dir
-from zenve_cli.core.discovery import AGENTS_SUBDIR, discover_agents
-from zenve_cli.models.settings import AgentSettings
-from zenve_cli.runtime.commit import GitError, commit_zenve_dir
 from zenve_config.settings import get_settings
+from zenve_engine.config import zenve_dir
+from zenve_engine.constants import DEFAULT_AGENTS_PATH, DEFAULT_REGISTRY_REPO
+from zenve_engine.discovery import AGENTS_SUBDIR, discover_agents
+from zenve_engine.git.commit import GitError, commit_zenve_dir
+from zenve_engine.models.settings import AgentSettings
 from zenve_models.errors import ZenveError
 from zenve_models.github_template import GitHubTemplateSummary
 from zenve_services.agent import build_agent_files

@@ -4,8 +4,8 @@ from dataclasses import dataclass
 
 import httpx
 
-from zenve_cli.constants import GITHUB_API
-from zenve_cli.constants import GITHUB_DEFAULT_TIMEOUT as DEFAULT_TIMEOUT
+from zenve_engine.constants import GITHUB_API
+from zenve_engine.constants import GITHUB_DEFAULT_TIMEOUT as DEFAULT_TIMEOUT
 
 
 class GitHubError(RuntimeError):

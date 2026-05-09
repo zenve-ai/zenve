@@ -4,8 +4,8 @@ from pathlib import Path
 
 import typer
 
-from zenve_cli.core.config import ConfigError, load_project_settings
-from zenve_cli.core.pipeline import validate_pipeline
+from zenve_engine.config import ConfigError, load_project_settings
+from zenve_engine.pipeline import validate_pipeline
 
 
 def cmd(repo_root: Path = Path(".")) -> None:

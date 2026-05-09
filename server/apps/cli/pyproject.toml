@@ -10,6 +10,7 @@ dependencies = [
     "pydantic>=2",
     "python-dotenv>=1.0",
     "zenve-adapters",
+    "zenve-engine",
     "zenve-models",
     "zenve-services",
     "zenve-utils",
@@ -26,3 +27,10 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/zenve_cli"]
+
+[tool.uv.sources]
+zenve-adapters = { workspace = true }
+zenve-engine = { workspace = true }
+zenve-models = { workspace = true }
+zenve-services = { workspace = true }
+zenve-utils = { workspace = true }

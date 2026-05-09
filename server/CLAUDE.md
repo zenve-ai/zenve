@@ -6,6 +6,7 @@ Architecture and development rules for this FastAPI monorepo.
 
 - [apps/cli/CLAUDE.md](apps/cli/CLAUDE.md) — CLI app: structure, layer rules, `.zenve/` convention, env vars, run flow
 - [apps/runtime/CLAUDE.md](apps/runtime/CLAUDE.md) — Runtime daemon: local FastAPI server (port 8001) exposing workspaces and runs over HTTP
+- [packages/engine/CLAUDE.md](packages/engine/CLAUDE.md) — Engine: self-contained library that executes a run against a `.zenve/` repo
 
 ## Monorepo Structure
 
@@ -62,6 +63,7 @@ zenve-db      → zenve-config
 zenve-models  → (pydantic only)
 zenve-utils   → zenve-config, zenve-db
 zenve-services → zenve-db, zenve-models, zenve-utils
+zenve-engine  → zenve-models, zenve-adapters    # the run executor — used by CLI, future use by daemon
 apps/api          → all packages above
 ```
 

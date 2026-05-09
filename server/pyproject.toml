@@ -31,6 +31,7 @@ zenve-utils = { workspace = true }
 zenve-services = { workspace = true }
 zenve-adapters = { workspace = true }
 zenve-cli = { workspace = true }
+zenve-engine = { workspace = true }
 zenve-runtime = { workspace = true }
 
 [dependency-groups]
@@ -65,6 +66,7 @@ known-first-party = [
     "zenve_adapters",
     "zenve_config",
     "zenve_db",
+    "zenve_engine",
     "zenve_models",
     "zenve_utils",
     "zenve_services",

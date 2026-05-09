@@ -6,10 +6,10 @@ from pathlib import Path
 
 import typer
 
-from zenve_cli.core.config import load_project_settings
-from zenve_cli.core.env import new_run_id, resolve_github_token
-from zenve_cli.integrations.github.client import GitHubClient
-from zenve_cli.integrations.github.snapshot import build_snapshot, write_snapshot
+from zenve_engine.config import load_project_settings
+from zenve_engine.env import new_run_id, resolve_github_token
+from zenve_engine.github.client import GitHubClient
+from zenve_engine.github.snapshot import build_snapshot, write_snapshot
 
 
 def repo_slug_from_url(url: str) -> str | None:
