@@ -1,8 +1,8 @@
 from fastapi import APIRouter, Depends
 
-from zenve_models.run import WorkspaceRunDetail, WorkspaceRunSummary
-from zenve_services import get_run_service
-from zenve_services.run_service import RunService
+from runtime.models.run import WorkspaceRunDetail, WorkspaceRunSummary
+from runtime.services import get_run_service
+from runtime.services.run_service import RunService
 
 router = APIRouter(prefix="/api/v1/workspaces/{workspace_id}/runs", tags=["runs"])
 

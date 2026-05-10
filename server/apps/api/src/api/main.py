@@ -6,6 +6,15 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 
 from api.lifespan import lifespan
+from api.models.errors import (
+    AuthError,
+    ConflictError,
+    ExternalError,
+    NotFoundError,
+    RateLimitError,
+    ValidationError,
+    ZenveError,
+)
 from api.routes import (
     agent_router,
     api_key_router,
@@ -15,15 +24,6 @@ from api.routes import (
     project_router,
     template_router,
     ws_router,
-)
-from zenve_models.errors import (
-    AuthError,
-    ConflictError,
-    ExternalError,
-    NotFoundError,
-    RateLimitError,
-    ValidationError,
-    ZenveError,
 )
 
 app = FastAPI(lifespan=lifespan)

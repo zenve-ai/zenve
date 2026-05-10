@@ -3,12 +3,12 @@ from urllib.parse import urlencode
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import RedirectResponse
 
-from zenve_config.settings import Settings, get_settings
-from zenve_db.models import UserRecord
-from zenve_models import LoginRequest, SignupRequest, TokenResponse, UserResponse
-from zenve_services import get_auth_service
-from zenve_services.auth import AuthService
-from zenve_utils.auth import create_token, get_current_user
+from api.config import Settings, get_settings
+from api.db.models import UserRecord
+from api.models.auth import LoginRequest, SignupRequest, TokenResponse, UserResponse
+from api.services import get_auth_service
+from api.services.auth import AuthService
+from api.utils.auth import create_token, get_current_user
 
 router = APIRouter(prefix="/api/v1/auth", tags=["auth"])
 

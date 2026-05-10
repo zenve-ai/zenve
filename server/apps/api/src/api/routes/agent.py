@@ -1,19 +1,19 @@
 from fastapi import APIRouter, Depends, status
 
-from zenve_db.models import UserRecord
-from zenve_models.agent import AgentCreate, AgentFileContent, AgentFileList, AgentUpdate
-from zenve_models.repo import AgentDetail, AgentSummary, RunDetail, RunSummary
-from zenve_services import (
+from api.db.models import UserRecord
+from api.models.agent import AgentCreate, AgentFileContent, AgentFileList, AgentUpdate
+from api.models.repo import AgentDetail, AgentSummary, RunDetail, RunSummary
+from api.services import (
     get_agent_service,
     get_membership_service,
     get_project_service,
     get_repo_reader_service,
 )
-from zenve_services.agent import AgentService
-from zenve_services.membership import MembershipService
-from zenve_services.project import ProjectService
-from zenve_services.repo_reader import RepoReaderService
-from zenve_utils.auth import get_current_user
+from api.services.agent import AgentService
+from api.services.membership import MembershipService
+from api.services.project import ProjectService
+from api.services.repo_reader import RepoReaderService
+from api.utils.auth import get_current_user
 
 router = APIRouter(prefix="/api/v1/projects/{project_id}/agents", tags=["agents"])
 

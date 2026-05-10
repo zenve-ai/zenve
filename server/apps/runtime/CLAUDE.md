@@ -16,19 +16,19 @@ The CLI is **not** modified. `zenve run` continues to work standalone.
 src/runtime/
 ├── main.py             # FastAPI app, exception handlers, CORS, router include
 ├── lifespan.py         # constructs WorkspaceService + RunService, stashes on app.state
+├── models/
+│   ├── errors.py       # ZenveError + domain exceptions
+│   ├── workspace.py    # Workspace, WorkspaceCreate, WorkspaceDetail
+│   └── run.py          # WorkspaceRunSummary, WorkspaceRunDetail, RunItem, TokenUsage, PipelineTransition
+├── services/
+│   ├── __init__.py     # get_workspace_service, get_run_service dependency factories
+│   ├── workspace_service.py
+│   └── run_service.py
 └── routes/
     ├── core.py         # GET / and /healthz
     ├── workspace.py    # /api/v1/workspaces
     └── run.py          # /api/v1/workspaces/{id}/runs
 ```
-
-Business logic lives in `packages/services/`:
-- `WorkspaceService` (`workspace_service.py`) — registry persisted to `~/.zenve/workspaces.json`, atomic writes, reads `.zenve/settings.json` on demand
-- `RunService` (`run_service.py`) — globs `.zenve/agents/*/runs/*.json`, parses into summaries/details
-
-DTOs live in `packages/models/`:
-- `workspace.py` — `Workspace`, `WorkspaceCreate`, `WorkspaceDetail`
-- `run.py` — `WorkspaceRunSummary`, `WorkspaceRunDetail`, `RunItem`, `TokenUsage`, `PipelineTransition`
 
 ## Endpoints
 
@@ -49,10 +49,10 @@ All under `/api/v1`. No auth.
 Same as `apps/api/` (see [server/CLAUDE.md](../../CLAUDE.md)):
 
 - **Routes are thin** — no business logic, no file I/O, no JSON parsing. Only `Depends(get_*_service)` then call.
-- **Services** raise domain exceptions from `zenve_models.errors` (`NotFoundError`, `ConflictError`, `ValidationError`, `ExternalError`). The handlers in `main.py` translate them to HTTP. **Never** raise `HTTPException` from a service.
-- **Pydantic models** live in `packages/models/`, never inside `apps/runtime/`.
-- **Dependency factories** (`get_workspace_service`, `get_run_service`) live only in `packages/services/src/zenve_services/__init__.py` — never in route files.
-- **No `zenve_db` imports** in routes. (Runtime currently has no DB at all — registry is filesystem.)
+- **Services** raise domain exceptions from `runtime.models.errors` (`NotFoundError`, `ConflictError`, `ValidationError`, `ExternalError`). The handlers in `main.py` translate them to HTTP. **Never** raise `HTTPException` from a service.
+- **Pydantic models** live in `runtime/models/`, never inside `routes/`.
+- **Dependency factories** (`get_workspace_service`, `get_run_service`) live only in `runtime/services/__init__.py` — never in route files.
+- **No DB imports** in routes. (Runtime has no DB — registry is filesystem.)
 
 ## Workspace Registry
 
@@ -101,9 +101,9 @@ curl localhost:8001/api/v1/workspaces
 ## Adding a Feature
 
 Same flow as `apps/api/`:
-1. **Pydantic model** → `packages/models/src/zenve_models/{domain}.py`
-2. **Service** → `packages/services/src/zenve_services/{domain}_service.py` (filesystem-backed services do not take `db: Session`)
-3. **Dependency factory** → `packages/services/src/zenve_services/__init__.py`
+1. **Pydantic model** → `apps/runtime/src/runtime/models/{domain}.py`
+2. **Service** → `apps/runtime/src/runtime/services/{domain}_service.py` (filesystem-backed services do not take `db: Session`)
+3. **Dependency factory** → `apps/runtime/src/runtime/services/__init__.py`
 4. **Route** → `apps/runtime/src/runtime/routes/{domain}.py`
 5. **Register router** → `apps/runtime/src/runtime/routes/__init__.py` + `main.py`
 

@@ -1,10 +1,10 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 
-from zenve_db.models import ApiKeyRecord, Project
-from zenve_models.api_key import ApiKeyCreate, ApiKeyCreated, ApiKeyResponse
-from zenve_services import get_api_key_service
-from zenve_services.api_key import ApiKeyService
-from zenve_services.api_key_auth import get_current_project
+from api.db.models import ApiKeyRecord, Project
+from api.models.api_key import ApiKeyCreate, ApiKeyCreated, ApiKeyResponse
+from api.services import get_api_key_service
+from api.services.api_key import ApiKeyService
+from api.services.api_key_auth import get_current_project
 
 router = APIRouter(prefix="/api/v1/projects/{project_id}/api-keys", tags=["api-keys"])
 

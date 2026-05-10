@@ -3,13 +3,13 @@ import logging
 from fastapi import APIRouter, Query, WebSocket, WebSocketDisconnect
 from jose import JWTError, jwt
 
-from zenve_config.settings import get_settings
-from zenve_db.database import get_db
-from zenve_db.models import UserRecord
-from zenve_services.membership import MembershipService
-from zenve_services.project import ProjectService
-from zenve_services.ws_manager import WebSocketManager
-from zenve_utils.auth import ALGORITHM
+from api.config import get_settings
+from api.db.database import get_db
+from api.db.models import UserRecord
+from api.services.membership import MembershipService
+from api.services.project import ProjectService
+from api.services.ws_manager import WebSocketManager
+from api.utils.auth import ALGORITHM
 
 logger = logging.getLogger(__name__)
 

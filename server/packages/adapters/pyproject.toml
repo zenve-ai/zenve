@@ -4,7 +4,7 @@ version = "0.1.0"
 description = "zenve agent adapter framework"
 requires-python = ">=3.13"
 dependencies = [
-    "zenve-models",
+    "pydantic>=2",
 ]
 
 [build-system]
@@ -14,5 +14,3 @@ build-backend = "hatchling.build"
 [tool.hatch.build.targets.wheel]
 packages = ["src/zenve_adapters"]
 
-[tool.uv.sources]
-zenve-models = { workspace = true }

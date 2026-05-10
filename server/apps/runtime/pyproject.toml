@@ -6,10 +6,8 @@ requires-python = ">=3.13"
 dependencies = [
     "fastapi>=0.115.0",
     "uvicorn[standard]>=0.30.0",
-    "zenve-config",
-    "zenve-models",
-    "zenve-services",
-    "zenve-utils",
+    "pydantic>=2",
+    "zenve-engine",
 ]
 
 [project.scripts]
@@ -26,7 +24,4 @@ packages = ["src"]
 "src" = ""
 
 [tool.uv.sources]
-zenve-config = { workspace = true }
-zenve-models = { workspace = true }
-zenve-services = { workspace = true }
-zenve-utils = { workspace = true }
+zenve-engine = { workspace = true }

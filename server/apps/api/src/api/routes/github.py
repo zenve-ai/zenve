@@ -1,10 +1,10 @@
 from fastapi import APIRouter, Depends, HTTPException
 
-from zenve_db.models import UserRecord
-from zenve_models.project import GitHubInstallationResponse, GitHubRepo
-from zenve_services import get_github_service
-from zenve_services.github import GitHubService
-from zenve_utils.auth import get_current_user
+from api.db.models import UserRecord
+from api.models.project import GitHubInstallationResponse, GitHubRepo
+from api.services import get_github_service
+from api.services.github import GitHubService
+from api.utils.auth import get_current_user
 
 router = APIRouter(prefix="/api/v1/github", tags=["github"])
 

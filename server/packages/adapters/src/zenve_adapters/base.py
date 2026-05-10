@@ -3,7 +3,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from typing import ClassVar
 
-from zenve_models.adapter import AdapterConfigBase, RunContext, RunResult
+from zenve_adapters.models import AdapterConfigBase, RunContext, RunResult
 
 
 class BaseAdapter(ABC):

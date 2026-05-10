@@ -10,19 +10,19 @@ from rich.text import Text
 
 from zenve_cli.commands.snapshot import resolve_github_token
 from zenve_cli.commands.ui import WIZARD_STYLE, sep
-from zenve_config.settings import get_settings
+from zenve_cli.config import get_settings
+from zenve_cli.models.errors import ZenveError
+from zenve_cli.models.github_template import GitHubTemplateSummary
+from zenve_cli.services.agent import build_agent_files
+from zenve_cli.services.agent_lock import AgentLockService
+from zenve_cli.services.scaffolding import ScaffoldingService
+from zenve_cli.services.template import GitHubTemplateService
+from zenve_cli.utils.scaffolding import slugify
 from zenve_engine.config import zenve_dir
 from zenve_engine.constants import DEFAULT_AGENTS_PATH, DEFAULT_REGISTRY_REPO
 from zenve_engine.discovery import AGENTS_SUBDIR, discover_agents
 from zenve_engine.git.commit import GitError, commit_zenve_dir
 from zenve_engine.models.settings import AgentSettings
-from zenve_models.errors import ZenveError
-from zenve_models.github_template import GitHubTemplateSummary
-from zenve_services.agent import build_agent_files
-from zenve_services.agent_lock import AgentLockService
-from zenve_services.scaffolding import ScaffoldingService
-from zenve_services.template import GitHubTemplateService
-from zenve_utils.scaffolding import slugify
 
 agent_app = typer.Typer(help="Agent management commands")
 console = Console()

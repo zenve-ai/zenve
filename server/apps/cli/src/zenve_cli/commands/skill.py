@@ -9,12 +9,12 @@ from rich.text import Text
 
 from zenve_cli.commands.snapshot import resolve_github_token
 from zenve_cli.commands.ui import WIZARD_STYLE, sep
-from zenve_config.settings import get_settings
+from zenve_cli.config import get_settings
+from zenve_cli.models.errors import ZenveError
+from zenve_cli.models.github_template import SkillSummary
+from zenve_cli.services.scaffolding import ScaffoldingService
+from zenve_cli.services.template import GitHubTemplateService
 from zenve_engine.constants import DEFAULT_REGISTRY_REPO, DEFAULT_SKILLS_PATH
-from zenve_models.errors import ZenveError
-from zenve_models.github_template import SkillSummary
-from zenve_services.scaffolding import ScaffoldingService
-from zenve_services.template import GitHubTemplateService
 
 skill_app = typer.Typer(help="Skill management commands")
 console = Console()

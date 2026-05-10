@@ -17,15 +17,15 @@ from zenve_cli.commands.skill import (
 )
 from zenve_cli.commands.snapshot import git_remote_slug, resolve_github_token
 from zenve_cli.commands.ui import WIZARD_STYLE, sep
-from zenve_config.settings import get_settings
+from zenve_cli.config import get_settings
+from zenve_cli.models.errors import ZenveError
+from zenve_cli.services.agent import build_agent_files
+from zenve_cli.services.agent_lock import AgentLockService
+from zenve_cli.services.scaffolding import ScaffoldingService
+from zenve_cli.services.template import GitHubTemplateService
+from zenve_cli.utils.scaffolding import slugify
 from zenve_engine.constants import DEFAULT_AGENTS_PATH, DEFAULT_REGISTRY_REPO, ZENVE_DIR
 from zenve_engine.git.commit import commit_skills, commit_zenve_dir
-from zenve_models.errors import ZenveError
-from zenve_services.agent import build_agent_files
-from zenve_services.agent_lock import AgentLockService
-from zenve_services.scaffolding import ScaffoldingService
-from zenve_services.template import GitHubTemplateService
-from zenve_utils.scaffolding import slugify
 
 console = Console()
 

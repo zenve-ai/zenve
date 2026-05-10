@@ -3,8 +3,8 @@ from __future__ import annotations
 import pytest
 
 from zenve_adapters.base import BaseAdapter
+from zenve_adapters.models import AdapterConfigBase, RunContext, RunResult
 from zenve_adapters.registry import AdapterRegistry
-from zenve_models.adapter import AdapterConfigBase, RunContext, RunResult
 
 
 class StubAdapter(BaseAdapter):

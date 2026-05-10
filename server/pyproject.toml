@@ -5,7 +5,6 @@ description = "zenve monorepo workspace"
 requires-python = ">=3.13"
 dependencies = [
     "httpx>=0.28.1",
-    "zenve-db",
 ]
 
 [build-system]
@@ -24,11 +23,6 @@ members = [
 ]
 
 [tool.uv.sources]
-zenve-config = { workspace = true }
-zenve-db = { workspace = true }
-zenve-models = { workspace = true }
-zenve-utils = { workspace = true }
-zenve-services = { workspace = true }
 zenve-adapters = { workspace = true }
 zenve-cli = { workspace = true }
 zenve-engine = { workspace = true }
@@ -64,10 +58,8 @@ ignore = ["E501", "B008"]
 [tool.ruff.lint.isort]
 known-first-party = [
     "zenve_adapters",
-    "zenve_config",
-    "zenve_db",
     "zenve_engine",
-    "zenve_models",
-    "zenve_utils",
-    "zenve_services",
+    "api",
+    "runtime",
+    "zenve_cli",
 ]

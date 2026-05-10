@@ -3,8 +3,8 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
-from zenve_services.run_service import RunService
-from zenve_services.workspace_service import WorkspaceService
+from runtime.services.run_service import RunService
+from runtime.services.workspace_service import WorkspaceService
 
 logger = logging.getLogger(__name__)
 

@@ -12,45 +12,58 @@ Architecture and development rules for this FastAPI monorepo.
 
 ```
 server/
-├── apps/api/         # Deployable FastAPI application
-│   └── src/api/
-│       ├── routes/   # Thin HTTP handlers only
-│       ├── lifespan.py
-│       └── main.py
-├── apps/cli/         # Typer CLI — runs agents against a GitHub repo
-│   └── src/zenve_cli/
+├── apps/
+│   ├── api/          # Deployable FastAPI application
+│   │   └── src/api/
+│   │       ├── config.py
+│   │       ├── db/        # SQLAlchemy engine, session, ORM models
+│   │       ├── models/    # Pydantic request/response models
+│   │       ├── utils/     # JWT, hashing, GitHub helpers
+│   │       ├── services/  # Business logic
+│   │       ├── routes/    # Thin HTTP handlers only
+│   │       ├── lifespan.py
+│   │       └── main.py
+│   ├── cli/          # Typer CLI — runs agents against a GitHub repo
+│   │   └── src/zenve_cli/
+│   │       ├── config.py
+│   │       ├── models/
+│   │       ├── services/
+│   │       └── utils/
+│   └── runtime/      # Local FastAPI daemon (port 8001)
+│       └── src/runtime/
+│           ├── models/
+│           ├── services/
+│           └── routes/
 └── packages/
-    ├── config/       # Settings (pydantic-settings)
-    ├── db/           # SQLAlchemy engine, session, ORM models
-    ├── models/       # Pydantic request/response models
-    ├── services/     # Business logic
-    └── utils/        # Stateless helpers (JWT, hashing, auth deps)
+    ├── engine/        # Run executor — used by CLI and runtime
+    └── adapters/      # Adapter types: RunContext, RunResult, *Config, BaseAdapter
 ```
+
+Each app is **self-contained** — it carries its own `config.py`, `models/`, `services/`, and `utils/`. Apps never import from each other.
 
 ## Layer Rules
 
 ### Routes (`apps/api/src/api/routes/`)
 - Thin wrappers only — no business logic, no db queries
 - Only call services via `Depends()`
-- Import from `zenve_services`, never from `zenve_db` directly
-- No helper functions — move any utility logic to `zenve_utils`
+- Import from `api.services`, never from `api.db` directly
+- No helper functions — move any utility logic to `api.utils`
 
-### Services (`packages/services/`)
+### Services (`apps/api/src/api/services/`)
 - All business logic lives here
 - Receive `db: Session` via constructor, never import `get_db` directly
-- Dependency functions (`get_*_service`) go in `zenve_services/__init__.py`
-- **Never raise `HTTPException`** — services are HTTP-agnostic. Raise domain exceptions from `zenve_models.errors` instead (`NotFoundError`, `ConflictError`, `ValidationError`, `ExternalError`, `RateLimitError`, `AuthError`). FastAPI exception handlers in `apps/api/src/api/main.py` convert these to HTTP responses.
+- Dependency functions (`get_*_service`) go in `api/services/__init__.py`
+- **Never raise `HTTPException`** — services are HTTP-agnostic. Raise domain exceptions from `api.models.errors` instead (`NotFoundError`, `ConflictError`, `ValidationError`, `ExternalError`, `RateLimitError`, `AuthError`). FastAPI exception handlers in `apps/api/src/api/main.py` convert these to HTTP responses.
 
-### Models (`packages/models/`)
-- All Pydantic models go here — never define them inside `apps/api/`
-- Shared freely across routes, services, and utils
+### Models (`apps/api/src/api/models/`)
+- All Pydantic models for the API go here — never define them inside `routes/`
+- Used freely by routes, services, and utils within the same app
 
-### Utils (`packages/utils/`)
+### Utils (`apps/api/src/api/utils/`)
 - Pure stateless helpers: hashing, JWT, `get_current_user` FastAPI dependency (JWT auth)
 - No business logic
-- **Test helpers** — shared test utilities (mock factories, fake data builders) go in `packages/utils/src/zenve_utils/testing.py`, not in individual test files or conftest.py
 
-### DB (`packages/db/`)
+### DB (`apps/api/src/api/db/`)
 - `database.py` — engine, session, `get_db`
 - `models.py` — SQLAlchemy ORM models using `Mapped` / `mapped_column`
 - Only imported by `services/` and `utils/`
@@ -58,13 +71,11 @@ server/
 ## Package Dependency Chain
 
 ```
-zenve-config  (no internal deps)
-zenve-db      → zenve-config
-zenve-models  → (pydantic only)
-zenve-utils   → zenve-config, zenve-db
-zenve-services → zenve-db, zenve-models, zenve-utils
-zenve-engine  → zenve-models, zenve-adapters    # the run executor — used by CLI, future use by daemon
-apps/api          → all packages above
+zenve-engine   → zenve-adapters    # the run executor — used by CLI and runtime
+zenve-adapters → pydantic          # RunContext, RunResult, all *Config types
+apps/api       → zenve-adapters    # uses adapter config types for agent management
+apps/cli       → zenve-engine, zenve-adapters
+apps/runtime   → zenve-engine
 ```
 
 ## Authentication & Authorization
@@ -102,12 +113,14 @@ Two auth systems coexist — use the right one for each context:
 
 ## Violations to Flag
 
-- `from zenve_db` imported inside any `apps/api/routes/` file
+- `from api.db` imported inside any `apps/api/routes/` file
 - `get_db` used directly in a route handler
-- Pydantic models defined inside `apps/api/`
+- Pydantic models defined inside `routes/`
 - Business logic (db queries, conditionals) inside route handlers
-- Helper functions defined inside `apps/api/routes/` — move to `zenve_utils`
-- `from fastapi import HTTPException` inside any `packages/services/` file — use domain errors instead
+- Helper functions defined inside route files — move to `utils/`
+- `from fastapi import HTTPException` inside any `services/` file — use domain errors instead
+- Cross-app imports: one app importing from another app's namespace
+- Any import of deleted packages: `zenve_config`, `zenve_db`, `zenve_models`, `zenve_utils`, `zenve_services`
 
 ## Development Commands
 
@@ -125,18 +138,11 @@ just docker-down  # stop container
 just docker-logs  # tail logs
 ```
 
-## Adding a New Feature
+## Adding a New Feature (API)
 
-1. **Pydantic Model** → `packages/models/src/zenve_models/{domain}.py`
-2. **ORM Model** → `packages/db/src/zenve_db/models.py`
-3. **Service** → `packages/services/src/zenve_services/{domain}.py`
-4. **Dependency function** → `packages/services/src/zenve_services/__init__.py`
+1. **Pydantic Model** → `apps/api/src/api/models/{domain}.py`
+2. **ORM Model** → `apps/api/src/api/db/models.py`
+3. **Service** → `apps/api/src/api/services/{domain}.py`
+4. **Dependency function** → `apps/api/src/api/services/__init__.py`
 5. **Route** → `apps/api/src/api/routes/{domain}.py` (thin wrapper)
 6. **Register Router** → `apps/api/src/api/routes/__init__.py` + `main.py`
-
-## Adding a New Package
-
-1. Create `packages/{name}/pyproject.toml` with name `zenve-{name}`
-2. Create `packages/{name}/src/zenve_{name}/__init__.py`
-3. Add to workspace root `pyproject.toml`: `[tool.uv.sources]` entry
-4. Run `uv sync`

@@ -4,11 +4,11 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from sqlalchemy import text
 
+from api.db.database import Base, get_engine
+from api.services.ws_manager import WebSocketManager
 from zenve_adapters.claude_code import ClaudeCodeAdapter
 from zenve_adapters.open_code import OpenCodeAdapter
 from zenve_adapters.registry import AdapterRegistry
-from zenve_db.database import Base, get_engine
-from zenve_services.ws_manager import WebSocketManager
 
 logger = logging.getLogger(__name__)
 

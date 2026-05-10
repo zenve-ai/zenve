@@ -15,6 +15,7 @@ The run engine (config, discovery, events, GitHub client, git/worktree helpers, 
 ```
 src/zenve_cli/
 ├── cli.py                  # Typer app + command registration
+├── config.py               # Settings, get_settings (pydantic-settings)
 ├── commands/               # One file per CLI command (thin wrappers)
 │   ├── run.py              # zenve run — TUI + dirty-tree checks, calls zenve_engine
 │   ├── snapshot.py         # zenve snapshot — calls zenve_engine.snapshot()
@@ -28,6 +29,17 @@ src/zenve_cli/
 │   ├── workspace.py        # zenve workspaces … (talks to runtime daemon)
 │   └── ui.py               # questionary wizard styles
 ├── console/                # Presentation: logo, theme, formatters, TUI
+├── models/
+│   ├── errors.py           # ZenveError + domain exceptions
+│   ├── agent.py            # AgentCreate (used by build_agent_files)
+│   └── github_template.py  # GitHubTemplateSummary, SkillSummary
+├── services/
+│   ├── template.py         # GitHubTemplateService
+│   ├── scaffolding.py      # ScaffoldingService
+│   ├── agent_lock.py       # AgentLockService
+│   └── agent.py            # build_agent_files helper
+├── utils/
+│   └── scaffolding.py      # slugify, default_files, build_settings_json
 └── runtime/
     └── client.py           # httpx client to the runtime daemon (NOT the engine)
 ```
@@ -62,15 +74,16 @@ Engine modules previously here have moved to `zenve_engine`:
 `commands/` is the CLI equivalent of `apps/api/routes/` in the FastAPI app. The same rules apply:
 
 - **Thin wrappers only** — parse args, call services, print output. No business logic.
-- **Only call `zenve_services`** — never implement logic that belongs in a service.
-- **No helper functions with logic** — if it's not pure UI (prompts, formatting), it belongs in a service or `zenve_utils`.
-- **Never import from `zenve_utils.scaffolding` directly** — that is a service concern.
+- **Only call `zenve_cli.services`** — never implement logic that belongs in a service.
+- **No helper functions with logic** — if it's not pure UI (prompts, formatting), it belongs in a service or `zenve_cli.utils`.
+- **Never import from `zenve_cli.utils.scaffolding` directly** — that is a service concern.
 - **`init` is a composition** — it calls the same service methods as `zenve agents add` and `zenve skills add`, never re-implements them inline.
 
 **Violations to flag:**
 - Any business logic (loops, conditionals, data construction) inside a `commands/` file
-- `from zenve_utils.scaffolding import ...` inside `commands/`
+- `from zenve_cli.utils.scaffolding import ...` inside `commands/`
 - Logic duplicated across two `commands/` files — extract to a service instead
+- Any import of deleted packages: `zenve_config`, `zenve_models`, `zenve_services`, `zenve_utils`
 
 ## `.zenve/` Folder Convention
 

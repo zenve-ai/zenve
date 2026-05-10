@@ -1,8 +1,8 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 
-from zenve_db.models import UserRecord
-from zenve_models.api_key import ApiKeyCreate, ApiKeyCreated, ApiKeyResponse
-from zenve_models.project import (
+from api.db.models import UserRecord
+from api.models.api_key import ApiKeyCreate, ApiKeyCreated, ApiKeyResponse
+from api.models.project import (
     ProjectCreate,
     ProjectCreatedResponse,
     ProjectGitHubConnect,
@@ -11,8 +11,8 @@ from zenve_models.project import (
     ProjectUpdate,
     ProjectWithRoleResponse,
 )
-from zenve_models.repo import AgentSummary, ProjectSettings
-from zenve_services import (
+from api.models.repo import AgentSummary, ProjectSettings
+from api.services import (
     get_agent_service,
     get_api_key_service,
     get_github_service,
@@ -20,13 +20,13 @@ from zenve_services import (
     get_project_service,
     get_repo_reader_service,
 )
-from zenve_services.agent import AgentService
-from zenve_services.api_key import ApiKeyService
-from zenve_services.github import GitHubService
-from zenve_services.membership import MembershipService
-from zenve_services.project import ProjectService
-from zenve_services.repo_reader import RepoReaderService
-from zenve_utils.auth import get_current_user
+from api.services.agent import AgentService
+from api.services.api_key import ApiKeyService
+from api.services.github import GitHubService
+from api.services.membership import MembershipService
+from api.services.project import ProjectService
+from api.services.repo_reader import RepoReaderService
+from api.utils.auth import get_current_user
 
 router = APIRouter(prefix="/api/v1/projects", tags=["projects"])
 
@@ -110,7 +110,6 @@ def github_connect(
         raise HTTPException(status_code=422, detail="No GitHub installation found.")
     updated = github_service.connect_project(project, installation_id, body.repo)
     return ProjectResponse.model_validate(updated, from_attributes=True)
-
 
 
 @router.delete("/{project_id}/github/disconnect", status_code=status.HTTP_204_NO_CONTENT)

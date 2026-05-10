@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import ClassVar
 
 from zenve_adapters.base import BaseAdapter
-from zenve_models.adapter import ClaudeCodeConfig, RunContext, RunResult
+from zenve_adapters.models import ClaudeCodeConfig, RunContext, RunResult
 
 logger = logging.getLogger(__name__)
 

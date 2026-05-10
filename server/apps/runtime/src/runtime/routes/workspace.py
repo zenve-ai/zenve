@@ -1,8 +1,8 @@
 from fastapi import APIRouter, Depends, status
 
-from zenve_models.workspace import Workspace, WorkspaceCreate, WorkspaceDetail
-from zenve_services import get_workspace_service
-from zenve_services.workspace_service import WorkspaceService
+from runtime.models.workspace import Workspace, WorkspaceCreate, WorkspaceDetail
+from runtime.services import get_workspace_service
+from runtime.services.workspace_service import WorkspaceService
 
 router = APIRouter(prefix="/api/v1/workspaces", tags=["workspaces"])
 

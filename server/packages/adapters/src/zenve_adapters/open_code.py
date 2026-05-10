@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import ClassVar
 
 from zenve_adapters.base import BaseAdapter
-from zenve_models.adapter import OpenCodeConfig, RunContext, RunResult
+from zenve_adapters.models import OpenCodeConfig, RunContext, RunResult
 
 
 class OpenCodeAdapter(BaseAdapter):

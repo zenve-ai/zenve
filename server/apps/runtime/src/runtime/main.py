@@ -6,8 +6,7 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 
 from runtime.lifespan import lifespan
-from runtime.routes import core_router, run_router, workspace_router
-from zenve_models.errors import (
+from runtime.models.errors import (
     AuthError,
     ConflictError,
     ExternalError,
@@ -16,6 +15,7 @@ from zenve_models.errors import (
     ValidationError,
     ZenveError,
 )
+from runtime.routes import core_router, run_router, workspace_router
 
 app = FastAPI(lifespan=lifespan)
 

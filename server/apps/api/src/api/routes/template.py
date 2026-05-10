@@ -1,8 +1,8 @@
 from fastapi import APIRouter, Depends, HTTPException
 
-from zenve_models.github_template import GitHubTemplateSummary
-from zenve_services import get_template_service
-from zenve_services.template import GitHubTemplateService
+from api.models.github_template import GitHubTemplateSummary
+from api.services import get_template_service
+from api.services.template import GitHubTemplateService
 
 router = APIRouter(prefix="/api/v1/templates", tags=["templates"])
 

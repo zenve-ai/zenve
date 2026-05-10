@@ -4,9 +4,9 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
+from conftest import json_line, make_proc
+from zenve_adapters.models import OpenCodeConfig, RunContext
 from zenve_adapters.open_code import OpenCodeAdapter
-from zenve_models.adapter import OpenCodeConfig, RunContext
-from zenve_utils.testing import json_line, make_proc
 
 # ---------------------------------------------------------------------------
 # Helpers

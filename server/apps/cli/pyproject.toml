@@ -8,12 +8,11 @@ dependencies = [
     "questionary>=2.0",
     "httpx>=0.27",
     "pydantic>=2",
+    "pydantic-settings",
+    "pyyaml",
     "python-dotenv>=1.0",
     "zenve-adapters",
     "zenve-engine",
-    "zenve-models",
-    "zenve-services",
-    "zenve-utils",
     "textual>=8.2.4",
     "croniter>=1.4",
 ]
@@ -31,6 +30,3 @@ packages = ["src/zenve_cli"]
 [tool.uv.sources]
 zenve-adapters = { workspace = true }
 zenve-engine = { workspace = true }
-zenve-models = { workspace = true }
-zenve-services = { workspace = true }
-zenve-utils = { workspace = true }

@@ -9,6 +9,7 @@ from typing import Literal
 
 from zenve_adapters import AdapterRegistry
 from zenve_adapters.base import BaseAdapter
+from zenve_adapters.models import RunContext, RunResult
 from zenve_engine.claims import add_claim, expired_claims, load_claims, remove_claim
 from zenve_engine.constants import CLAIMED_LABEL, FAILED_LABEL, NEEDS_INPUT_LABEL
 from zenve_engine.discovery import DiscoveredAgent
@@ -37,7 +38,6 @@ from zenve_engine.models.run_result import (
 from zenve_engine.models.settings import AgentSettings, ProjectSettings
 from zenve_engine.models.snapshot import Snapshot, SnapshotIssue, SnapshotPR
 from zenve_engine.pipeline import next_label, prev_labels
-from zenve_models.adapter import RunContext, RunResult
 
 logger = logging.getLogger(__name__)
 
