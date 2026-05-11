@@ -319,6 +319,7 @@ def ls(
     limit: int = typer.Option(50, "--limit", help="Max number of runs to show"),
 ) -> None:
     """List all runs for the current workspace."""
+    ensure_runtime()
     workspace_id = resolve_workspace_id(repo)
     resp = runtime_request("GET", f"/api/v1/workspaces/{workspace_id}/runs", params={"limit": limit})
     if resp.status_code != 200:
@@ -363,6 +364,7 @@ def show(
     repo: Path = typer.Option(Path("."), "--repo", help="Path to the repo root"),
 ) -> None:
     """Show details for a specific run."""
+    ensure_runtime()
     workspace_id = resolve_workspace_id(repo)
     resp = runtime_request("GET", f"/api/v1/workspaces/{workspace_id}/runs/{run_id}")
     if resp.status_code == 404:
@@ -386,12 +388,18 @@ def show(
     console.print()
 
     for agent in run["agents"]:
-        agent_status_style = "green" if agent["status"] == "done" else "red"
+        status = agent["status"]
+        if status in ("done", "completed"):
+            agent_status_style = "green"
+        elif status in ("needs_input", "changes_requested"):
+            agent_status_style = "yellow"
+        else:
+            agent_status_style = "red"
         line = Text()
         line.append("  ◆ ", style="bold cyan")
         line.append(agent["agent"], style="bold")
         line.append("  ")
-        line.append(agent["status"], style=agent_status_style)
+        line.append(status, style=agent_status_style)
         if agent.get("duration_seconds") is not None:
             line.append(f"  {agent['duration_seconds']:.1f}s", style="dim")
         console.print(line)

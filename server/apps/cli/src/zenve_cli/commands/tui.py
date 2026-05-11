@@ -29,13 +29,21 @@ def resolve_run_id(workspace_id: str, run_id: str | None) -> str:
     if run_id:
         return run_id
     resp = runtime_request("GET", f"/api/v1/workspaces/{workspace_id}/runs/active-run")
-    if resp.status_code == 404:
-        console.print("[yellow]◆[/yellow] No active run for this workspace.")
-        raise typer.Exit(0)
+    if resp.status_code == 200:
+        return resp.json()["run_id"]
+    if resp.status_code != 404:
+        report_error(resp)
+        raise typer.Exit(1)
+    # No active run — fall back to latest
+    resp = runtime_request("GET", f"/api/v1/workspaces/{workspace_id}/runs/latest")
     if resp.status_code != 200:
         report_error(resp)
         raise typer.Exit(1)
-    return resp.json()["run_id"]
+    latest = resp.json()
+    if latest is None:
+        console.print("[yellow]◆[/yellow] No runs found for this workspace.")
+        raise typer.Exit(0)
+    return latest["run_id"]
 
 
 def cmd(repo_root: Path, run_id: str | None) -> None:

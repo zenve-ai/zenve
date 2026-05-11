@@ -61,6 +61,10 @@ class RunService:
         runs.sort(key=lambda r: r.started_at, reverse=True)
         return runs[:limit]
 
+    def get_latest(self, workspace_id: str) -> WorkspaceRun | None:
+        runs = self.list_grouped(workspace_id, limit=1)
+        return runs[0] if runs else None
+
     def get_grouped(self, workspace_id: str, run_id: str) -> WorkspaceRun:
         agents: list[WorkspaceRunSummary] = []
         for path in self.iter_run_files(workspace_id):

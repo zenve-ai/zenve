@@ -43,6 +43,14 @@ def get_active_run(
     return {"run_id": record.run_id, "status": record.status}
 
 
+@router.get("/latest", response_model=WorkspaceRun | None)
+def get_latest_run(
+    workspace_id: str,
+    service: RunService = Depends(get_run_service),
+):
+    return service.get_latest(workspace_id)
+
+
 @router.get("/{run_id}", response_model=WorkspaceRun)
 def get_run(
     workspace_id: str,
