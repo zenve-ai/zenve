@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from abc import ABC, abstractmethod
 from typing import ClassVar
 
@@ -50,7 +51,7 @@ class BaseAdapter(ABC):
     # ------------------------------------------------------------------
 
     @abstractmethod
-    async def execute(self, ctx: RunContext) -> RunResult:
+    async def execute(self, ctx: RunContext, cancel_event: asyncio.Event | None = None) -> RunResult:
         """Execute the agent for one run (manual or heartbeat).
 
         Called inside a Celery worker. Implementations must handle both run

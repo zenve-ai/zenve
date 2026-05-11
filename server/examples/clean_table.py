@@ -2,7 +2,6 @@ import sys
 from typing import Any
 
 from sqlalchemy import text
-
 from zenve_db.database import make_session
 
 

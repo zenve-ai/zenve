@@ -50,7 +50,7 @@ class OpenCodeAdapter(BaseAdapter):
     # Execution
     # ------------------------------------------------------------------
 
-    async def execute(self, ctx: RunContext) -> RunResult:
+    async def execute(self, ctx: RunContext, cancel_event: asyncio.Event | None = None) -> RunResult:
         start = time.monotonic()
         config = self.validate_config(ctx.adapter_config)
 
@@ -127,9 +127,36 @@ class OpenCodeAdapter(BaseAdapter):
         last_error_payload: dict | None = None
 
         if proc.stdout:
-            async for raw_line in proc.stdout:
+            read_task = asyncio.create_task(proc.stdout.readline())
+            cancel_task = asyncio.create_task(cancel_event.wait()) if cancel_event else None
+
+            while True:
+                tasks: list = [read_task]
+                if cancel_task:
+                    tasks.append(cancel_task)
+
+                done, _ = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
+
+                if cancel_task and cancel_task in done:
+                    proc.terminate()
+                    await proc.wait()
+                    read_task.cancel()
+                    return RunResult(
+                        exit_code=-1,
+                        stdout="\n".join(full_stdout_lines),
+                        stderr="",
+                        duration_seconds=time.monotonic() - start,
+                        error="cancelled",
+                        outcome=None,
+                    )
+
+                raw_line = read_task.result()
+                if not raw_line:
+                    break  # EOF — process finished naturally
+
                 line = raw_line.decode(errors="replace").strip()
                 if not line:
+                    read_task = asyncio.create_task(proc.stdout.readline())
                     continue
                 full_stdout_lines.append(line)
 
@@ -137,6 +164,7 @@ class OpenCodeAdapter(BaseAdapter):
                     parsed = json.loads(line)
                 except json.JSONDecodeError:
                     print(f"[run:{ctx.run_id}] output: {line}")
+                    read_task = asyncio.create_task(proc.stdout.readline())
                     continue
 
                 event_type = parsed.get("type")
@@ -208,6 +236,8 @@ class OpenCodeAdapter(BaseAdapter):
 
                 if event:
                     ctx.on_event(*event)
+
+                read_task = asyncio.create_task(proc.stdout.readline())
 
         stderr_bytes = await proc.stderr.read() if proc.stderr else b""
         await proc.wait()

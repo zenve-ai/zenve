@@ -1,5 +1,6 @@
 import logging
 import os
+from pathlib import Path
 
 import uvicorn
 from fastapi import FastAPI, HTTPException, Request
@@ -74,9 +75,16 @@ app.include_router(core_router)
 app.include_router(workspace_router)
 app.include_router(run_router)
 
+log_file = Path.home() / ".zenve" / "runtime.log"
+log_file.parent.mkdir(exist_ok=True)
+
 logging.basicConfig(
     level=logging.INFO,
     format="%(levelname)s:     %(message)s",
+    handlers=[
+        logging.StreamHandler(),
+        logging.FileHandler(log_file),
+    ],
 )
 
 logger = logging.getLogger(__name__)

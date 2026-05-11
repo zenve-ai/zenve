@@ -1,12 +1,12 @@
 from logging.config import fileConfig
 
-from sqlalchemy import engine_from_config, pool
-
 import zenve_db.models  # noqa: F401 — registers all ORM models on Base
-from alembic import context
+from sqlalchemy import engine_from_config, pool
 
 # Import all models so Alembic sees them for autogenerate
 from zenve_db.database import Base
+
+from alembic import context
 
 config = context.config
 

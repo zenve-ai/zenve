@@ -6,11 +6,12 @@ from pathlib import Path
 import httpx
 import questionary
 import typer
+from rich import box
 from rich.console import Console
 from rich.table import Table
 
 from zenve_cli.commands.ui import WIZARD_STYLE
-from zenve_cli.runtime.client import report_error, runtime_request, runtime_url
+from zenve_cli.runtime.client import ensure_runtime, report_error, runtime_request, runtime_url
 from zenve_engine.constants import ZENVE_DIR
 
 workspace_app = typer.Typer(help="Workspace management commands")
@@ -71,6 +72,7 @@ def add_workspace(
     path: Path = typer.Argument(Path("."), help="Path to a repo with a .zenve/ folder"),
 ) -> None:
     """Register a workspace with the local runtime."""
+    ensure_runtime()
     status, body = register_path(path)
     if status == 201 and body:
         console.print(f"[green]✓[/green] Registered [cyan]{body['path']}[/cyan] (id: {body['id']})")
@@ -82,9 +84,10 @@ def add_workspace(
     raise typer.Exit(1)
 
 
-@workspace_app.command("list")
+@workspace_app.command("ls")
 def list_workspaces() -> None:
     """List workspaces registered with the runtime."""
+    ensure_runtime()
     resp = runtime_request("GET", "/api/v1/workspaces")
     if resp.status_code != 200:
         report_error(resp)
@@ -93,13 +96,25 @@ def list_workspaces() -> None:
     if not workspaces:
         console.print("[dim]No workspaces registered.[/dim]")
         return
-    table = Table(show_header=True, header_style="bold", box=None)
-    table.add_column("ID", style="cyan")
-    table.add_column("Path")
-    table.add_column("Registered", style="dim")
+
+    table = Table(
+        box=box.ROUNDED,
+        border_style="dim",
+        header_style="bold cyan",
+        show_lines=False,
+        pad_edge=True,
+    )
+    table.add_column("ID", style="cyan", no_wrap=True)
+    table.add_column("PATH")
+    table.add_column("REGISTERED", style="dim")
+
     for w in workspaces:
-        table.add_row(w["id"], w["path"], w["registered_at"])
+        registered = w["registered_at"].replace("T", " ").replace("Z", "")
+        table.add_row(w["id"], w["path"], registered)
+
+    console.print()
     console.print(table)
+    console.print()
 
 
 @workspace_app.command("remove")
@@ -107,6 +122,7 @@ def remove_workspace(
     target: str = typer.Argument(..., help="Workspace id or path (e.g. '.')"),
 ) -> None:
     """Unregister a workspace from the runtime (does not touch .zenve/)."""
+    ensure_runtime()
     workspace = resolve_workspace(target)
     resp = runtime_request("DELETE", f"/api/v1/workspaces/{workspace['id']}")
     if resp.status_code == 204:

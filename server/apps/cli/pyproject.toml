@@ -2,7 +2,7 @@
 name = "zenve-cli"
 version = "0.1.3"
 description = "Zenve CLI — autonomous agent runtime for GitHub repos"
-requires-python = ">=3.11"
+requires-python = ">=3.13"
 dependencies = [
     "typer[all]>=0.12",
     "questionary>=2.0",
@@ -13,6 +13,7 @@ dependencies = [
     "python-dotenv>=1.0",
     "zenve-adapters",
     "zenve-engine",
+    "zenve-runtime",
     "textual>=8.2.4",
     "croniter>=1.4",
 ]
@@ -30,3 +31,4 @@ packages = ["src/zenve_cli"]
 [tool.uv.sources]
 zenve-adapters = { workspace = true }
 zenve-engine = { workspace = true }
+zenve-runtime = { workspace = true }

@@ -7,7 +7,9 @@ from collections.abc import Callable
 from pathlib import Path
 
 import typer
+from rich import box
 from rich.console import Console
+from rich.table import Table
 from rich.text import Text
 
 from zenve_adapters import AdapterRegistry
@@ -15,6 +17,7 @@ from zenve_adapters.claude_code import ClaudeCodeAdapter
 from zenve_adapters.open_code import OpenCodeAdapter
 from zenve_cli.commands.snapshot import git_remote_slug
 from zenve_cli.console import ZenveTUI
+from zenve_cli.runtime.client import ensure_runtime, report_error, runtime_request
 from zenve_engine.config import ConfigError, load_project_settings
 from zenve_engine.discovery import DiscoveryError, discover_agents
 from zenve_engine.env import EnvError, load_env
@@ -35,7 +38,20 @@ from zenve_engine.github.client import GitHubClient
 from zenve_engine.github.snapshot import build_snapshot, write_snapshot
 from zenve_engine.models.run_result import RunResultFile
 
+run_app = typer.Typer(help="Run agents and inspect run history", invoke_without_command=True)
 console = Console()
+
+
+@run_app.callback()
+def run_callback(
+    ctx: typer.Context,
+    agent: str | None = typer.Option(None, "--agent", help="Run only this agent"),
+    dry_run: bool = typer.Option(False, "--dry-run", help="Show plan, no writes"),
+    repo: Path = typer.Option(Path("."), "--repo", help="Path to the repo root"),
+) -> None:
+    """Run all enabled agents against a fresh GitHub snapshot."""
+    if ctx.invoked_subcommand is None:
+        execute(agent=agent, dry_run=dry_run, repo=repo)
 
 
 def build_registry() -> AdapterRegistry:
@@ -45,12 +61,28 @@ def build_registry() -> AdapterRegistry:
     return registry
 
 
-def cmd(
-    repo_root: Path = Path("."),
-    agent: str | None = None,
-    dry_run: bool = False,
+def resolve_workspace_id(repo_root: Path) -> str:
+    abs_path = str(repo_root.expanduser().resolve())
+    resp = runtime_request("GET", "/api/v1/workspaces")
+    if resp.status_code != 200:
+        report_error(resp)
+        raise typer.Exit(1)
+    for w in resp.json():
+        if w["path"] == abs_path:
+            return w["id"]
+    console.print(f"[red]✗[/red] No workspace registered at [cyan]{abs_path}[/cyan]")
+    console.print("  Register it with: [cyan]zenve workspace add .[/cyan]")
+    raise typer.Exit(1)
+
+
+def execute(
+    agent: str | None = typer.Option(None, "--agent", help="Run only this agent"),
+    dry_run: bool = typer.Option(False, "--dry-run", help="Show plan, no writes"),
+    repo: Path = typer.Option(Path("."), "--repo", help="Path to the repo root"),
 ) -> None:
     """Run all enabled agents against a fresh GitHub snapshot."""
+    ensure_runtime()
+    repo_root = repo
     status = console.status("[cyan]starting zenve…[/cyan]", spinner="dots")
     status.start()
     try:
@@ -74,8 +106,8 @@ def cmd(
         raise typer.Exit(0)
 
     status.update("[cyan]checking git remote…[/cyan]")
-    repo = git_remote_slug(repo_root)
-    if not repo:
+    repo_slug = git_remote_slug(repo_root)
+    if not repo_slug:
         status.stop()
         typer.echo("✗ Could not determine repo. Ensure git remote origin is a GitHub URL.")
         raise typer.Exit(1)
@@ -133,10 +165,10 @@ def cmd(
         )
         emitter.emit(
             et.RUN_STARTED,
-            data={"agents": [a.name for a in agents], "repo": repo, "dry_run": True},
+            data={"agents": [a.name for a in agents], "repo": repo_slug, "dry_run": True},
         )
 
-        with GitHubClient(env.github_token, repo) as gh:
+        with GitHubClient(env.github_token, repo_slug) as gh:
             snapshot = build_snapshot(gh, env.run_id)
             write_snapshot(repo_root, snapshot)
             emitter.emit(
@@ -222,10 +254,10 @@ def cmd(
         )
         emitter.emit(
             et.RUN_STARTED,
-            data={"agents": [a.name for a in agents], "repo": repo, "dry_run": False},
+            data={"agents": [a.name for a in agents], "repo": repo_slug, "dry_run": False},
         )
 
-        with GitHubClient(env.github_token, repo) as gh:
+        with GitHubClient(env.github_token, repo_slug) as gh:
             snapshot = build_snapshot(gh, env.run_id)
             write_snapshot(repo_root, snapshot)
             emitter.emit(
@@ -279,3 +311,91 @@ def cmd(
         )
 
     ZenveTUI(run_fn=run_fn, schedule=project.run_schedule).run()
+
+
+@run_app.command("ls")
+def ls(
+    repo: Path = typer.Option(Path("."), "--repo", help="Path to the repo root"),
+    limit: int = typer.Option(50, "--limit", help="Max number of runs to show"),
+) -> None:
+    """List all runs for the current workspace."""
+    workspace_id = resolve_workspace_id(repo)
+    resp = runtime_request("GET", f"/api/v1/workspaces/{workspace_id}/runs", params={"limit": limit})
+    if resp.status_code != 200:
+        report_error(resp)
+        raise typer.Exit(1)
+
+    runs = resp.json()
+    if not runs:
+        console.print("[dim]No runs found.[/dim]")
+        return
+
+    table = Table(
+        box=box.ROUNDED,
+        border_style="dim",
+        header_style="bold cyan",
+        show_lines=False,
+        pad_edge=True,
+    )
+    table.add_column("RUN ID", style="cyan", no_wrap=True)
+    table.add_column("STARTED", style="dim")
+    table.add_column("STATUS", justify="center")
+    table.add_column("AGENTS")
+
+    for run in runs:
+        status = run["status"]
+        if status == "done":
+            status_text = Text("● done", style="green")
+        else:
+            status_text = Text("✗ failed", style="red")
+        agent_names = "  ".join(a["agent"] for a in run["agents"])
+        started = run["started_at"].replace("T", " ").replace("Z", "")
+        table.add_row(run["run_id"][:12], started, status_text, agent_names)
+
+    console.print()
+    console.print(table)
+    console.print()
+
+
+@run_app.command("show")
+def show(
+    run_id: str = typer.Argument(..., help="Run id to inspect"),
+    repo: Path = typer.Option(Path("."), "--repo", help="Path to the repo root"),
+) -> None:
+    """Show details for a specific run."""
+    workspace_id = resolve_workspace_id(repo)
+    resp = runtime_request("GET", f"/api/v1/workspaces/{workspace_id}/runs/{run_id}")
+    if resp.status_code == 404:
+        console.print(f"[red]✗[/red] Run [cyan]{run_id}[/cyan] not found.")
+        raise typer.Exit(1)
+    if resp.status_code != 200:
+        report_error(resp)
+        raise typer.Exit(1)
+
+    run = resp.json()
+
+    header = Text()
+    header.append("run  ", style="dim")
+    header.append(run["run_id"], style="bold cyan")
+    header.append("   ")
+    status_style = "bold green" if run["status"] == "done" else "bold red"
+    header.append(run["status"], style=status_style)
+    console.print(header)
+    console.print(f"  [dim]started   {run['started_at'].replace('T', ' ').replace('Z', '')}[/dim]")
+    console.print(f"  [dim]finished  {run['finished_at'].replace('T', ' ').replace('Z', '')}[/dim]")
+    console.print()
+
+    for agent in run["agents"]:
+        agent_status_style = "green" if agent["status"] == "done" else "red"
+        line = Text()
+        line.append("  ◆ ", style="bold cyan")
+        line.append(agent["agent"], style="bold")
+        line.append("  ")
+        line.append(agent["status"], style=agent_status_style)
+        if agent.get("duration_seconds") is not None:
+            line.append(f"  {agent['duration_seconds']:.1f}s", style="dim")
+        console.print(line)
+        if agent.get("error"):
+            console.print(f"    [red]{agent['error']}[/red]")
+
+    console.print()

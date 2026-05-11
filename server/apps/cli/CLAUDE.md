@@ -165,3 +165,32 @@ Create `integrations/{provider}/` with its own `__init__.py` and client module. 
 1. Create `commands/{name}.py` with a `cmd(repo_root, ...)` function
 2. Register in `cli.py` with `@app.command()`
 3. Keep the command thin — delegate to `core/` or `runtime/`
+
+## Table Style
+
+All commands that display lists of items must use the same Rich table style:
+
+```python
+from rich import box
+from rich.table import Table
+
+table = Table(
+    box=box.ROUNDED,
+    border_style="dim",
+    header_style="bold cyan",
+    show_lines=False,
+    pad_edge=True,
+)
+table.add_column("COLUMN", style="cyan", no_wrap=True)
+table.add_column("OTHER COLUMN", style="dim")
+
+console.print()
+console.print(table)
+console.print()
+```
+
+- Column headers in ALL CAPS
+- First/ID column: `style="cyan"`, `no_wrap=True`
+- Timestamp columns: `style="dim"`
+- Status values: use `Text("● done", style="green")` / `Text("✗ failed", style="red")`
+- List commands are named `ls`, not `list`

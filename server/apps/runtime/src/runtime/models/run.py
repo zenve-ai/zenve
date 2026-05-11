@@ -50,3 +50,23 @@ class WorkspaceRunDetail(WorkspaceRunSummary):
     pipeline_transition: PipelineTransition | None = None
     token_usage: TokenUsage | None = None
     error: str | None = None
+
+
+class WorkspaceRun(BaseModel):
+    """All agent results for a single run, grouped by run_id."""
+
+    run_id: str
+    started_at: str
+    finished_at: str
+    status: str
+    agents: list[WorkspaceRunSummary]
+
+
+class RunTriggerRequest(BaseModel):
+    only_agent: str | None = None
+    env_vars: dict[str, str] | None = None
+
+
+class RunTriggerResponse(BaseModel):
+    run_id: str
+    status: Literal["queued"]

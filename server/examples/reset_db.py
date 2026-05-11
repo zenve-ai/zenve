@@ -15,7 +15,6 @@ import argparse
 import sys
 
 from sqlalchemy import text
-
 from zenve_db.database import make_session
 
 
