@@ -4,30 +4,30 @@ Local-machine FastAPI daemon. Long-running process that owns workspaces (registe
 
 Port: **8001** (API app uses 8000).
 
-## Status
-
-Scaffold only. Read endpoints over the on-disk format the CLI already writes. **No** auth, **no** scheduler, **no** run triggering, **no** SSE/WebSocket yet — those land in subsequent iterations.
-
-The CLI is **not** modified. `zenve run` continues to work standalone.
-
 ## Structure
 
 ```
 src/runtime/
-├── main.py             # FastAPI app, exception handlers, CORS, router include
-├── lifespan.py         # constructs WorkspaceService + RunService, stashes on app.state
+├── main.py                  # FastAPI app, exception handlers, CORS, router include
+├── lifespan.py              # constructs all services, stashes on app.state
+├── run_store.py             # in-memory run state + SSE broadcast
 ├── models/
-│   ├── errors.py       # ZenveError + domain exceptions
-│   ├── workspace.py    # Workspace, WorkspaceCreate, WorkspaceDetail
-│   └── run.py          # WorkspaceRunSummary, WorkspaceRunDetail, RunItem, TokenUsage, PipelineTransition
+│   ├── errors.py            # ZenveError + domain exceptions
+│   ├── workspace.py         # Workspace, WorkspaceCreate, WorkspaceDetail
+│   ├── run.py               # WorkspaceRunSummary, WorkspaceRunDetail, RunItem, TokenUsage, PipelineTransition
+│   └── snapshot.py          # SnapshotResponse
 ├── services/
-│   ├── __init__.py     # get_workspace_service, get_run_service dependency factories
+│   ├── __init__.py          # get_*_service dependency factories
 │   ├── workspace_service.py
-│   └── run_service.py
+│   ├── run_service.py
+│   ├── run_trigger_service.py
+│   ├── scheduler_service.py
+│   └── snapshot_service.py  # SnapshotService.take() — calls zenve_engine.snapshot()
 └── routes/
-    ├── core.py         # GET / and /healthz
-    ├── workspace.py    # /api/v1/workspaces
-    └── run.py          # /api/v1/workspaces/{id}/runs
+    ├── core.py              # GET / and /healthz
+    ├── workspace.py         # /api/v1/workspaces
+    ├── run.py               # /api/v1/workspaces/{id}/runs + SSE stream
+    └── snapshot.py          # POST /api/v1/workspaces/{id}/snapshot
 ```
 
 ## Endpoints
@@ -41,8 +41,11 @@ All under `/api/v1`. No auth.
 | GET | `/workspaces` | `list[Workspace]` |
 | GET | `/workspaces/{id}` | `WorkspaceDetail` (re-reads `settings.json` each call; lists agent slugs) |
 | DELETE | `/workspaces/{id}` | 204 (registry only — never touches `.zenve/`) |
+| POST | `/workspaces/{id}/runs` | 202 `RunTriggerResponse` — triggers a run via engine |
 | GET | `/workspaces/{id}/runs?agent=&limit=` | `list[WorkspaceRunSummary]` sorted by `started_at` desc |
 | GET | `/workspaces/{id}/runs/{run_id}` | `WorkspaceRunDetail` |
+| GET | `/workspaces/{id}/runs/{run_id}/stream` | SSE stream of run events |
+| POST | `/workspaces/{id}/snapshot` | `SnapshotResponse` — fetches GitHub state, writes `.zenve/snapshot.json` |
 
 ## Layer Rules
 
@@ -51,7 +54,7 @@ Same as `apps/api/` (see [server/CLAUDE.md](../../CLAUDE.md)):
 - **Routes are thin** — no business logic, no file I/O, no JSON parsing. Only `Depends(get_*_service)` then call.
 - **Services** raise domain exceptions from `runtime.models.errors` (`NotFoundError`, `ConflictError`, `ValidationError`, `ExternalError`). The handlers in `main.py` translate them to HTTP. **Never** raise `HTTPException` from a service.
 - **Pydantic models** live in `runtime/models/`, never inside `routes/`.
-- **Dependency factories** (`get_workspace_service`, `get_run_service`) live only in `runtime/services/__init__.py` — never in route files.
+- **Dependency factories** (`get_workspace_service`, `get_run_service`, `get_snapshot_service`, etc.) live only in `runtime/services/__init__.py` — never in route files.
 - **No DB imports** in routes. (Runtime has no DB — registry is filesystem.)
 
 ## Workspace Registry
@@ -107,10 +110,7 @@ Same flow as `apps/api/`:
 4. **Route** → `apps/runtime/src/runtime/routes/{domain}.py`
 5. **Register router** → `apps/runtime/src/runtime/routes/__init__.py` + `main.py`
 
-## Roadmap (out of scope for current scaffold)
+## Roadmap
 
-- Scheduler — fire runs based on each workspace's `run_schedule` (cron). The CLI already has the cron parsing logic; lift into a service.
-- Run triggering — `POST /workspaces/{id}/runs` to spawn `zenve run` subprocesses
-- SSE / WebSocket streaming of live events
 - Filesystem watcher on each `settings.json` so schedule edits hot-reload
 - Auth (local-only `127.0.0.1` is the only "auth" today)

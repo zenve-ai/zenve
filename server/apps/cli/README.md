@@ -46,10 +46,10 @@ zenve pipeline                 Display + validate the pipeline
 zenve status                   Last run per agent
 zenve init                     Scaffold .zenve/ interactively
 zenve doctor                   Check repo setup
-zenve agents list              List agents and enabled/disabled status
-zenve agents logs <name>       Run history for an agent
-zenve agents enable <name>     Enable an agent
-zenve agents disable <name>    Disable an agent
+zenve agent ls                 List agents and enabled/disabled status
+zenve agent logs <name>        Run history for an agent
+zenve agent enable <name>      Enable an agent
+zenve agent disable <name>     Disable an agent
 zenve skills list              List available skills
 ```
 
