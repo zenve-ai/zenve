@@ -21,3 +21,4 @@ class WorkspaceDetail(Workspace):
     pipeline: dict[str, str | None] = Field(default_factory=dict)
     stack: list[str] = Field(default_factory=list)
     agents: list[str] = Field(default_factory=list)
+    repo: str | None = None

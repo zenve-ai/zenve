@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import logging
-import os
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from uuid import uuid4
@@ -11,6 +10,7 @@ from runtime.models.run import RunTriggerRequest, RunTriggerResponse
 from runtime.run_store import RunStore
 from runtime.services.workspace_service import WorkspaceService
 from zenve_engine import DirtyTreeError, EngineError, MissingRemoteBranchError
+from zenve_engine.env import resolve_github_token
 
 logger = logging.getLogger(__name__)
 
@@ -23,11 +23,11 @@ class RunTriggerService:
 
     def trigger(self, workspace_id: str, req: RunTriggerRequest) -> RunTriggerResponse:
         detail = self.workspace_service.detail(workspace_id)
-        github_token = os.environ.get("GITHUB_TOKEN", "")
+        github_token = resolve_github_token() or ""
         run_id = uuid4().hex
         self.run_store.create(run_id, workspace_id)
         self._executor.submit(
-            self.execute_run, run_id, Path(detail.path), detail.project, github_token, req
+            self.execute_run, run_id, Path(detail.path), detail.repo or detail.project, github_token, req
         )
         return RunTriggerResponse(run_id=run_id, status="queued")
 

@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import json
 import os
+import re
+import subprocess
 import threading
 import uuid
 from datetime import UTC, datetime
@@ -9,6 +11,26 @@ from pathlib import Path
 
 from runtime.models.errors import ConflictError, ExternalError, NotFoundError, ValidationError
 from runtime.models.workspace import Workspace, WorkspaceCreate, WorkspaceDetail
+
+
+def git_remote_slug(repo_root: Path) -> str | None:
+    """Return `owner/repo` from the git remote origin URL, or None."""
+    try:
+        result = subprocess.run(
+            ["git", "remote", "get-url", "origin"],
+            capture_output=True,
+            text=True,
+            check=True,
+            cwd=repo_root,
+        )
+        url = result.stdout.strip()
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        return None
+    m = re.search(r"github\.com[:/]([^/]+)/([^/]+?)(?:\.git)?/?$", url)
+    if not m:
+        return None
+    return f"{m.group(1)}/{m.group(2)}"
+
 
 ZENVE_DIR = ".zenve"
 SETTINGS_FILE = "settings.json"
@@ -125,4 +147,5 @@ class WorkspaceService:
             pipeline=settings.get("pipeline", {}),
             stack=settings.get("stack", []),
             agents=agent_slugs,
+            repo=git_remote_slug(path),
         )
