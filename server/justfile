@@ -48,6 +48,29 @@ cli-bump bump="patch":
 
     print(f"Updated pyproject.toml and __init__.py to {new_version}")
 
+cli-release:
+    #!/usr/bin/env python3
+    import subprocess, re, sys
+    from pathlib import Path
+
+    pyproject = Path("apps/cli/pyproject.toml")
+    version = re.search(r'(?<=version = ")[^"]+', pyproject.read_text()).group()
+    tag = f"v{version}"
+
+    existing = subprocess.run(["git", "tag", "--list", tag], capture_output=True, text=True, cwd="..").stdout.strip()
+    if existing:
+        print(f"Tag {tag} already exists"); sys.exit(1)
+
+    subprocess.run(["git", "tag", tag], cwd="..", check=True)
+    print(f"Tagged {tag}")
+
+    result = subprocess.run(["git-cliff", "--tag", tag, "-o", "CHANGELOG.md"], cwd="..")
+    if result.returncode != 0:
+        subprocess.run(["git", "tag", "-d", tag], cwd="..")
+        print("git-cliff failed, tag removed"); sys.exit(1)
+
+    print(f"CHANGELOG.md updated for {tag}")
+
 cli-build:
     uv sync --all-packages
     uv run --with pyinstaller pyinstaller apps/cli/zenve.spec --distpath apps/cli/dist --workpath /tmp/pyinstaller_build --noconfirm
