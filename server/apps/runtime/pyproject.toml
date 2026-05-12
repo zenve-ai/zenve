@@ -8,6 +8,7 @@ dependencies = [
     "uvicorn[standard]>=0.30.0",
     "pydantic>=2",
     "croniter>=2.0",
+    "pyyaml",
     "zenve-engine",
 ]
 

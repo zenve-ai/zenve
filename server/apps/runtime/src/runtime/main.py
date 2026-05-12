@@ -16,7 +16,8 @@ from runtime.models.errors import (
     ValidationError,
     ZenveError,
 )
-from runtime.routes import core_router, run_router, workspace_router
+from runtime.routes import core_router, run_router, skill_router, snapshot_router, template_router, workspace_router
+from zenve_engine.github.client import GitHubError
 
 app = FastAPI(lifespan=lifespan)
 
@@ -56,6 +57,11 @@ async def zenve_handler(request: Request, exc: ZenveError) -> None:
     raise HTTPException(status_code=500, detail=exc.message)
 
 
+@app.exception_handler(GitHubError)
+async def github_error_handler(request: Request, exc: GitHubError) -> None:
+    raise HTTPException(status_code=502, detail=f"GitHub API error ({exc.status_code}): {exc.body}")
+
+
 origins = [
     "http://localhost:5173",
     "http://localhost:5174",
@@ -74,6 +80,9 @@ app.add_middleware(
 app.include_router(core_router)
 app.include_router(workspace_router)
 app.include_router(run_router)
+app.include_router(snapshot_router)
+app.include_router(template_router)
+app.include_router(skill_router)
 
 log_file = Path.home() / ".zenve" / "runtime.log"
 log_file.parent.mkdir(exist_ok=True)
