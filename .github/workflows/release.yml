@@ -5,25 +5,13 @@ on:
     tags:
       - "v*.*.*"
 
-env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
-
 jobs:
-  build:
-    name: Build ${{ matrix.asset }}
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - os: ubuntu-latest
-            asset: zenve-linux-x86_64
-          - os: macos-latest
-            asset: zenve-macos-arm64
-          # - os: macos-13
-          #   asset: zenve-macos-x86_64
-          - os: windows-latest
-            asset: zenve-windows-x86_64.exe
+  publish:
+    name: Build & publish to PyPI
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write   # PyPI trusted publishing (OIDC)
+      contents: write   # GitHub release
 
     steps:
       - uses: actions/checkout@v4
@@ -38,63 +26,34 @@ jobs:
         with:
           python-version: "3.13"
 
-      - name: Install workspace dependencies
+      - name: Build all packages
         working-directory: server
-        run: uv sync --all-packages
+        run: |
+          rm -rf dist
+          uv build --package zenve-adapters
+          uv build --package zenve-engine
+          uv build --package zenve-runtime
+          uv build --package zenve-cli
+          ls -lh dist/
 
-      - name: Build binary
+      - name: Publish to PyPI
         working-directory: server
-        run: uv run --with pyinstaller pyinstaller apps/cli/zenve.spec --distpath apps/cli/dist --workpath /tmp/pyinstaller_build --noconfirm
+        run: uv publish dist/*
 
-      - name: Rename binary (Unix)
-        if: runner.os != 'Windows'
-        run: mv server/apps/cli/dist/zenve server/apps/cli/dist/${{ matrix.asset }}
-
-      - name: Rename binary (Windows)
-        if: runner.os == 'Windows'
-        shell: pwsh
-        run: Move-Item server/apps/cli/dist/zenve.exe server/apps/cli/dist/${{ matrix.asset }}
-
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: ${{ matrix.asset }}
-          path: server/apps/cli/dist/${{ matrix.asset }}
-
-  release:
-    name: Create GitHub Release
-    needs: build
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Download all artifacts
-        uses: actions/download-artifact@v4
-        with:
-          path: dist/
-          merge-multiple: true
-
-      - name: Create release
+      - name: Create GitHub release
         uses: softprops/action-gh-release@v2
         with:
-          files: dist/*
           generate_release_notes: true
           body: |
             ## Install
 
-            **macOS / Linux (curl)**
             ```bash
-            curl -fsSL https://raw.githubusercontent.com/${{ github.repository }}/main/scripts/install.sh | sh
+            uv tool install zenve-cli       # recommended
+            pipx install zenve-cli          # alternative
             ```
 
-            **Manual download**
-            Pick the binary for your platform from the assets below and place it in your `$PATH`.
+            Upgrade:
 
-            | Platform | File |
-            |---|---|
-            | Linux x86_64 | `zenve-linux-x86_64` |
-            | macOS arm64 (M1/M2/M3) | `zenve-macos-arm64` |
-            | Windows x86_64 | `zenve-windows-x86_64.exe` |
+            ```bash
+            uv tool upgrade zenve-cli
+            ```

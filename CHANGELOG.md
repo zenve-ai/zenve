@@ -1,6 +1,44 @@
 # Changelog
+## [0.1.5] - 2026-05-12
 
-## [0.1.3] - 2026-05-10
+### Documentation
+
+- Update readme
+
+## [0.1.4] - 2026-05-12
+
+### Bug Fixes
+
+- **cli**: Fix install script for silicon mac
+- **cli**: Small bugs
+- **runtime**: Detect git remote repo slug, use resolve_github_token
+
+### Chores
+
+- **release**: Bump CLI to v0.1.4 and add cli-release recipe
+
+### Documentation
+
+- Add docs dir to repo
+- Update CLAUDE.md files, remove old CLI ARCHITECTURE.md
+
+### Features
+
+- **runtime**: Create runtime app
+- **cli**: Add workspace command + auto-register on init
+- **cli**: Add server command
+- **runtime**: Add SSE streaming for run events
+- **runtime**: Add scheduler service
+- **runtime**: Add snapshot, template, and skill routes and services
+
+### Refactoring
+
+- Extract run engine into zenve-engine package
+- Remove from packages services
+- **cli**: Simplify TUI to consume Iterable[dict]
+- **cli**: Rename subcommands, update commands, remove local template service
+
+## [0.1.3] - 2026-05-08
 
 ### Bug Fixes
 
@@ -20,6 +58,7 @@
 - **server**: Rename justfile cli recipes to cli-* prefix
 - **examples**: Switch run_adapter to ClaudeCodeAdapter plan mode
 - **adapters**: Bump claude_code default max_turns to 20
+- Update changelog for v1.0.0
 
 ### Documentation
 

@@ -1,6 +1,6 @@
 [project]
 name = "zenve-engine"
-version = "0.1.4"
+version = "0.1.5"
 description = "Zenve agent run engine — parallel execution of agents against a .zenve/ repo"
 readme = "README.md"
 requires-python = ">=3.13"
@@ -20,7 +20,7 @@ dependencies = [
     "httpx>=0.27",
     "pydantic>=2",
     "python-dotenv>=1.0",
-    "zenve-adapters>=0.1.4",
+    "zenve-adapters>=0.1.5",
 ]
 
 [project.urls]

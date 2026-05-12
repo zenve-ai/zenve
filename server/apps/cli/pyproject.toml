@@ -1,6 +1,6 @@
 [project]
 name = "zenve-cli"
-version = "0.1.4"
+version = "0.1.5"
 description = "Zenve CLI — autonomous agent runtime for GitHub repos"
 readme = "README.md"
 requires-python = ">=3.13"
@@ -26,9 +26,9 @@ dependencies = [
     "pydantic-settings",
     "pyyaml",
     "python-dotenv>=1.0",
-    "zenve-adapters>=0.1.4",
-    "zenve-engine>=0.1.4",
-    "zenve-runtime>=0.1.4",
+    "zenve-adapters>=0.1.5",
+    "zenve-engine>=0.1.5",
+    "zenve-runtime>=0.1.5",
     "textual>=8.2.4",
     "croniter>=1.4",
 ]
