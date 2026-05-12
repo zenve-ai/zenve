@@ -1,4 +1,8 @@
+import json
+import queue
+
 from fastapi import APIRouter, Depends
+from fastapi.responses import StreamingResponse
 
 from runtime.models.errors import NotFoundError
 from runtime.models.run import (
@@ -67,3 +71,29 @@ def get_run_events(
     service: RunService = Depends(get_run_service),
 ):
     return service.get_events(workspace_id, run_id)
+
+
+@router.get("/{run_id}/stream")
+def stream_run_events(
+    workspace_id: str,
+    run_id: str,
+    run_store: RunStore = Depends(get_run_store),
+):
+    if run_store.get(run_id) is None:
+        raise NotFoundError(f"Run {run_id} not found")
+
+    def generate():
+        q = run_store.subscribe(run_id)
+        try:
+            while True:
+                try:
+                    event = q.get(timeout=30)
+                    if event is None:
+                        break
+                    yield f"data: {json.dumps(event)}\n\n"
+                except queue.Empty:
+                    yield ": heartbeat\n\n"
+        finally:
+            run_store.unsubscribe(run_id, q)
+
+    return StreamingResponse(generate(), media_type="text/event-stream")

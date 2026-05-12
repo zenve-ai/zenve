@@ -41,6 +41,10 @@ class RunTriggerService:
     ) -> None:
         self.run_store.update_status(run_id, "running")
         try:
+            def on_event(event: dict) -> None:
+                logger.info("run_event run_id=%s event=%s", run_id, event)
+                self.run_store.broadcast(run_id, event)
+
             zenve_engine.run(
                 project_dir=project_dir,
                 run_id=run_id,
@@ -48,12 +52,15 @@ class RunTriggerService:
                 repo=repo,
                 only_agent=req.only_agent,
                 env_vars=req.env_vars,
-                on_event=lambda event: logger.info("run_event run_id=%s event=%s", run_id, event),
+                on_event=on_event,
             )
             self.run_store.update_status(run_id, "done")
         except (DirtyTreeError, MissingRemoteBranchError, EngineError) as exc:
             logger.error("run failed run_id=%s: %s", run_id, exc)
             self.run_store.update_status(run_id, "failed")
+            self.run_store.broadcast(run_id, {"type": "run.failed", "data": {"error": str(exc)}})
+        finally:
+            self.run_store.close(run_id)
 
     def shutdown(self) -> None:
         self._executor.shutdown(wait=False)
