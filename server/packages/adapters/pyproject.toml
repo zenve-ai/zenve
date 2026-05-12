@@ -1,11 +1,29 @@
 [project]
 name = "zenve-adapters"
-version = "0.1.0"
-description = "zenve agent adapter framework"
+version = "0.1.4"
+description = "Zenve agent adapter framework — base types for adapters that run agents (Claude Code, opencode, etc.)"
+readme = "README.md"
 requires-python = ">=3.13"
+license = { text = "MIT" }
+authors = [{ name = "Alexandru Ghiura", email = "ghalex@gmail.com" }]
+keywords = ["zenve", "agents", "automation", "github", "claude"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Software Development :: Libraries",
+]
 dependencies = [
     "pydantic>=2",
 ]
+
+[project.urls]
+Homepage = "https://github.com/zenve-ai/zenve"
+Repository = "https://github.com/zenve-ai/zenve"
+Issues = "https://github.com/zenve-ai/zenve/issues"
 
 [build-system]
 requires = ["hatchling"]
@@ -13,4 +31,3 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/zenve_adapters"]
-

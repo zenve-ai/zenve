@@ -6,6 +6,19 @@ See [ARCHITECTURE.md](./ARCHITECTURE.md) for the full design.
 
 ## Install
 
+```bash
+uv tool install zenve-cli      # recommended
+pipx install zenve-cli         # alternative
+```
+
+Upgrade:
+
+```bash
+uv tool upgrade zenve-cli
+```
+
+### From source (for development)
+
 The CLI is a uv workspace member. From `server/`:
 
 ```bash

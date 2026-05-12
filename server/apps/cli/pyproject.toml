@@ -2,7 +2,22 @@
 name = "zenve-cli"
 version = "0.1.4"
 description = "Zenve CLI — autonomous agent runtime for GitHub repos"
+readme = "README.md"
 requires-python = ">=3.13"
+license = { text = "MIT" }
+authors = [{ name = "Alexandru Ghiura", email = "ghalex@gmail.com" }]
+keywords = ["zenve", "agents", "automation", "github", "claude", "cli"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Software Development",
+    "Topic :: Utilities",
+]
 dependencies = [
     "typer[all]>=0.12",
     "questionary>=2.0",
@@ -11,15 +26,20 @@ dependencies = [
     "pydantic-settings",
     "pyyaml",
     "python-dotenv>=1.0",
-    "zenve-adapters",
-    "zenve-engine",
-    "zenve-runtime",
+    "zenve-adapters>=0.1.4",
+    "zenve-engine>=0.1.4",
+    "zenve-runtime>=0.1.4",
     "textual>=8.2.4",
     "croniter>=1.4",
 ]
 
 [project.scripts]
 zenve = "zenve_cli.cli:app"
+
+[project.urls]
+Homepage = "https://github.com/zenve-ai/zenve"
+Repository = "https://github.com/zenve-ai/zenve"
+Issues = "https://github.com/zenve-ai/zenve/issues"
 
 [build-system]
 requires = ["hatchling"]

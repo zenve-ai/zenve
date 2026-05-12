@@ -1,19 +1,37 @@
 [project]
 name = "zenve-runtime"
-version = "0.1.0"
-description = "zenve runtime daemon"
+version = "0.1.4"
+description = "Zenve runtime daemon — local FastAPI service that owns workspaces and runs"
+readme = "README.md"
 requires-python = ">=3.13"
+license = { text = "MIT" }
+authors = [{ name = "Alexandru Ghiura", email = "ghalex@gmail.com" }]
+keywords = ["zenve", "agents", "automation", "github", "claude", "fastapi"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Software Development :: Libraries",
+]
 dependencies = [
     "fastapi>=0.115.0",
     "uvicorn[standard]>=0.30.0",
     "pydantic>=2",
     "croniter>=2.0",
     "pyyaml",
-    "zenve-engine",
+    "zenve-engine>=0.1.4",
 ]
 
 [project.scripts]
 runtime-start = "runtime.main:main"
+
+[project.urls]
+Homepage = "https://github.com/zenve-ai/zenve"
+Repository = "https://github.com/zenve-ai/zenve"
+Issues = "https://github.com/zenve-ai/zenve/issues"
 
 [build-system]
 requires = ["hatchling"]

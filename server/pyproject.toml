@@ -19,7 +19,8 @@ members = [
     "apps/api",
     "apps/cli",
     "apps/runtime",
-    "packages/*",
+    "packages/adapters",
+    "packages/engine",
 ]
 
 [tool.uv.sources]
