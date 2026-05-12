@@ -3,9 +3,11 @@ from __future__ import annotations
 import asyncio
 import dataclasses
 import json
-from collections.abc import Callable
+import os
+from collections.abc import Iterator
 from pathlib import Path
 
+import httpx
 import typer
 from rich import box
 from rich.console import Console
@@ -17,17 +19,15 @@ from zenve_adapters.claude_code import ClaudeCodeAdapter
 from zenve_adapters.open_code import OpenCodeAdapter
 from zenve_cli.commands.snapshot import git_remote_slug
 from zenve_cli.console import ZenveTUI
-from zenve_cli.runtime.client import ensure_runtime, report_error, runtime_request
+from zenve_cli.runtime.client import ensure_runtime, report_error, runtime_request, runtime_url
 from zenve_engine.config import ConfigError, load_project_settings
 from zenve_engine.discovery import DiscoveryError, discover_agents
 from zenve_engine.env import EnvError, load_env
 from zenve_engine.events import types as et
 from zenve_engine.events.emitter import EventEmitter
-from zenve_engine.exec.executor import DryRunResult, reconcile_claims
-from zenve_engine.exec.parallel import run_all
+from zenve_engine.exec.executor import DryRunResult
 from zenve_engine.git.commit import (
     GitError,
-    commit_agents,
     commit_zenve_dir,
     fetch_origin,
     has_dirty_outside_zenve,
@@ -36,7 +36,6 @@ from zenve_engine.git.commit import (
 )
 from zenve_engine.github.client import GitHubClient
 from zenve_engine.github.snapshot import build_snapshot, write_snapshot
-from zenve_engine.models.run_result import RunResultFile
 
 run_app = typer.Typer(help="Run agents and inspect run history", invoke_without_command=True)
 console = Console()
@@ -75,14 +74,10 @@ def resolve_workspace_id(repo_root: Path) -> str:
     raise typer.Exit(1)
 
 
-def execute(
-    agent: str | None = typer.Option(None, "--agent", help="Run only this agent"),
-    dry_run: bool = typer.Option(False, "--dry-run", help="Show plan, no writes"),
-    repo: Path = typer.Option(Path("."), "--repo", help="Path to the repo root"),
-) -> None:
-    """Run all enabled agents against a fresh GitHub snapshot."""
-    ensure_runtime()
-    repo_root = repo
+def execute_dry(agent: str | None, repo_root: Path) -> None:
+    """Run agents in dry-run mode locally — shows plan without writes."""
+    from zenve_engine.exec.parallel import run_all
+
     status = console.status("[cyan]starting zenve…[/cyan]", spinner="dots")
     status.start()
     try:
@@ -115,14 +110,19 @@ def execute(
     if has_dirty_outside_zenve(repo_root):
         status.stop()
         typer.echo("✗ Local repo has uncommitted changes outside .zenve/.")
-        typer.echo("  Zenve cannot run safely because generated worktrees/snapshots may be based on stale or mixed state.")
+        typer.echo(
+            "  Zenve cannot run safely because generated worktrees/snapshots may be based on stale or mixed state."
+        )
         typer.echo("")
         typer.echo("  Commit, stash, or discard your changes, then run again.")
         raise typer.Exit(1)
 
     if has_dirty_zenve(repo_root):
         status.stop()
-        if not typer.confirm("Local .zenve/ has uncommitted changes. Commit and push them before running?", default=True):
+        if not typer.confirm(
+            "Local .zenve/ has uncommitted changes. Commit and push them before running?",
+            default=True,
+        ):
             typer.echo("✗ Aborted. Commit, stash, or discard your .zenve/ changes, then run again.")
             raise typer.Exit(1)
         status.start()
@@ -155,162 +155,131 @@ def execute(
 
     env_vars = {"ZENVE_RUN_ID": env.run_id, "GH_TOKEN": env.github_token}
 
-    if dry_run:
-        emitter = EventEmitter(
-            repo_root=repo_root,
-            run_id=env.run_id,
-            webhook_url=env.webhook_url,
-            webhook_secret=env.webhook_secret,
-            on_event=None,
-        )
+    emitter = EventEmitter(
+        repo_root=repo_root,
+        run_id=env.run_id,
+        webhook_url=env.webhook_url,
+        webhook_secret=env.webhook_secret,
+        on_event=None,
+    )
+    emitter.emit(
+        et.RUN_STARTED,
+        data={"agents": [a.name for a in agents], "repo": repo_slug, "dry_run": True},
+    )
+
+    with GitHubClient(env.github_token, repo_slug) as gh:
+        snapshot = build_snapshot(gh, env.run_id)
+        write_snapshot(repo_root, snapshot)
         emitter.emit(
-            et.RUN_STARTED,
-            data={"agents": [a.name for a in agents], "repo": repo_slug, "dry_run": True},
+            et.SNAPSHOT_FETCHED,
+            data={
+                "issues": len(snapshot.issues),
+                "pull_requests": len(snapshot.pull_requests),
+                "branches": len(snapshot.branches),
+            },
         )
 
-        with GitHubClient(env.github_token, repo_slug) as gh:
-            snapshot = build_snapshot(gh, env.run_id)
-            write_snapshot(repo_root, snapshot)
-            emitter.emit(
-                et.SNAPSHOT_FETCHED,
-                data={
-                    "issues": len(snapshot.issues),
-                    "pull_requests": len(snapshot.pull_requests),
-                    "branches": len(snapshot.branches),
-                },
-            )
-
-            registry = build_registry()
-            results = asyncio.run(
-                run_all(
-                    agents=agents,
-                    snapshot=snapshot,
-                    project=project,
-                    repo_root=repo_root,
-                    run_id=env.run_id,
-                    registry=registry,
-                    gh=gh,
-                    emitter=emitter,
-                    env_vars=env_vars,
-                    dry_run=True,
-                )
-            )
-
-        dry_lookup = {r.agent_name: r for r in results if isinstance(r, DryRunResult)}
-        label_w = 12
-
-        def row(label: str, value: str, value_style: str = "default") -> None:
-            line = Text()
-            line.append(f"    {label:<{label_w}}", style="dim")
-            line.append(value, style=value_style)
-            console.print(line)
-
-        console.print()
-        for ag in agents:
-            slug_line = Text()
-            slug_line.append("  ◆ ", style="bold cyan")
-            slug_line.append(ag.name, style="bold")
-            console.print(slug_line)
-
-            dr = dry_lookup.get(ag.name)
-            if dr is None:
-                console.print("    [dim]no result[/dim]")
-                console.print()
-                continue
-
-            row("name", ag.settings.name)
-            row("label", dr.label, "cyan")
-            row("model", str(ag.settings.adapter_config.get("model", "")), "dim")
-
-            if dr.item is not None:
-                pick_text = f"{dr.item.kind} #{dr.item.number}: {dr.item.title}"
-                row("would pick", pick_text)
-
-                ctx_dict = {
-                    k: v for k, v in dataclasses.asdict(dr.context).items() if not callable(v)
-                }
-                ctx_json = json.dumps(ctx_dict, indent=2)
-                indented = "\n".join(f"    {line}" for line in ctx_json.splitlines())
-                console.print()
-                console.print("    context", style="dim")
-                console.print(indented, style="dim")
-            else:
-                row("would pick", "nothing to do", "dim")
-
-            console.print()
-
-        emitter.emit(et.RUN_COMPLETED, data={"dry_run": True})
-        return
-
-    # ── Live run — launch TUI ─────────────────────────────────────────────────
-
-    def run_fn(on_event: Callable[[dict], None]) -> None:
-        emitter = EventEmitter(
-            repo_root=repo_root,
-            run_id=env.run_id,
-            webhook_url=env.webhook_url,
-            webhook_secret=env.webhook_secret,
-            on_event=on_event,
-        )
-        emitter.emit(
-            et.RUN_STARTED,
-            data={"agents": [a.name for a in agents], "repo": repo_slug, "dry_run": False},
-        )
-
-        with GitHubClient(env.github_token, repo_slug) as gh:
-            snapshot = build_snapshot(gh, env.run_id)
-            write_snapshot(repo_root, snapshot)
-            emitter.emit(
-                et.SNAPSHOT_FETCHED,
-                data={
-                    "issues": len(snapshot.issues),
-                    "pull_requests": len(snapshot.pull_requests),
-                    "branches": len(snapshot.branches),
-                },
-            )
-
-            reconcile_claims(gh, snapshot, repo_root)
-
-            registry = build_registry()
-            results = asyncio.run(
-                run_all(
-                    agents=agents,
-                    snapshot=snapshot,
-                    project=project,
-                    repo_root=repo_root,
-                    run_id=env.run_id,
-                    registry=registry,
-                    gh=gh,
-                    emitter=emitter,
-                    env_vars=env_vars,
-                    dry_run=False,
-                )
-            )
-
-        summaries = [r for r in results if isinstance(r, RunResultFile)]
-        summary = ", ".join(
-            f"{r.agent}: {r.status}{' #' + str(r.item.number) if r.item else ''}" for r in summaries
-        )
-
-        emitter.emit(et.RUN_COMMITTING)
-        committed = False
-        try:
-            committed = commit_agents(
+        registry = build_registry()
+        results = asyncio.run(
+            run_all(
+                agents=agents,
+                snapshot=snapshot,
+                project=project,
                 repo_root=repo_root,
                 run_id=env.run_id,
-                prefix=project.commit_message_prefix,
-                branch=project.default_branch,
-                summary=summary,
+                registry=registry,
+                gh=gh,
+                emitter=emitter,
+                env_vars=env_vars,
+                dry_run=True,
             )
-        except GitError as exc:
-            emitter.emit(et.RUN_FAILED, data={"error": str(exc)})
-
-        emitter.emit(
-            et.RUN_COMPLETED,
-            data={"committed": committed, "summary": summary, "agents": len(summaries)},
         )
 
-    ZenveTUI(run_fn=run_fn, schedule=project.run_schedule).run()
+    dry_lookup = {r.agent_name: r for r in results if isinstance(r, DryRunResult)}
+    label_w = 12
+
+    def row(label: str, value: str, value_style: str = "default") -> None:
+        line = Text()
+        line.append(f"    {label:<{label_w}}", style="dim")
+        line.append(value, style=value_style)
+        console.print(line)
+
+    console.print()
+    for ag in agents:
+        slug_line = Text()
+        slug_line.append("  ◆ ", style="bold cyan")
+        slug_line.append(ag.name, style="bold")
+        console.print(slug_line)
+
+        dr = dry_lookup.get(ag.name)
+        if dr is None:
+            console.print("    [dim]no result[/dim]")
+            console.print()
+            continue
+
+        row("name", ag.settings.name)
+        row("label", dr.label, "cyan")
+        row("model", str(ag.settings.adapter_config.get("model", "")), "dim")
+
+        if dr.item is not None:
+            pick_text = f"{dr.item.kind} #{dr.item.number}: {dr.item.title}"
+            row("would pick", pick_text)
+
+            ctx_dict = {k: v for k, v in dataclasses.asdict(dr.context).items() if not callable(v)}
+            ctx_json = json.dumps(ctx_dict, indent=2)
+            indented = "\n".join(f"    {line}" for line in ctx_json.splitlines())
+            console.print()
+            console.print("    context", style="dim")
+            console.print(indented, style="dim")
+        else:
+            row("would pick", "nothing to do", "dim")
+
+        console.print()
+
+    emitter.emit(et.RUN_COMPLETED, data={"dry_run": True})
+
+
+def stream_run_events(workspace_id: str, run_id: str) -> Iterator[dict]:
+    url = f"{runtime_url()}/api/v1/workspaces/{workspace_id}/runs/{run_id}/stream"
+    with httpx.stream("GET", url, timeout=None) as r:
+        for line in r.iter_lines():
+            if line.startswith("data: "):
+                event = json.loads(line[6:])
+                yield event
+                if event.get("type") in ("run.completed", "run.failed"):
+                    break
+
+
+def execute(
+    agent: str | None = typer.Option(None, "--agent", help="Run only this agent"),
+    dry_run: bool = typer.Option(False, "--dry-run", help="Show plan, no writes"),
+    repo: Path = typer.Option(Path("."), "--repo", help="Path to the repo root"),
+) -> None:
+    """Run all enabled agents against a fresh GitHub snapshot."""
+    ensure_runtime()
+    repo_root = repo
+
+    if dry_run:
+        execute_dry(agent, repo_root)
+        return
+
+    workspace_id = resolve_workspace_id(repo_root)
+    env_vars: dict[str, str] = {}
+    github_token = os.environ.get("GITHUB_TOKEN", "")
+    if github_token:
+        env_vars["GITHUB_TOKEN"] = github_token
+
+    trigger_resp = runtime_request(
+        "POST",
+        f"/api/v1/workspaces/{workspace_id}/runs",
+        json={"only_agent": agent, "env_vars": env_vars},
+    )
+    if trigger_resp.status_code != 202:
+        report_error(trigger_resp)
+        raise typer.Exit(1)
+    run_id = trigger_resp.json()["run_id"]
+
+    ZenveTUI(events=stream_run_events(workspace_id, run_id)).run()
 
 
 @run_app.command("ls")
@@ -321,7 +290,9 @@ def ls(
     """List all runs for the current workspace."""
     ensure_runtime()
     workspace_id = resolve_workspace_id(repo)
-    resp = runtime_request("GET", f"/api/v1/workspaces/{workspace_id}/runs", params={"limit": limit})
+    resp = runtime_request(
+        "GET", f"/api/v1/workspaces/{workspace_id}/runs", params={"limit": limit}
+    )
     if resp.status_code != 200:
         report_error(resp)
         raise typer.Exit(1)

@@ -1,11 +1,8 @@
 from __future__ import annotations
 
-import datetime
-import threading
 import time
-from collections.abc import Callable
+from collections.abc import Iterable
 
-from croniter import croniter
 from rich.markup import escape
 from rich.panel import Panel
 from rich.text import Text
@@ -22,7 +19,6 @@ from .theme import AGENT_COLOR, EVENT_BG, OUTPUT_BG, TOOLS_BG
 class ZenveTUI(App):
     BINDINGS = [
         Binding("ctrl+q", "quit", "quit"),
-        Binding("ctrl+r", "run_now", "run now"),
     ]
 
     CSS = """
@@ -69,15 +65,8 @@ class ZenveTUI(App):
     }
     """
 
-    def __init__(
-        self,
-        events: list[dict] | None = None,
-        run_fn: Callable[[Callable[[dict], None]], None] | None = None,
-        schedule: str | None = None,
-    ) -> None:
-        self.replay_events = events or []
-        self.run_fn = run_fn
-        self.schedule = schedule
+    def __init__(self, events: Iterable[dict]) -> None:
+        self.events = events
 
         # Block buffering
         self.block_type: str | None = None
@@ -85,15 +74,12 @@ class ZenveTUI(App):
         self.block_agent: str | None = None
         self.last_agent: str | None = None
 
-        # Run-now trigger — set by ctrl+r to skip the countdown sleep
-        self.run_now_event = threading.Event()
-
         # Loading indicator
         self.loading_widget: Static | None = None
         self.loading_frame: int = 0
         self.loading_started_at: float | None = None
         self.run_active: bool = False
-        self._spinner_frames = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"]
+        self.spinner_frames = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"]
 
         # Run state
         self.run_agents: list[str] = []
@@ -117,26 +103,28 @@ class ZenveTUI(App):
 
     def on_mount(self) -> None:
         self.update_status()
-        if self.run_fn:
-            self.set_interval(0.15, self.tick_loading)
-            self.run_worker(self.execute_run, thread=True)
-        else:
-            for event in self.replay_events:
-                self.handle_event(event)
-            self.flush_block()
-            self.query_one("#log", ScrollableContainer).scroll_end(animate=False)
-
-    def action_run_now(self) -> None:
-        if self.schedule and not self.run_active:
-            self.run_now_event.set()
+        self.set_interval(0.15, self.tick_loading)
+        self.run_worker(self.stream_events, thread=True)
 
     # ── Live run worker ───────────────────────────────────────────────────────
 
-    def handle_event_from_thread(self, event: dict) -> None:
-        self.call_from_thread(self.handle_event_and_scroll, event)
+    def stream_events(self) -> None:
+        try:
+            for event in self.events:
+                self.call_from_thread(self.handle_event_and_scroll, event)
+        except Exception as exc:
+            self.call_from_thread(
+                self.handle_event_and_scroll,
+                {"type": "run.failed", "data": {"error": str(exc)}},
+            )
+        self.call_from_thread(self.finish_stream)
+
+    def finish_stream(self) -> None:
+        self.flush_block()
+        self.query_one("#log", ScrollableContainer).scroll_end(animate=False)
 
     def show_loading(self) -> None:
-        frame = self._spinner_frames[self.loading_frame % len(self._spinner_frames)]
+        frame = self.spinner_frames[self.loading_frame % len(self.spinner_frames)]
         if self.loading_started_at is None:
             self.loading_started_at = time.monotonic()
         elapsed = int(time.monotonic() - self.loading_started_at)
@@ -164,61 +152,6 @@ class ZenveTUI(App):
         if self.run_active:
             self.show_loading()
         self.query_one("#log", ScrollableContainer).scroll_end(animate=False)
-
-    def execute_run(self) -> None:
-        assert self.run_fn is not None
-        while True:
-            try:
-                self.run_fn(self.handle_event_from_thread)
-            except Exception as exc:
-                self.call_from_thread(
-                    self.handle_event_and_scroll,
-                    {"type": "run.failed", "agent": None, "data": {"error": str(exc)}},
-                )
-
-            if self.schedule is None:
-                break
-
-            now = datetime.datetime.now()
-            next_dt = croniter(self.schedule, now).get_next(datetime.datetime)
-            deadline = time.monotonic() + (next_dt - now).total_seconds()
-
-            while time.monotonic() < deadline:
-                remaining = max(0.0, deadline - time.monotonic())
-                mins, secs = divmod(int(remaining), 60)
-                self.call_from_thread(self._update_countdown, f"{mins}:{secs:02d}")
-                if self.run_now_event.wait(timeout=1):
-                    self.run_now_event.clear()
-                    break
-
-            self.call_from_thread(self._reset_for_new_run)
-
-    def _update_countdown(self, time_str: str) -> None:
-        t = Text()
-        t.append("next run in ", style="dim")
-        t.append(time_str, style="cyan")
-        self.query_one("#status-right", Static).update(t)
-
-    def _reset_for_new_run(self) -> None:
-        log = self.query_one("#log", ScrollableContainer)
-        for child in list(log.children):
-            child.remove()
-        self.loading_widget = None
-        self.loading_started_at = None
-        self.block_type = None
-        self.block_lines = []
-        self.block_agent = None
-        self.last_agent = None
-        self.run_agents = []
-        self.agent_states = {}
-        self.run_active = False
-        self.current_action = ""
-        self.run_id = ""
-        self.snapshot = {}
-        self.update_info()
-        self.update_agents()
-        self.update_status()
-        self.query_one("#status-right", Static).update("")
 
     # ── Block helpers ─────────────────────────────────────────────────────────
 
@@ -334,8 +267,6 @@ class ZenveTUI(App):
             if not last:
                 t.append("│", style="#3a3a3a")
 
-        if self.schedule and not self.run_active:
-            keybind("ctrl+r", "run now")
         keybind("ctrl+q", "quit", last=True)
         self.query_one("#status-left", Static).update(t)
 
