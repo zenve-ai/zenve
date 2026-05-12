@@ -21,10 +21,10 @@ from zenve_cli.commands.workspace import workspace_app
 from zenve_cli.console import print_logo
 
 app = typer.Typer(name="zenve", help="Zenve CLI — autonomous agents in your repo")
-app.add_typer(agent_app, name="agents")
+app.add_typer(agent_app, name="agent")
 app.add_typer(run_app, name="run")
 app.add_typer(server_app, name="server")
-app.add_typer(skill_app, name="skills")
+app.add_typer(skill_app, name="skill")
 app.add_typer(workspace_app, name="workspace")
 
 
@@ -88,7 +88,7 @@ def pipeline(
 def status(
     repo: Path = typer.Option(Path("."), "--repo", help="Path to the repo root"),
 ) -> None:
-    """Show last run result per agent."""
+    """Show system status and agents."""
     status_cmd.cmd(repo_root=repo)
 
 

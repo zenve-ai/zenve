@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import base64
 import json
 import subprocess
 from pathlib import Path
@@ -11,20 +12,19 @@ from rich.console import Console
 from zenve_cli.commands.agent import collect_agents_wizard
 from zenve_cli.commands.skill import (
     collect_skills_wizard,
-    install_skills,
+    fetch_and_install_skills,
     installed_skill_names,
-    make_skill_svc,
 )
-from zenve_cli.commands.snapshot import git_remote_slug, resolve_github_token
+from zenve_cli.commands.snapshot import git_remote_slug
 from zenve_cli.commands.ui import WIZARD_STYLE, sep
-from zenve_cli.config import get_settings
 from zenve_cli.models.errors import ZenveError
+from zenve_cli.models.github_template import GitHubTemplateSummary, SkillSummary
+from zenve_cli.runtime.client import ensure_runtime, report_error, runtime_request
 from zenve_cli.services.agent import build_agent_files
 from zenve_cli.services.agent_lock import AgentLockService
 from zenve_cli.services.scaffolding import ScaffoldingService
-from zenve_cli.services.template import GitHubTemplateService
 from zenve_cli.utils.scaffolding import slugify
-from zenve_engine.constants import DEFAULT_AGENTS_PATH, DEFAULT_REGISTRY_REPO, ZENVE_DIR
+from zenve_engine.constants import ZENVE_DIR
 from zenve_engine.git.commit import commit_skills, commit_zenve_dir
 
 console = Console()
@@ -72,6 +72,35 @@ def git_current_branch() -> str:
         return "main"
 
 
+def fetch_templates() -> list[GitHubTemplateSummary]:
+    ensure_runtime()
+    resp = runtime_request("GET", "/api/v1/templates")
+    if resp.status_code != 200:
+        report_error(resp)
+        raise typer.Exit(1)
+    return [GitHubTemplateSummary(**t) for t in resp.json()]
+
+
+def fetch_template_files(template_id: str) -> tuple[dict[str, bytes], str | None, str]:
+    resp = runtime_request("GET", f"/api/v1/templates/{template_id}/files")
+    if resp.status_code != 200:
+        try:
+            detail = resp.json().get("detail", resp.text)
+        except Exception:
+            detail = resp.text
+        raise ZenveError(f"HTTP {resp.status_code}: {detail}")
+    data = resp.json()
+    files = {k: base64.b64decode(v) for k, v in data["files"].items()}
+    return files, data.get("sha"), data["source"]
+
+
+def fetch_available_skills() -> list[SkillSummary]:
+    resp = runtime_request("GET", "/api/v1/skills")
+    if resp.status_code != 200:
+        return []
+    return [SkillSummary(**s) for s in resp.json()]
+
+
 def cmd(repo_root: Path = Path("."), description: str | None = None) -> None:
     zenve_dir = repo_root / ZENVE_DIR
     update_mode = zenve_dir.exists()
@@ -88,16 +117,8 @@ def cmd(repo_root: Path = Path("."), description: str | None = None) -> None:
             existing_agent_slugs = {p.name for p in agents_dir.iterdir() if p.is_dir()}
 
     # Load templates early so the list is ready before prompts begin
-    settings = get_settings().model_copy(
-        update={
-            "github_agents_repo": get_settings().github_agents_repo or DEFAULT_REGISTRY_REPO,
-            "github_token": get_settings().github_token or resolve_github_token(),
-        }
-    )
-    svc = GitHubTemplateService(settings, base_path=DEFAULT_AGENTS_PATH)
-
     try:
-        templates = svc.list_templates()
+        templates = fetch_templates()
     except ZenveError as exc:
         console.print(
             f"[red]✗[/red] Could not fetch agent templates: {exc.message}", highlight=False
@@ -106,7 +127,7 @@ def cmd(repo_root: Path = Path("."), description: str | None = None) -> None:
 
     if not templates:
         console.print(
-            f"[red]✗[/red] No agent templates found in {settings.github_agents_repo}/{DEFAULT_AGENTS_PATH}.",
+            "[red]✗[/red] No agent templates found.",
             highlight=False,
         )
         raise typer.Exit(1)
@@ -158,21 +179,23 @@ def cmd(repo_root: Path = Path("."), description: str | None = None) -> None:
 
     scaffold = ScaffoldingService()
     lock = AgentLockService(zenve_dir)
-    commit_sha = svc.get_head_sha()
-    source = svc.repo or DEFAULT_REGISTRY_REPO
     existing_pipeline: dict = existing_settings.get("pipeline", {}) if update_mode else {}
     pipeline: dict[str, None] = {}
 
     for agent_name, template_id in agent_specs:
+        template_obj = next((t for t in templates if t.id == template_id), None)
         used_template_id: str | None = template_id
         try:
-            agent_slug, files = build_agent_files(agent_name, template_id, svc)
+            raw_files, commit_sha, source = fetch_template_files(template_id)
+            agent_slug, files = build_agent_files(agent_name, template_obj, raw_files)
         except ZenveError as exc:
             console.print(
                 f"[yellow]Warning:[/yellow] could not fetch template '{template_id}': {exc.message}"
             )
-            agent_slug, files = build_agent_files(agent_name, None, svc)
+            agent_slug, files = build_agent_files(agent_name, None, {})
             used_template_id = None
+            commit_sha = None
+            source = None
         pipeline[f"zenve:{agent_slug}"] = None
         scaffold.write_agent_files(zenve_dir, agent_slug, files)
         if used_template_id is not None:
@@ -211,11 +234,7 @@ def cmd(repo_root: Path = Path("."), description: str | None = None) -> None:
             f.write("\n".join(missing_entries) + "\n")
 
     # Skills step
-    skill_svc = make_skill_svc()
-    try:
-        available_skills = skill_svc.list_skills()
-    except ZenveError:
-        available_skills = []
+    available_skills = fetch_available_skills()
 
     if available_skills:
         selected_skill_ids = collect_skills_wizard(
@@ -226,7 +245,7 @@ def cmd(repo_root: Path = Path("."), description: str | None = None) -> None:
         if selected_skill_ids:
             console.print("[cyan]◆[/cyan] Installing skills...")
             sep()
-            install_skills(repo_root, selected_skill_ids, skill_svc)
+            fetch_and_install_skills(repo_root, selected_skill_ids)
             sep()
             commit_skills(repo_root, "[zenve] install skills", branch=detected_branch)
 

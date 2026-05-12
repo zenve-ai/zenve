@@ -6,7 +6,10 @@ import subprocess
 from pathlib import Path
 
 import typer
+from rich import box
 from rich.console import Console
+from rich.table import Table
+from rich.text import Text
 
 from zenve_adapters.claude_code import ClaudeCodeAdapter
 from zenve_adapters.open_code import OpenCodeAdapter
@@ -19,8 +22,6 @@ console = Console()
 
 def cmd(repo_root: Path) -> None:
     """Run setup checks and report pass/fail."""
-    console.print("\n[bold]Zenve Doctor[/bold]\n")
-
     checks: list[tuple[str, bool, str | None]] = []
     critical_failures = 0
 
@@ -111,28 +112,38 @@ def cmd(repo_root: Path) -> None:
     both_adapters_failed = not claude_ok and not open_ok
 
     # Render results
-    for label, ok, detail in checks:
-        if ok is True:
-            icon = "[green]✓[/green]"
-        elif ok is False:
-            icon = "[red]✗[/red]"
-        else:
-            icon = "[yellow]~[/yellow]"
+    table = Table(
+        box=box.ROUNDED,
+        border_style="dim",
+        header_style="bold cyan",
+        show_lines=False,
+        pad_edge=True,
+    )
+    table.add_column("CHECK", style="default", no_wrap=True)
+    table.add_column("STATUS", justify="center")
+    table.add_column("DETAIL", style="dim")
 
-        suffix = f"  [dim]{detail}[/dim]" if detail else ""
-        console.print(f"  {icon} {label}{suffix}")
+    for label, ok, detail in checks:
+        if ok:
+            status = Text("● ok", style="bold green")
+        else:
+            status = Text("✗ fail", style="bold red")
+        table.add_row(label, status, detail or "")
+
+    console.print()
+    console.print(table)
 
     if both_adapters_failed:
-        console.print("\n  [yellow]warning:[/yellow] no usable adapter found — both claude_code and open_code unavailable")
+        console.print()
+        console.print("  [yellow]◆[/yellow] [dim]no usable adapter — both claude_code and open_code unavailable[/dim]")
 
     console.print()
     if critical_failures == 0:
-        console.print("[green]All checks passed.[/green]")
+        console.print("  [bold green]●[/bold green]  all checks passed")
     elif critical_failures == 1:
-        console.print("[red]1 critical issue found.[/red]")
+        console.print("  [bold red]✗[/bold red]  1 critical issue found")
     else:
-        console.print(f"[red]{critical_failures} critical issues found.[/red]")
-
+        console.print(f"  [bold red]✗[/bold red]  {critical_failures} critical issues found")
     console.print()
 
     if critical_failures > 0:

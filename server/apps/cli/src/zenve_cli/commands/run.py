@@ -19,7 +19,7 @@ from zenve_adapters.claude_code import ClaudeCodeAdapter
 from zenve_adapters.open_code import OpenCodeAdapter
 from zenve_cli.commands.snapshot import git_remote_slug
 from zenve_cli.console import ZenveTUI
-from zenve_cli.runtime.client import ensure_runtime, report_error, runtime_request, runtime_url
+from zenve_cli.runtime.client import ensure_runtime, report_error, resolve_workspace_id, runtime_request, runtime_url
 from zenve_engine.config import ConfigError, load_project_settings
 from zenve_engine.discovery import DiscoveryError, discover_agents
 from zenve_engine.env import EnvError, load_env
@@ -59,19 +59,6 @@ def build_registry() -> AdapterRegistry:
     registry.register(OpenCodeAdapter())
     return registry
 
-
-def resolve_workspace_id(repo_root: Path) -> str:
-    abs_path = str(repo_root.expanduser().resolve())
-    resp = runtime_request("GET", "/api/v1/workspaces")
-    if resp.status_code != 200:
-        report_error(resp)
-        raise typer.Exit(1)
-    for w in resp.json():
-        if w["path"] == abs_path:
-            return w["id"]
-    console.print(f"[red]✗[/red] No workspace registered at [cyan]{abs_path}[/cyan]")
-    console.print("  Register it with: [cyan]zenve workspace add .[/cyan]")
-    raise typer.Exit(1)
 
 
 def execute_dry(agent: str | None, repo_root: Path) -> None:

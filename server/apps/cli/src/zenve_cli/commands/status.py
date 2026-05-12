@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 
 import httpx
@@ -11,11 +12,24 @@ from rich.table import Table
 from rich.text import Text
 
 from zenve_engine.config import ConfigError, zenve_dir
-from zenve_engine.discovery import DiscoveryError, discover_agents
 
-from zenve_cli.runtime.client import ensure_runtime, runtime_url
+from zenve_cli.commands.agent import iter_agent_dirs, load_agent_settings
+from zenve_cli.runtime.client import runtime_url
+from zenve_cli.utils.time import time_ago
 
 console = Console()
+
+
+def web_url() -> str:
+    return os.getenv("ZENVE_WEB_URL", "http://localhost:5173").rstrip("/")
+
+
+def check_service(url: str, path: str = "/") -> bool:
+    try:
+        resp = httpx.get(f"{url}{path}", timeout=2.0)
+        return resp.status_code < 500
+    except Exception:
+        return False
 
 
 def latest_run(agent_path: Path) -> dict | None:
@@ -31,64 +45,45 @@ def latest_run(agent_path: Path) -> dict | None:
         return None
 
 
-def fetch_active_run(workspace_id: str) -> dict | None:
-    try:
-        with httpx.Client(timeout=2.0) as client:
-            resp = client.get(f"{runtime_url()}/api/v1/workspaces/{workspace_id}/runs/active-run")
-        if resp.status_code == 200:
-            return resp.json()
-    except httpx.ConnectError:
-        pass
-    return None
-
-
-def fetch_workspace_id(repo_root: Path) -> str | None:
-    abs_path = str(repo_root.expanduser().resolve())
-    try:
-        with httpx.Client(timeout=2.0) as client:
-            resp = client.get(f"{runtime_url()}/api/v1/workspaces")
-        if resp.status_code == 200:
-            for w in resp.json():
-                if w["path"] == abs_path:
-                    return w["id"]
-    except httpx.ConnectError:
-        pass
-    return None
-
-
 def cmd(repo_root: Path = Path(".")) -> None:
-    """Show last run result per agent."""
-    ensure_runtime()
-    if not zenve_dir(repo_root).exists():
-        typer.echo(f"✗ No `.zenve/` folder at {repo_root}")
-        raise typer.Exit(1)
-
-    try:
-        agents = discover_agents(repo_root)
-    except (ConfigError, DiscoveryError) as exc:
-        typer.echo(f"✗ {exc}")
-        raise typer.Exit(1) from exc
-
-    if not agents:
-        typer.echo("No enabled agents found.")
-        return
-
-    # ── Active run (best-effort, runtime may not be running) ─────────────────
-    workspace_id = fetch_workspace_id(repo_root)
-    active_run = fetch_active_run(workspace_id) if workspace_id else None
+    """Show system status and agents."""
+    rurl = runtime_url()
+    wurl = web_url()
+    runtime_up = check_service(rurl, "/healthz")
+    web_up = check_service(wurl)
 
     console.print()
 
-    if active_run:
-        banner = Text()
-        banner.append("  ● ", style="bold cyan")
-        banner.append("active run  ", style="bold")
-        banner.append(active_run["run_id"][:12], style="cyan")
-        banner.append(f"  {active_run['status']}", style="dim")
-        console.print(banner)
-        console.print()
+    # ── Services ──────────────────────────────────────────────────────────────
+    for label, url, up in [("runtime", rurl, runtime_up), ("web", wurl, web_up)]:
+        line = Text("  ")
+        if up:
+            line.append("●", style="bold green")
+            line.append(f"  {label:<10}", style="bold")
+            line.append(url, style="cyan link " + url)
+        else:
+            line.append("○", style="dim red")
+            line.append(f"  {label:<10}", style="dim")
+            line.append(url, style="dim")
+            line.append("   not running", style="dim red")
+        console.print(line)
 
-    # ── Agent table ───────────────────────────────────────────────────────────
+    if not zenve_dir(repo_root).exists():
+        console.print()
+        console.print("  [dim]No .zenve/ found — run [bold]zenve init[/bold] to get started.[/dim]")
+        console.print()
+        return
+
+    # ── Agents ────────────────────────────────────────────────────────────────
+    agent_dirs = iter_agent_dirs(repo_root)
+    if not agent_dirs:
+        console.print()
+        console.print("  [dim]No agents configured.[/dim]")
+        console.print()
+        return
+
+    console.print()
+
     table = Table(
         box=box.ROUNDED,
         border_style="dim",
@@ -97,25 +92,39 @@ def cmd(repo_root: Path = Path(".")) -> None:
         pad_edge=True,
     )
     table.add_column("AGENT", style="cyan", no_wrap=True)
-    table.add_column("STATUS", justify="center")
-    table.add_column("RUN ID", style="dim")
-    table.add_column("STARTED", style="dim")
+    table.add_column("ENABLED", justify="center")
+    table.add_column("LAST RUN", justify="center")
+    table.add_column("WHEN", style="dim")
 
-    for agent in agents:
-        run = latest_run(agent.path)
-        if run is None:
-            table.add_row(agent.name, Text("—", style="dim"), "—", "—")
-            continue
-        status = run.get("status", "?")
-        if status == "done":
-            status_text = Text("● done", style="green")
-        elif status == "failed":
-            status_text = Text("✗ failed", style="red")
+    for d in agent_dirs:
+        s = load_agent_settings(d)
+        name = d.name if s is None else s.name
+
+        if s is None:
+            enabled_text = Text("—", style="dim")
+        elif s.enabled:
+            enabled_text = Text("● on", style="bold green")
         else:
-            status_text = Text(status, style="dim")
-        run_id = run.get("run_id", "?")[:12]
-        started = run.get("started_at", "?").replace("T", " ").replace("Z", "")
-        table.add_row(agent.name, status_text, run_id, started)
+            enabled_text = Text("○ off", style="dim red")
+
+        run = latest_run(d)
+        if run is None:
+            table.add_row(name, enabled_text, Text("—", style="dim"), "—")
+            continue
+
+        run_status = run.get("status", "?")
+        if run_status == "done":
+            run_text = Text("● done", style="green")
+        elif run_status == "failed":
+            run_text = Text("✗ failed", style="red")
+        elif run_status == "running":
+            run_text = Text("◌ running", style="cyan")
+        else:
+            run_text = Text(run_status, style="dim")
+
+        started = run.get("started_at", "")
+        when = time_ago(started) if started else "—"
+        table.add_row(name, enabled_text, run_text, when)
 
     console.print(table)
     console.print()

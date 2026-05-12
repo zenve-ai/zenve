@@ -1,25 +1,25 @@
 from __future__ import annotations
 
+import base64
 import json
 from pathlib import Path
 
 import questionary
 import typer
+from rich import box
 from rich.console import Console
+from rich.table import Table
 from rich.text import Text
 
-from zenve_cli.commands.snapshot import resolve_github_token
 from zenve_cli.commands.ui import WIZARD_STYLE, sep
-from zenve_cli.config import get_settings
 from zenve_cli.models.errors import ZenveError
 from zenve_cli.models.github_template import GitHubTemplateSummary
+from zenve_cli.runtime.client import ensure_runtime, report_error, runtime_request
 from zenve_cli.services.agent import build_agent_files
 from zenve_cli.services.agent_lock import AgentLockService
 from zenve_cli.services.scaffolding import ScaffoldingService
-from zenve_cli.services.template import GitHubTemplateService
 from zenve_cli.utils.scaffolding import slugify
 from zenve_engine.config import zenve_dir
-from zenve_engine.constants import DEFAULT_AGENTS_PATH, DEFAULT_REGISTRY_REPO
 from zenve_engine.discovery import AGENTS_SUBDIR, discover_agents
 from zenve_engine.git.commit import GitError, commit_zenve_dir
 from zenve_engine.models.settings import AgentSettings
@@ -28,21 +28,11 @@ agent_app = typer.Typer(help="Agent management commands")
 console = Console()
 
 
-def _make_template_service() -> GitHubTemplateService:
-    settings = get_settings().model_copy(
-        update={
-            "github_agents_repo": get_settings().github_agents_repo or DEFAULT_REGISTRY_REPO,
-            "github_token": get_settings().github_token or resolve_github_token(),
-        }
-    )
-    return GitHubTemplateService(settings, base_path=DEFAULT_AGENTS_PATH)
-
-
-def _resolve_template_slug(t) -> str:
+def resolve_template_slug(t) -> str:
     return t.slug or slugify(t.name if getattr(t, "name", None) else t.id)
 
 
-def _do_commit(repo_root: Path, message: str, branch: str) -> None:
+def do_commit(repo_root: Path, message: str, branch: str) -> None:
     try:
         committed = commit_zenve_dir(repo_root, message, branch=branch)
         if committed:
@@ -135,50 +125,43 @@ def collect_agents_wizard(
     return agents
 
 
-@agent_app.command("list")
+@agent_app.command("ls")
 def list_agents(repo_root: Path = typer.Option(Path("."), "--repo")) -> None:
     """List all agents and their enabled/disabled status."""
     dirs = iter_agent_dirs(repo_root)
     if not dirs:
-        console.print("[dim]No agents found.[/dim]")
+        console.print()
+        console.print("  [dim]No agents found.[/dim]")
+        console.print()
         return
 
-    console.print()
+    table = Table(
+        box=box.ROUNDED,
+        border_style="dim",
+        header_style="bold cyan",
+        show_lines=False,
+        pad_edge=True,
+    )
+    table.add_column("AGENT", style="cyan", no_wrap=True)
+    table.add_column("SLUG", style="dim", no_wrap=True)
+    table.add_column("STATUS", justify="center")
+    table.add_column("PICKS UP")
+    table.add_column("LABEL")
+    table.add_column("MODEL", style="dim")
+
     for d in dirs:
         s = load_agent_settings(d)
-
-        # Slug header
-        slug_line = Text()
-        slug_line.append("  ◆ ", style="bold cyan")
-        slug_line.append(d.name, style="bold")
-        console.print(slug_line)
-
         if s is None:
-            console.print("    [dim red]missing settings.json[/dim red]")
-            console.print()
+            table.add_row(d.name, d.name, Text("missing settings.json", style="dim red"), "—", "—", "—")
             continue
 
-        label_w = 12
+        status = Text("● on", style="bold green") if s.enabled else Text("○ off", style="dim red")
+        model = str(s.adapter_config.get("model", "")) or "—"
+        table.add_row(s.name, s.slug, status, s.picks_up, s.github_label, model)
 
-        def row(label: str, value: str, value_style: str = "default", _w: int = label_w) -> None:
-            line = Text()
-            line.append(f"    {label:<{_w}}", style="dim")
-            line.append(value, style=value_style)
-            console.print(line)
-
-        row("slug", s.slug)
-        row("name", s.name)
-
-        if s.enabled:
-            row("status", "● enabled", "bold green")
-        else:
-            row("status", "○ disabled", "dim red")
-
-        row("picks up", s.picks_up, "yellow")
-        row("label", s.github_label, "cyan")
-        row("model", str(s.adapter_config.get("model", "")), "dim")
-
-        console.print()
+    console.print()
+    console.print(table)
+    console.print()
 
 
 @agent_app.command("logs")
@@ -218,6 +201,30 @@ def disable(name: str, repo_root: Path = typer.Option(Path("."), "--repo")) -> N
     typer.echo(f"✓ Disabled agent {name!r}")
 
 
+def fetch_templates() -> list[GitHubTemplateSummary]:
+    """Fetch template list from the runtime. Raises typer.Exit on failure."""
+    ensure_runtime()
+    resp = runtime_request("GET", "/api/v1/templates")
+    if resp.status_code != 200:
+        report_error(resp)
+        raise typer.Exit(1)
+    return [GitHubTemplateSummary(**t) for t in resp.json()]
+
+
+def fetch_template_files(template_id: str) -> tuple[dict[str, bytes], str | None, str]:
+    """Fetch and decode template files from runtime. Returns (files, sha, source)."""
+    resp = runtime_request("GET", f"/api/v1/templates/{template_id}/files")
+    if resp.status_code != 200:
+        try:
+            detail = resp.json().get("detail", resp.text)
+        except Exception:
+            detail = resp.text
+        raise ZenveError(f"HTTP {resp.status_code}: {detail}")
+    data = resp.json()
+    files = {k: base64.b64decode(v) for k, v in data["files"].items()}
+    return files, data.get("sha"), data["source"]
+
+
 @agent_app.command("add")
 def add(
     repo_root: Path = typer.Option(Path("."), "--repo"),
@@ -244,10 +251,8 @@ def add(
     if agents_dir.exists():
         existing_agent_slugs = {p.name for p in agents_dir.iterdir() if p.is_dir()}
 
-    svc = _make_template_service()
-
     try:
-        templates = svc.list_templates()
+        templates = fetch_templates()
     except ZenveError as exc:
         console.print(
             f"[red]✗[/red] Could not fetch agent templates: {exc.message}", highlight=False
@@ -261,7 +266,7 @@ def add(
     # --agent SLUG: non-interactive single install
     if agent is not None:
         match = next(
-            (t for t in templates if t.id == agent or _resolve_template_slug(t) == agent),
+            (t for t in templates if t.id == agent or resolve_template_slug(t) == agent),
             None,
         )
         if match is None:
@@ -269,22 +274,22 @@ def add(
                 f"[red]✗[/red] No template found for slug [bold]{agent}[/bold]."
             )
             raise typer.Exit(1)
-        target_slug = _resolve_template_slug(match)
+        target_slug = resolve_template_slug(match)
         if target_slug in existing_agent_slugs:
             console.print(
                 f"[yellow]◆[/yellow] Agent [bold]{target_slug}[/bold] is already installed. "
-                f"Use [bold]zenve agents update --agent {target_slug}[/bold] to re-fetch."
+                f"Use [bold]zenve agent update --agent {target_slug}[/bold] to re-fetch."
             )
             raise typer.Exit(0)
         agent_specs = [(match.name if getattr(match, "name", None) else match.id, match.id)]
     else:
         available_templates = [
-            t for t in templates if _resolve_template_slug(t) not in existing_agent_slugs
+            t for t in templates if resolve_template_slug(t) not in existing_agent_slugs
         ]
         if not available_templates:
             console.print(
                 "[dim]All available agents are already installed. "
-                "Use [bold]zenve agents update[/bold] to re-fetch.[/dim]"
+                "Use [bold]zenve agent update[/bold] to re-fetch.[/dim]"
             )
             raise typer.Exit(0)
 
@@ -300,25 +305,28 @@ def add(
 
     scaffold = ScaffoldingService()
     lock = AgentLockService(zdir)
-    commit_sha = svc.get_head_sha()
-    source = svc.repo or DEFAULT_REGISTRY_REPO
     pipeline: dict[str, None] = {}
 
     for agent_name, template_id in agent_specs:
+        template_obj = next((t for t in templates if t.id == template_id), None)
+        used_template_id: str | None = template_id
         try:
-            agent_slug, files = build_agent_files(agent_name, template_id, svc)
+            raw_files, commit_sha, source = fetch_template_files(template_id)
+            agent_slug, files = build_agent_files(agent_name, template_obj, raw_files)
         except ZenveError as exc:
             console.print(
                 f"[yellow]Warning:[/yellow] could not fetch template '{template_id}': {exc.message}"
             )
-            agent_slug, files = build_agent_files(agent_name, None, svc)
-            template_id = None
+            agent_slug, files = build_agent_files(agent_name, None, {})
+            used_template_id = None
+            commit_sha = None
+            source = None
         pipeline[f"zenve:{agent_slug}"] = None
         scaffold.write_agent_files(zdir, agent_slug, files)
-        if template_id is not None:
+        if used_template_id is not None:
             lock.record_install(
                 slug=agent_slug,
-                template_id=template_id,
+                template_id=used_template_id,
                 files=files,
                 source=source,
                 commit_sha=commit_sha,
@@ -345,7 +353,7 @@ def add(
 
     if do_commit:
         branch = existing_settings.get("default_branch", "main")
-        _do_commit(
+        do_commit(
             repo_root,
             f"[zenve] add {len(added_slugs)} agent(s): {', '.join(added_slugs)}",
             branch=branch,
@@ -402,11 +410,8 @@ def update(
     except Exception:
         existing_settings = {}
 
-    svc = _make_template_service()
-    lock = AgentLockService(zdir)
-
     try:
-        templates = svc.list_templates()
+        templates = fetch_templates()
     except ZenveError as exc:
         console.print(
             f"[red]✗[/red] Could not fetch agent templates: {exc.message}", highlight=False
@@ -416,7 +421,7 @@ def update(
     # Map: installed slug -> template
     installed_templates: dict[str, GitHubTemplateSummary] = {}
     for t in templates:
-        slug = _resolve_template_slug(t)
+        slug = resolve_template_slug(t)
         if slug in existing_agent_slugs:
             installed_templates[slug] = t
 
@@ -424,18 +429,7 @@ def update(
         console.print("[dim]No installed agents match any available template.[/dim]")
         raise typer.Exit(0)
 
-    head_sha = svc.get_head_sha()
-
-    def is_up_to_date(slug: str) -> bool:
-        if head_sha is None:
-            return False
-        entry = lock.get_entry(slug)
-        if not entry:
-            return False
-        return (
-            lock.status(slug) == "clean"
-            and entry.get("sourceCommitSha") == head_sha
-        )
+    lock = AgentLockService(zdir)
 
     # Resolve selection
     if agent is not None:
@@ -444,22 +438,12 @@ def update(
                 f"[red]✗[/red] Agent [bold]{agent}[/bold] is not installed or has no matching template."
             )
             raise typer.Exit(1)
-        if is_up_to_date(agent) and not force:
-            console.print(
-                f"[dim]◆[/dim] {agent} [dim]is already up to date "
-                f"({head_sha[:7] if head_sha else '?'}). Use --force to re-fetch.[/dim]"
-            )
-            raise typer.Exit(0)
         selected_slugs = [agent]
     else:
         choices = []
         for slug in installed_templates:
             status = lock.status(slug)
-            up_to_date = is_up_to_date(slug)
-            if up_to_date:
-                label, style = "up to date", "dim green"
-            else:
-                label, style = _STATUS_LABEL[status]
+            label, style = _STATUS_LABEL[status]
             title = Text()
             title.append(slug, style="default")
             title.append("  ")
@@ -468,13 +452,8 @@ def update(
                 questionary.Choice(
                     title=title.plain,
                     value=slug,
-                    disabled="up to date" if up_to_date and not force else None,
                 )
             )
-
-        if all(getattr(c, "disabled", None) for c in choices):
-            console.print("[dim]All installed agents are already up to date.[/dim]")
-            raise typer.Exit(0)
 
         selected_slugs = questionary.checkbox(
             "Select agents to update",
@@ -525,8 +504,6 @@ def update(
     sep()
 
     scaffold = ScaffoldingService()
-    commit_sha = svc.get_head_sha()
-    source = svc.repo or DEFAULT_REGISTRY_REPO
     updated_slugs: list[str] = []
 
     for slug in to_update:
@@ -534,12 +511,24 @@ def update(
         template_id = template.id
         agent_name = template.name if getattr(template, "name", None) else template_id
         try:
-            agent_slug, files = build_agent_files(agent_name, template_id, svc)
+            raw_files, commit_sha, source = fetch_template_files(template_id)
+            agent_slug, files = build_agent_files(agent_name, template, raw_files)
         except ZenveError as exc:
             console.print(
                 f"[yellow]Warning:[/yellow] could not fetch template '{template_id}': {exc.message}"
             )
             continue
+
+        # Check if already up to date (using SHA from files response)
+        if not force and commit_sha is not None:
+            entry = lock.get_entry(slug)
+            if entry and lock.status(slug) == "clean" and entry.get("sourceCommitSha") == commit_sha:
+                console.print(
+                    f"  [dim]◆[/dim] {slug} [dim]is already up to date "
+                    f"({commit_sha[:7]}). Use --force to re-fetch.[/dim]"
+                )
+                continue
+
         scaffold.write_agent_files_with_merge(zdir, agent_slug, files)
         lock.record_install(
             slug=agent_slug,
@@ -568,7 +557,7 @@ def update(
 
     if do_commit:
         branch = existing_settings.get("default_branch", "main")
-        _do_commit(
+        do_commit(
             repo_root,
             f"[zenve] update {len(updated_slugs)} agent(s): {', '.join(updated_slugs)}",
             branch=branch,

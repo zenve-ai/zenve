@@ -1,27 +1,25 @@
 from zenve_cli.models.agent import AgentCreate
-from zenve_cli.services.template import GitHubTemplateService
+from zenve_cli.models.github_template import GitHubTemplateSummary
 from zenve_cli.utils.scaffolding import build_settings_json, default_files, slugify
 
 
 def build_agent_files(
     name: str,
-    template_id: str | None,
-    template_service: GitHubTemplateService,
+    template: GitHubTemplateSummary | None,
+    files: dict[str, bytes],
 ) -> tuple[str, dict[str, bytes]]:
     slug = slugify(name)
-    if template_id:
-        files = template_service.fetch_template_files(template_id)
-        manifest = template_service.get_template(template_id)
-        slug = manifest.slug or slug
+    if template is not None:
+        slug = template.slug or slug
         merged = AgentCreate(
             name=name,
-            template=template_id,
-            adapter_type=manifest.adapter_type,
-            adapter_config=manifest.adapter_config,
-            skills=manifest.skills,
-            tools=manifest.tools,
-            heartbeat_interval_seconds=manifest.heartbeat_interval_seconds,
-            mode=manifest.mode,
+            template=template.id,
+            adapter_type=template.adapter_type,
+            adapter_config=template.adapter_config,
+            skills=template.skills,
+            tools=template.tools,
+            heartbeat_interval_seconds=template.heartbeat_interval_seconds,
+            mode=template.mode,
         )
     else:
         files = default_files()

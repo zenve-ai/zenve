@@ -74,3 +74,17 @@ def report_error(resp: httpx.Response) -> None:
     except Exception:
         detail = resp.text
     console.print(f"[red]✗[/red] {resp.status_code}: {detail}")
+
+
+def resolve_workspace_id(repo_root: Path) -> str:
+    abs_path = str(repo_root.expanduser().resolve())
+    resp = runtime_request("GET", "/api/v1/workspaces")
+    if resp.status_code != 200:
+        report_error(resp)
+        raise typer.Exit(1)
+    for w in resp.json():
+        if w["path"] == abs_path:
+            return w["id"]
+    console.print(f"[red]✗[/red] No workspace registered at [cyan]{abs_path}[/cyan]")
+    console.print("  Register it with: [cyan]zenve workspace add .[/cyan]")
+    raise typer.Exit(1)

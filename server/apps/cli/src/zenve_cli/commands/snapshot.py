@@ -5,11 +5,14 @@ import subprocess
 from pathlib import Path
 
 import typer
+from rich import box
+from rich.console import Console
+from rich.table import Table
+from rich.text import Text
 
-from zenve_engine.config import load_project_settings
-from zenve_engine.env import new_run_id, resolve_github_token
-from zenve_engine.github.client import GitHubClient
-from zenve_engine.github.snapshot import build_snapshot, write_snapshot
+from zenve_cli.runtime.client import ensure_runtime, report_error, resolve_workspace_id, runtime_request
+
+console = Console()
 
 
 def repo_slug_from_url(url: str) -> str | None:
@@ -37,25 +40,31 @@ def git_remote_slug(repo_root: Path) -> str | None:
 
 def cmd(repo_root: Path = Path(".")) -> None:
     """Fetch current GitHub state and write it to `.zenve/snapshot.json`."""
-    token = resolve_github_token()
-    if not token:
-        typer.echo("✗ No GitHub token found. Run `gh auth login`.")
+    ensure_runtime()
+    workspace_id = resolve_workspace_id(repo_root)
+    resp = runtime_request("POST", f"/api/v1/workspaces/{workspace_id}/snapshot", timeout=60.0)
+    if resp.status_code != 200:
+        report_error(resp)
         raise typer.Exit(1)
+    data = resp.json()
+    path = repo_root.expanduser().resolve() / ".zenve" / "snapshot.json"
 
-    load_project_settings(repo_root)
+    table = Table(
+        box=box.ROUNDED,
+        border_style="dim",
+        header_style="bold cyan",
+        show_lines=False,
+        pad_edge=True,
+    )
+    table.add_column("RESOURCE", style="cyan", no_wrap=True)
+    table.add_column("COUNT", justify="right")
 
-    repo = git_remote_slug(repo_root)
-    if not repo:
-        typer.echo("✗ Could not determine repo. Ensure git remote origin is a GitHub URL.")
-        raise typer.Exit(1)
+    table.add_row("Issues", str(data["issues_count"]))
+    table.add_row("Pull requests", str(data["pull_requests_count"]))
+    table.add_row("Branches", str(data["branches_count"]))
 
-    run_id = new_run_id()
-
-    with GitHubClient(token, repo) as gh:
-        snapshot = build_snapshot(gh, run_id)
-
-    path = write_snapshot(repo_root, snapshot)
-    typer.echo(f"✓ snapshot written to {path}")
-    typer.echo(f"  issues: {len(snapshot.issues)}")
-    typer.echo(f"  pull_requests: {len(snapshot.pull_requests)}")
-    typer.echo(f"  branches: {len(snapshot.branches)}")
+    console.print()
+    console.print(f"[green]✓[/green] Snapshot written to [dim]{path}[/dim]")
+    console.print()
+    console.print(table)
+    console.print()

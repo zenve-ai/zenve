@@ -41,7 +41,7 @@ def is_runtime_path(rel: str) -> bool:
 
 class AgentLockService:
     """Manages .zenve/agents/agents-lock.json — tracks per-agent file hashes
-    so `zenve agents update` can tell which agents are pristine vs. user-modified."""
+    so `zenve agent update` can tell which agents are pristine vs. user-modified."""
 
     def __init__(self, zdir: Path) -> None:
         self.zdir = zdir
