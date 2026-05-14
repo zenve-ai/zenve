@@ -4,14 +4,14 @@ import './main.css'
 import AppRoutes from '@/routes'
 import { useAppDispatch } from '@/store/hooks'
 import { restoreFromStorage } from '@/store/auth'
-import { restoreFromStorage as restoreProjectFromStorage } from '@/store/project'
+import { restoreFromStorage as restoreWorkspaceFromStorage } from '@/store/workspace'
 
 export default function App() {
   const dispatch = useAppDispatch()
 
   useEffect(() => {
     dispatch(restoreFromStorage())
-    dispatch(restoreProjectFromStorage())
+    dispatch(restoreWorkspaceFromStorage())
   }, [dispatch])
 
   return (

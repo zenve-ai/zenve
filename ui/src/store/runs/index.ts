@@ -1,4 +1,4 @@
-export { runsApi, useCreateRunMutation, useListRunsQuery, useGetRunQuery, useGetRunEventsQuery } from './api'
+export { runsApi, useCreateRunMutation, useListRunsQuery, useGetRunQuery, useGetRunEventsQuery, useGetActiveRunQuery } from './api'
 export {
   runsSlice,
   runCreated,

@@ -1,25 +1,60 @@
-import { Code, Compass, Crown, type LucideIcon } from 'lucide-react'
+import {
+  BarChart2,
+  Bot,
+  Code,
+  Compass,
+  Crown,
+  FileText,
+  GitPullRequest,
+  Layers,
+  Rocket,
+  ShieldCheck,
+  TestTube,
+  Wrench,
+  type LucideIcon,
+} from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { AgentIconKey } from '@/types'
 
-const AGENT_ICONS: Record<AgentIconKey, LucideIcon> = {
-  crown: Crown,
-  compass: Compass,
-  code: Code,
-}
+const SLUG_KEYWORD_MAP: Array<[string[], LucideIcon]> = [
+  [['architect', 'architecture'], Layers],
+  [['frontend', 'ui', 'design', 'style'], Bot],
+  [['backend', 'api', 'server'], Code],
+  [['dev', 'code', 'coder', 'engineer'], Code],
+  [['review', 'pr', 'pull-request', 'pullrequest'], GitPullRequest],
+  [['deploy', 'ci', 'cd', 'pipeline', 'infra', 'devops', 'release'], Rocket],
+  [['sec', 'security', 'audit', 'pentest'], ShieldCheck],
+  [['doc', 'docs', 'writer', 'readme'], FileText],
+  [['test', 'qa', 'quality'], TestTube],
+  [['pm', 'product', 'manager', 'planning', 'planner'], BarChart2],
+  [['fix', 'bug', 'debug', 'patch', 'maintenance'], Wrench],
+  [['navigator', 'compass', 'lead'], Compass],
+  [['owner', 'admin', 'boss', 'crown'], Crown],
+]
 
-const ICON_KEYS: AgentIconKey[] = ['crown', 'compass', 'code']
+const FALLBACK_ICONS: LucideIcon[] = [Bot, Code, Compass, Layers, Wrench, GitPullRequest]
 
-export function assignIconKey(slug: string): AgentIconKey {
+function resolveIcon(slug: string): LucideIcon {
+  const lower = slug.toLowerCase()
+  for (const [keywords, icon] of SLUG_KEYWORD_MAP) {
+    if (keywords.some((k) => lower.includes(k))) return icon
+  }
   let hash = 0
   for (let i = 0; i < slug.length; i++) {
     hash = (hash * 31 + slug.charCodeAt(i)) | 0
   }
-  return ICON_KEYS[Math.abs(hash) % ICON_KEYS.length]
+  return FALLBACK_ICONS[Math.abs(hash) % FALLBACK_ICONS.length]
+}
+
+export function assignIconKey(slug: string): AgentIconKey {
+  const icon = resolveIcon(slug)
+  if (icon === Crown) return 'crown'
+  if (icon === Compass) return 'compass'
+  return 'code'
 }
 
 export function getAgentLucideIcon(slug: string): LucideIcon {
-  return AGENT_ICONS[assignIconKey(slug)] ?? Code
+  return resolveIcon(slug)
 }
 
 export function AgentIcon({
@@ -31,11 +66,10 @@ export function AgentIcon({
   className?: string
   iconClassName?: string
 }) {
-  const key = assignIconKey(slug)
-  const IconCmp = AGENT_ICONS[key] ?? Code
+  const IconCmp = resolveIcon(slug)
   return (
     <div className={cn('flex shrink-0 items-center justify-center border border-border bg-muted/50', className)}>
-      <IconCmp className={cn('size-3', iconClassName)} aria-hidden />
+      <IconCmp className={cn('size-3.5', iconClassName)} aria-hidden />
     </div>
   )
 }

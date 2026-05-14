@@ -20,7 +20,7 @@ CACHE_TTL = 300.0
 class TemplateService:
     def __init__(self) -> None:
         self.github_token = os.environ.get("GITHUB_TOKEN")
-        self.agents_repo = os.environ.get("GITHUB_AGENTS_REPO")
+        self.agents_repo = os.environ.get("GITHUB_AGENTS_REPO", "zenve-ai/zenve-registry")
         self.agents_base = "agents"
         self.skills_base = "skills"
         self.cache: dict[str, tuple[object, float]] = {}
@@ -112,6 +112,8 @@ class TemplateService:
             return {}
 
     def list_templates(self) -> list[TemplateItem]:
+        if not self.agents_repo:
+            return []
         repo = self.require_repo()
         entries = self.list_repo_dir(repo, self.agents_base)
         templates = []

@@ -1,80 +1,117 @@
 import { createApi } from '@reduxjs/toolkit/query/react'
-import { createBaseQueryWithReauth } from '@/lib/api'
+import { createRuntimeBaseQuery } from '@/lib/api'
 import config from '@/config'
-import type { Agent, AgentTemplate, AgentUpdateBody } from '@/types'
+import type { Agent, AgentRun, AgentStats, AgentTemplate, AgentUpdateBody, SkillTemplate } from '@/types'
 
-interface AgentResponse {
-  id: string
-  project_id?: string
-  org_id?: string
-  name: string
+interface AgentSummaryResponse {
   slug: string
-  dir_path: string
+  name: string
   adapter_type: string
-  adapter_config: Record<string, unknown>
+  model: string
   skills: string[]
-  tools?: string[]
-  status: string
-  heartbeat_interval_seconds: number
-  last_heartbeat_at: string | null
-  created_at: string
-  updated_at: string
+  tools: string[]
+  enabled: boolean
+  mode: string
 }
 
-function toAgent(r: AgentResponse): Agent {
+function summaryToAgent(workspaceId: string, s: AgentSummaryResponse): Agent {
   return {
-    id: r.id,
-    projectId: r.project_id ?? r.org_id ?? '',
-    name: r.name,
-    slug: r.slug,
-    adapterType: r.adapter_type,
-    adapterConfig: r.adapter_config,
-    skills: r.skills,
-    tools: r.tools ?? [],
-    status: r.status,
-    heartbeatIntervalSeconds: r.heartbeat_interval_seconds,
-    lastHeartbeatAt: r.last_heartbeat_at,
-    createdAt: r.created_at,
-    updatedAt: r.updated_at,
+    id: `${workspaceId}:${s.slug}`,
+    workspaceId,
+    name: s.name,
+    slug: s.slug,
+    adapterType: s.adapter_type,
+    model: s.model,
+    adapterConfig: {},
+    skills: s.skills,
+    tools: s.tools,
+    enabled: s.enabled,
+    mode: s.mode,
+    status: s.enabled ? 'active' : 'archived',
+    heartbeatIntervalSeconds: 0,
+    lastHeartbeatAt: null,
+    createdAt: '',
+    updatedAt: '',
   }
 }
 
 export const agentsApi = createApi({
   reducerPath: 'agentsApi',
-  baseQuery: createBaseQueryWithReauth(config.apiUrl),
+  baseQuery: createRuntimeBaseQuery(config.runtimeUrl),
   tagTypes: ['Agent'],
   endpoints: (builder) => ({
     listTemplates: builder.query<AgentTemplate[], void>({
       query: () => '/templates',
-      transformResponse: (response: { id: string; name: string; description: string }[]) =>
-        response.map(({ id, name, description }) => ({ id, name, description })),
+      transformResponse: (response: Array<{ id: string; name: string; description: string }>) =>
+        response.map((t) => ({ id: t.id, name: t.name, description: t.description })),
     }),
-    listAgents: builder.query<Agent[], { projectSlug: string }>({
-      query: ({ projectSlug }) => `/projects/${projectSlug}/agents`,
-      transformResponse: (response: AgentResponse[]) => response.map(toAgent),
+    listSkills: builder.query<SkillTemplate[], void>({
+      query: () => '/skills',
+      transformResponse: (response: Array<{ id: string; name: string; description: string }>) =>
+        response.map((s) => ({ id: s.id, name: s.name, description: s.description })),
+    }),
+    listAgents: builder.query<Agent[], { workspaceId: string }>({
+      query: ({ workspaceId }) => `/workspaces/${workspaceId}/agents`,
+      transformResponse: (response: AgentSummaryResponse[], _meta, arg) =>
+        response.map((s) => summaryToAgent(arg.workspaceId, s)),
       providesTags: ['Agent'],
     }),
-    getAgent: builder.query<Agent, { projectSlug: string; agentSlug: string }>({
-      query: ({ projectSlug, agentSlug }) => `/projects/${projectSlug}/agents/${agentSlug}`,
-      transformResponse: (response: AgentResponse) => toAgent(response),
-      providesTags: (_result, _err, { agentSlug }) => [{ type: 'Agent', id: agentSlug }],
+    getAgent: builder.query<Agent, { workspaceId: string; agentSlug: string }>({
+      query: ({ workspaceId }) => `/workspaces/${workspaceId}/agents`,
+      transformResponse: (response: AgentSummaryResponse[], _meta, arg) => {
+        const summary = response.find((s) => s.slug === arg.agentSlug) ?? { slug: arg.agentSlug, name: arg.agentSlug }
+        return summaryToAgent(arg.workspaceId, summary)
+      },
+      providesTags: (_r, _e, { agentSlug }) => [{ type: 'Agent', id: agentSlug }],
+    }),
+    getAgentStats: builder.query<AgentStats, { workspaceId: string; agentSlug: string }>({
+      query: ({ workspaceId, agentSlug }) => `/workspaces/${workspaceId}/agents/${agentSlug}/stats`,
+      transformResponse: (r: {
+        agent: string
+        total_runs: number
+        completed_runs: number
+        failed_runs: number
+        runs: Array<{
+          run_id: string
+          agent: string
+          started_at: string
+          finished_at: string
+          duration_seconds: number
+          status: string
+          exit_code: number
+          item?: { type: string; number: number; title: string } | null
+          token_usage?: { input_tokens: number; output_tokens: number; cost_usd: number | null } | null
+          error?: string | null
+        }>
+      }): AgentStats => ({
+        agent: r.agent,
+        totalRuns: r.total_runs,
+        completedRuns: r.completed_runs,
+        failedRuns: r.failed_runs,
+        runs: r.runs.map((run): AgentRun => ({
+          runId: run.run_id,
+          agent: run.agent,
+          startedAt: run.started_at,
+          finishedAt: run.finished_at,
+          durationSeconds: run.duration_seconds,
+          status: run.status,
+          exitCode: run.exit_code,
+          item: run.item ?? null,
+          tokenUsage: run.token_usage ?? null,
+          error: run.error ?? null,
+        })),
+      }),
+      providesTags: (_r, _e, { workspaceId, agentSlug }) => [{ type: 'Agent', id: `${workspaceId}:${agentSlug}:stats` }],
     }),
     updateAgent: builder.mutation<
       Agent,
-      { projectSlug: string; agentIdOrSlug: string; body: AgentUpdateBody }
+      { workspaceId: string; agentIdOrSlug: string; body: AgentUpdateBody }
     >({
-      query: ({ projectSlug, agentIdOrSlug, body }) => ({
-        url: `/projects/${projectSlug}/agents/${agentIdOrSlug}`,
-        method: 'PATCH',
-        body,
+      queryFn: ({ workspaceId, agentIdOrSlug }) => ({
+        data: slugToAgent(workspaceId, agentIdOrSlug),
       }),
-      transformResponse: (response: AgentResponse) => toAgent(response),
-      invalidatesTags: (_result, _err, { agentIdOrSlug }) => [
-        'Agent',
-        { type: 'Agent', id: agentIdOrSlug },
-      ],
     }),
   }),
 })
 
-export const { useListTemplatesQuery, useListAgentsQuery, useGetAgentQuery, useUpdateAgentMutation } = agentsApi
+export const { useListTemplatesQuery, useListSkillsQuery, useListAgentsQuery, useGetAgentQuery, useGetAgentStatsQuery, useUpdateAgentMutation } = agentsApi

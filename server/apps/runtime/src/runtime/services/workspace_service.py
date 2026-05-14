@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import base64
 import json
 import os
 import re
@@ -10,7 +11,8 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from runtime.models.errors import ConflictError, ExternalError, NotFoundError, ValidationError
-from runtime.models.workspace import Workspace, WorkspaceCreate, WorkspaceDetail
+from runtime.models.run import AgentStats, WorkspaceRunDetail
+from runtime.models.workspace import AgentSummary, ScaffoldWorkspaceBody, Workspace, WorkspaceCreate, WorkspaceDetail
 
 
 def git_remote_slug(repo_root: Path) -> str | None:
@@ -64,7 +66,7 @@ class WorkspaceService:
     def save(self) -> None:
         payload = {
             "version": REGISTRY_VERSION,
-            "workspaces": [w.model_dump() for w in self.workspaces],
+            "workspaces": [w.model_dump(exclude={"agent_count"}) for w in self.workspaces],
         }
         tmp = self.registry_path.with_suffix(self.registry_path.suffix + ".tmp")
         with tmp.open("w", encoding="utf-8") as fh:
@@ -72,7 +74,52 @@ class WorkspaceService:
         os.replace(tmp, self.registry_path)
 
     def list(self) -> list[Workspace]:
-        return list(self.workspaces)
+        return [w.model_copy(update={"agent_count": self.count_agents(w.path)}) for w in self.workspaces]
+
+    def count_agents(self, workspace_path: str) -> int:
+        agents_dir = Path(workspace_path) / ZENVE_DIR / AGENTS_SUBDIR
+        if not agents_dir.exists():
+            return 0
+        return sum(1 for p in agents_dir.iterdir() if p.is_dir())
+
+    def list_agents(self, workspace_id: str) -> list[AgentSummary]:
+        workspace = self.get(workspace_id)
+        agents_dir = Path(workspace.path) / ZENVE_DIR / AGENTS_SUBDIR
+        if not agents_dir.exists():
+            return []
+        results: list[AgentSummary] = []
+        for agent_dir in sorted(agents_dir.iterdir()):
+            if not agent_dir.is_dir():
+                continue
+            slug = agent_dir.name
+            settings_path = agent_dir / SETTINGS_FILE
+            name = slug
+            adapter_type = ""
+            model = ""
+            skills: list[str] = []
+            tools: list[str] = []
+            enabled = True
+            if settings_path.exists():
+                with settings_path.open("r", encoding="utf-8") as fh:
+                    data = json.load(fh)
+                name = data.get("name", slug)
+                adapter_type = data.get("adapter_type", "")
+                model = data.get("adapter_config", {}).get("model", "")
+                skills = data.get("skills", [])
+                tools = data.get("tools", [])
+                enabled = data.get("enabled", True)
+                mode = data.get("mode", "")
+            results.append(AgentSummary(
+                slug=slug,
+                name=name,
+                adapter_type=adapter_type,
+                model=model,
+                skills=skills,
+                tools=tools,
+                enabled=enabled,
+                mode=mode,
+            ))
+        return results
 
     def get(self, workspace_id: str) -> Workspace:
         for w in self.workspaces:
@@ -119,6 +166,114 @@ class WorkspaceService:
                     self.save()
                     return
             raise NotFoundError(f"Workspace {workspace_id} not found")
+
+    def get_agent_stats(self, workspace_id: str, agent_slug: str) -> AgentStats:
+        workspace = self.get(workspace_id)
+        runs_dir = Path(workspace.path) / ZENVE_DIR / AGENTS_SUBDIR / agent_slug / "runs"
+        runs: list[WorkspaceRunDetail] = []
+        if runs_dir.exists():
+            for path in sorted(runs_dir.glob("*.json"), key=lambda p: p.stem, reverse=True):
+                try:
+                    with path.open("r", encoding="utf-8") as fh:
+                        data = json.load(fh)
+                    runs.append(WorkspaceRunDetail.model_validate(data))
+                except Exception:
+                    pass
+        completed = sum(1 for r in runs if r.status == "completed")
+        failed = sum(1 for r in runs if r.status == "failed")
+        return AgentStats(
+            agent=agent_slug,
+            total_runs=len(runs),
+            completed_runs=completed,
+            failed_runs=failed,
+            runs=runs,
+        )
+
+    def scaffold(self, body: ScaffoldWorkspaceBody, template_svc: object) -> Workspace:
+        from runtime.services.template_service import TemplateService
+        svc: TemplateService = template_svc  # type: ignore[assignment]
+
+        path = Path(body.path).expanduser().resolve()
+        if not path.exists() or not path.is_dir():
+            raise ValidationError(f"Path does not exist or is not a directory: {path}")
+
+        zenve_dir = path / ZENVE_DIR
+        agents_dir = zenve_dir / AGENTS_SUBDIR
+        zenve_dir.mkdir(parents=True, exist_ok=True)
+        agents_dir.mkdir(parents=True, exist_ok=True)
+
+        slug = re.sub(r"[^a-z0-9]+", "-", body.name.lower().strip()).strip("-") or "project"
+        pipeline: dict[str, None] = {}
+
+        for template_id in body.agents:
+            template = svc.get_template(template_id)
+            agent_slug = template.slug or template_id
+            try:
+                tfiles = svc.get_template_files(template_id)
+                raw_files = {k: base64.b64decode(v) for k, v in tfiles.files.items()}
+            except Exception:
+                raw_files = {}
+            agent_settings = {
+                "slug": agent_slug,
+                "name": template.name,
+                "adapter_type": template.adapter_type,
+                "adapter_config": template.adapter_config,
+                "skills": template.skills,
+                "tools": template.tools,
+                "heartbeat_interval_seconds": template.heartbeat_interval_seconds,
+                "github_label": f"zenve:{agent_slug}",
+                "enabled": True,
+                "mode": template.mode,
+            }
+            raw_files["settings.json"] = json.dumps(agent_settings, indent=2).encode()
+            agent_out = agents_dir / agent_slug
+            for relpath, content in raw_files.items():
+                dest = agent_out / relpath
+                dest.parent.mkdir(parents=True, exist_ok=True)
+                dest.write_bytes(content)
+            pipeline[f"zenve:{agent_slug}"] = None
+
+        for skill_id in body.skills:
+            try:
+                skill_files = svc.get_skill_files(skill_id)
+            except Exception:
+                continue
+            skill_out = path / ".agents" / "skills" / skill_id
+            skill_out.mkdir(parents=True, exist_ok=True)
+            for relpath, content in skill_files.files.items():
+                dest = skill_out / relpath
+                dest.parent.mkdir(parents=True, exist_ok=True)
+                dest.write_bytes(base64.b64decode(content))
+            link_dir = path / ".claude" / "skills"
+            link_dir.mkdir(parents=True, exist_ok=True)
+            link_path = link_dir / skill_id
+            if link_path.exists() or link_path.is_symlink():
+                link_path.unlink()
+            link_path.symlink_to(Path("../../.agents/skills") / skill_id)
+
+        root_settings = {
+            "project": slug,
+            "description": body.description,
+            "default_branch": body.default_branch,
+            "commit_message_prefix": "[zenve]",
+            "run_timeout_seconds": 600,
+            "stack": body.stack,
+            "pipeline": pipeline,
+        }
+        (zenve_dir / SETTINGS_FILE).write_text(json.dumps(root_settings, indent=2), encoding="utf-8")
+
+        with self.lock:
+            for w in self.workspaces:
+                if w.path == str(path):
+                    raise ConflictError(f"Workspace already registered at {path}")
+            workspace = Workspace(
+                id=uuid.uuid4().hex[:12],
+                path=str(path),
+                registered_at=datetime.now(UTC).isoformat(),
+            )
+            self.workspaces.append(workspace)
+            self.save()
+        return workspace
 
     def detail(self, workspace_id: str) -> WorkspaceDetail:
         workspace = self.get(workspace_id)

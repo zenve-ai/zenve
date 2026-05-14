@@ -1,6 +1,6 @@
 export { OnboardingDecorativePanel } from './onboarding-decorative-panel'
 export { OnboardingStepIndicator } from './onboarding-step-indicator'
-export { StepProjectName } from './step-project-name'
-export { StepGithubConnect } from './step-github-connect'
+export { StepWorkspace } from './step-workspace'
 export { StepSelectAgents } from './step-select-agents'
+export { StepSelectSkills } from './step-select-skills'
 export { StepFinish } from './step-finish'

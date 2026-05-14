@@ -1,5 +1,7 @@
+import { useState } from 'react'
 import { ArrowRight, Check, Clock, Loader2 } from 'lucide-react'
 import { AgentDashboardBarChartCard } from '@/components/agents/agent-dashboard-bar-chart-card'
+import { RunLogView } from '@/components/runs'
 import { Button } from '@/components/ui/button'
 import type { ChartConfig } from '@/components/ui/chart'
 import {
@@ -8,30 +10,14 @@ import {
   type DayGroup,
   timestampToLocalCalendarDateKey,
 } from '@/components/ui/day-bucket-bar-chart'
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { cn } from '@/lib/utils'
-import {
-  MOCK_COST_ROWS,
-  MOCK_COST_SUMMARY,
-  MOCK_ISSUE_ROWS,
-  type MockIssueRow,
-} from '@/lib/mock-agent-dashboard'
-import { useListRunsQuery } from '@/store/runs'
-import type { Run } from '@/types'
+import { MOCK_ISSUE_ROWS, type MockIssueRow } from '@/lib/mock-agent-dashboard'
+import { useGetAgentStatsQuery } from '@/store/agents'
+import { useGetActiveRunQuery, useGetRunEventsQuery } from '@/store/runs'
+import type { AgentRun } from '@/types'
 
 // ─── helpers ────────────────────────────────────────────────────────────────
-
-const OUTCOME_SIGNAL = /^(?:RUN_OK|RUN_FAILED|RUN_NEEDS_INPUT|HEARTBEAT_OK|HEARTBEAT_FAILED|HEARTBEAT_NEEDS_INPUT)(?::\s*(.+))?$/
-
-function parseOutcome(outcome: string | null): string | null {
-  if (!outcome) return null
-  const lines = outcome.trim().split('\n').slice(-10).reverse()
-  for (const raw of lines) {
-    const line = raw.trim()
-    const match = OUTCOME_SIGNAL.exec(line)
-    if (match) return match[1]?.trim() ?? null
-  }
-  return null
-}
 
 function formatRelativeTime(dateStr: string): string {
   const diff = Date.now() - new Date(dateStr).getTime()
@@ -43,11 +29,16 @@ function formatRelativeTime(dateStr: string): string {
   return `${Math.floor(hours / 24)}d ago`
 }
 
-function formatDuration(startedAt: string | null, finishedAt: string | null): string {
-  if (!startedAt || !finishedAt) return '—'
-  const secs = Math.round((new Date(finishedAt).getTime() - new Date(startedAt).getTime()) / 1000)
-  if (secs < 60) return `${secs}s`
-  return `${Math.floor(secs / 60)}m ${secs % 60}s`
+function formatDuration(seconds: number): string {
+  if (seconds < 60) return `${Math.round(seconds)}s`
+  return `${Math.floor(seconds / 60)}m ${Math.round(seconds % 60)}s`
+}
+
+function formatUsd(v: number): string {
+  if (v === 0) return '$0'
+  if (v < 0.01) return `$${v.toFixed(4)}`
+  if (v < 1) return `$${v.toFixed(3)}`
+  return `$${v.toFixed(2)}`
 }
 
 const RUN_STATUS: Record<string, { label: string; className: string }> = {
@@ -55,7 +46,7 @@ const RUN_STATUS: Record<string, { label: string; className: string }> = {
   running:   { label: 'RUN',     className: 'border-blue-500/40 bg-blue-500/10 text-blue-700 dark:text-blue-400' },
   queued:    { label: 'QUEUED',  className: 'border-border text-muted-foreground' },
   failed:    { label: 'FAIL',    className: 'border-red-500/40 bg-red-500/10 text-red-700 dark:text-red-400' },
-  cancelled: { label: 'CANCEL', className: 'border-border text-muted-foreground' },
+  cancelled: { label: 'CANCEL',  className: 'border-border text-muted-foreground' },
   timeout:   { label: 'TIMEOUT', className: 'border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-400' },
 }
 
@@ -92,10 +83,10 @@ function IssueStatusBadge({ row }: { row: MockIssueRow }) {
   )
 }
 
-function RunRow({ run, onViewDetails }: { run: Run; onViewDetails?: () => void }) {
-  const outcomeNote = parseOutcome(run.outcome)
-  const duration = formatDuration(run.startedAt, run.finishedAt)
+function RunRow({ run, onViewDetails }: { run: AgentRun; onViewDetails?: () => void }) {
   const cfg = RUN_STATUS[run.status] ?? { label: run.status.toUpperCase(), className: 'border-border text-muted-foreground' }
+  const duration = formatDuration(run.durationSeconds)
+  const label = run.item ? `#${run.item.number} ${run.item.title}` : run.error ?? run.runId.slice(0, 8)
 
   return (
     <div
@@ -112,20 +103,17 @@ function RunRow({ run, onViewDetails }: { run: Run; onViewDetails?: () => void }
         <Check className="size-2.5" />
         {cfg.label}
       </span>
-      <span className="shrink-0 border border-border px-1 py-px font-mono text-[9px] tracking-widest text-muted-foreground uppercase">
-        {run.trigger}
-      </span>
-      {duration !== '—' && (
+      {run.durationSeconds > 0 && (
         <span className="inline-flex shrink-0 items-center gap-0.5 border border-border px-1 py-px font-mono text-[9px] tracking-widest text-muted-foreground">
           <Clock className="size-2.5" />
           {duration}
         </span>
       )}
       <span className="min-w-0 flex-1 truncate font-mono text-[11px] text-muted-foreground">
-        {outcomeNote ?? run.errorSummary ?? run.id.slice(0, 8)}
+        {label}
       </span>
       <span className="shrink-0 font-mono text-[10px] text-muted-foreground/60">
-        {formatRelativeTime(run.createdAt)}
+        {formatRelativeTime(run.startedAt)}
       </span>
     </div>
   )
@@ -133,80 +121,95 @@ function RunRow({ run, onViewDetails }: { run: Run; onViewDetails?: () => void }
 
 // ─── daily aggregation helpers ──────────────────────────────────────────────
 
-function groupRunsByDay(runs: Run[], days = 7): DayGroup<Run>[] {
-  return buildDayGroupsForLastNDays(runs, (r) => timestampToLocalCalendarDateKey(r.createdAt), { days })
+function groupByDay(runs: AgentRun[], days = 7): DayGroup<AgentRun>[] {
+  return buildDayGroupsForLastNDays(runs, (r) => timestampToLocalCalendarDateKey(r.startedAt), { days })
 }
 
 function toBuckets<T>(groups: DayGroup<T>[], reducer: (items: T[]) => number): DayBucket[] {
   return groups.map((g) => ({ label: g.label, dateKey: g.dateKey, value: reducer(g.items) }))
 }
 
-function getRunCostUsd(run: Run): number {
-  const cost = (run.tokenUsage as { cost_usd?: unknown } | null)?.cost_usd
-  return typeof cost === 'number' ? cost : 0
-}
-
 const CHART_CONFIG_RUNS: ChartConfig = {
-  value: {
-    label: 'Runs',
-    /** Near Tailwind `emerald-500` at ~80% fill — lighter than a deep forest green. */
-    color: 'oklch(0.78 0.14 158 / 0.78)',
-  },
+  value: { label: 'Runs', color: 'oklch(0.78 0.14 158 / 0.78)' },
 }
-
 const CHART_CONFIG_FAILURES: ChartConfig = {
-  value: {
-    label: 'Failed',
-    color: 'oklch(0.58 0.2 27 / 0.88)',
-  },
+  value: { label: 'Failed', color: 'oklch(0.58 0.2 27 / 0.88)' },
 }
-
 const CHART_CONFIG_COST: ChartConfig = {
-  value: {
-    label: 'Cost',
-    color: 'oklch(0.72 0.16 75 / 0.88)',
-  },
+  value: { label: 'Cost', color: 'oklch(0.72 0.16 75 / 0.88)' },
 }
-
 const CHART_CONFIG_ISSUES: ChartConfig = {
-  value: {
-    label: 'Issues',
-    color: 'oklch(0.62 0.14 240 / 0.88)',
-  },
-}
-
-function formatUsd(v: number): string {
-  if (v === 0) return '$0'
-  if (v < 0.01) return `$${v.toFixed(4)}`
-  if (v < 1) return `$${v.toFixed(3)}`
-  return `$${v.toFixed(2)}`
+  value: { label: 'Issues', color: 'oklch(0.62 0.14 240 / 0.88)' },
 }
 
 // ─── main component ──────────────────────────────────────────────────────────
 
 export function AgentDashboardTab({
-  projectSlug,
-  agentId,
+  workspaceId,
+  agentSlug,
   onViewRunDetails,
 }: {
-  projectSlug: string
-  agentId: string
+  workspaceId: string
+  agentSlug: string
   onViewRunDetails?: () => void
 }) {
-  const { data: runs = [], isLoading: runsLoading } = useListRunsQuery(
-    { projectSlug, agentId },
-    { skip: !projectSlug || !agentId },
+  const [selectedRunId, setSelectedRunId] = useState<string | null>(null)
+  const [sheetOpen, setSheetOpen] = useState(false)
+
+  const { data: stats, isLoading } = useGetAgentStatsQuery(
+    { workspaceId, agentSlug },
+    { skip: !workspaceId || !agentSlug },
   )
 
-  const dayGroups = groupRunsByDay(runs)
+  const { data: activeRun } = useGetActiveRunQuery(
+    { workspaceId },
+    { skip: !workspaceId },
+  )
+
+  const { data: activeRunEvents } = useGetRunEventsQuery(
+    { workspaceId, runId: activeRun?.run_id ?? '' },
+    { skip: !activeRun?.run_id },
+  )
+
+  const runs = stats?.runs ?? []
+  const dayGroups = groupByDay(runs, 10)
   const runActivity = toBuckets(dayGroups, (rs) => rs.length)
-  const runFailures = toBuckets(dayGroups, (rs) => rs.filter((r) => r.status === 'failed' || r.status === 'timeout').length)
-  const runCost = toBuckets(dayGroups, (rs) => rs.reduce((sum, r) => sum + getRunCostUsd(r), 0))
+  const runFailures = toBuckets(dayGroups, (rs) => rs.filter((r) => r.status === 'failed').length)
+  const runCost = toBuckets(dayGroups, (rs) => rs.reduce((sum, r) => sum + (r.tokenUsage?.cost_usd ?? 0), 0))
   const issueDayGroups = buildDayGroupsForLastNDays(
     MOCK_ISSUE_ROWS,
     (row) => timestampToLocalCalendarDateKey(row.createdAt),
   )
   const issueActivity = toBuckets(issueDayGroups, (rows) => rows.length)
+
+  const openSheet = (runId: string) => {
+    setSelectedRunId(runId)
+    setSheetOpen(true)
+  }
+
+  const renderNow = () => {
+    if (!activeRun) return null
+    const claimEvent = activeRunEvents?.find(
+      (e) => e.type === 'agent.claimed_issue' || e.type === 'agent.claimed_pr',
+    )
+    const label = claimEvent
+      ? `#${(claimEvent.data as { number: number }).number}  ${(claimEvent.data as { title: string }).title}`
+      : activeRun.run_id.slice(0, 8)
+    return (
+      <section className="border border-blue-500/30 bg-blue-500/5">
+        <SectionBar title="Now · 1 active task" />
+        <button
+          type="button"
+          onClick={() => openSheet(activeRun.run_id)}
+          className="flex w-full items-center gap-3 px-3 py-2.5 text-left hover:bg-blue-500/10"
+        >
+          <Loader2 className="size-3 shrink-0 animate-spin text-blue-400" />
+          <span className="min-w-0 flex-1 truncate font-mono text-[11px] text-blue-300">{label}</span>
+          <span className="shrink-0 font-mono text-[10px] text-muted-foreground/60">active</span>
+        </button>
+      </section>
+    )
+  }
 
   const renderRuns = () => (
     <section className="border border-border bg-card">
@@ -224,7 +227,7 @@ export function AgentDashboardTab({
           </Button>
         }
       />
-      {runsLoading ? (
+      {isLoading ? (
         <div className="flex items-center gap-2 px-3 py-3">
           <Loader2 className="size-3 animate-spin text-muted-foreground" />
           <span className="font-mono text-[10px] tracking-widest text-muted-foreground">LOADING...</span>
@@ -233,9 +236,9 @@ export function AgentDashboardTab({
         <p className="px-3 py-3 font-mono text-[11px] text-muted-foreground">No runs yet.</p>
       ) : (
         <ul className="divide-y divide-border/60">
-          {[...runs].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()).slice(0, 5).map((run) => (
-            <li key={run.id}>
-              <RunRow run={run} onViewDetails={onViewRunDetails} />
+          {[...runs].sort((a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime()).slice(0, 5).map((run) => (
+            <li key={run.runId}>
+              <RunRow run={run} onViewDetails={() => openSheet(run.runId)} />
             </li>
           ))}
         </ul>
@@ -243,25 +246,45 @@ export function AgentDashboardTab({
     </section>
   )
 
+  const renderSheet = () => (
+    <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
+      <SheetContent side="right" className="flex !w-[80vw] !max-w-[80vw] flex-col rounded-none p-0 sm:!max-w-[80vw] gap-0">
+        <SheetHeader className="shrink-0 border-b border-border/60 p-4">
+          <SheetTitle className="font-mono text-[11px] font-normal text-muted-foreground">
+            Run:  <b>{selectedRunId}</b>
+          </SheetTitle>
+        </SheetHeader>
+        {selectedRunId && (
+          <RunLogView
+            workspaceId={workspaceId}
+            runId={selectedRunId}
+            isActive={activeRun?.run_id === selectedRunId}
+            agentFilter={agentSlug}
+          />
+        )}
+      </SheetContent>
+    </Sheet>
+  )
+
   const renderCharts = () => (
     <div className="grid gap-3 md:grid-cols-2 2xl:grid-cols-4">
       <AgentDashboardBarChartCard
         title="Total runs"
-        subtitle="Last 7 days"
+        subtitle="Last 10 days"
         buckets={runActivity}
         config={CHART_CONFIG_RUNS}
         emptyLabel="No runs"
       />
       <AgentDashboardBarChartCard
         title="Failed runs"
-        subtitle="Last 7 days"
+        subtitle="Last 10 days"
         buckets={runFailures}
         config={CHART_CONFIG_FAILURES}
         emptyLabel="No failures"
       />
       <AgentDashboardBarChartCard
         title="Run cost"
-        subtitle="Last 7 days"
+        subtitle="Last 10 days"
         buckets={runCost}
         config={CHART_CONFIG_COST}
         emptyLabel="No cost"
@@ -293,71 +316,28 @@ export function AgentDashboardTab({
         }
       />
       <ul className="divide-y divide-border/60">
-        {[...MOCK_ISSUE_ROWS].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()).map((row) => (
-          <li key={row.id} className="flex items-start gap-3 px-3 py-2">
-            <span className="shrink-0 font-mono text-[10px] text-muted-foreground">{row.id}</span>
-            <span className="min-w-0 flex-1 text-[12px] leading-snug">{row.title}</span>
-            <IssueStatusBadge row={row} />
-          </li>
-        ))}
+        {[...MOCK_ISSUE_ROWS]
+          .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+          .map((row) => (
+            <li key={row.id} className="flex items-start gap-3 px-3 py-2">
+              <span className="shrink-0 font-mono text-[10px] text-muted-foreground">{row.id}</span>
+              <span className="min-w-0 flex-1 text-[12px] leading-snug">{row.title}</span>
+              <IssueStatusBadge row={row} />
+            </li>
+          ))}
       </ul>
     </section>
   )
 
-  const renderCosts = () => (
-    <section className="border border-border bg-card">
-      <SectionBar title="Costs (mock)" />
-      <div className="grid gap-3 border-b border-dashed border-border/60 px-3 py-3 sm:grid-cols-2 lg:grid-cols-4">
-        <div>
-          <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Input tokens</p>
-          <p className="font-mono text-[13px]">{MOCK_COST_SUMMARY.inputTokens}</p>
-        </div>
-        <div>
-          <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Output tokens</p>
-          <p className="font-mono text-[13px]">{MOCK_COST_SUMMARY.outputTokens}</p>
-        </div>
-        <div>
-          <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Cached tokens</p>
-          <p className="font-mono text-[13px]">{MOCK_COST_SUMMARY.cachedTokens}</p>
-        </div>
-        <div>
-          <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Total cost</p>
-          <p className="font-mono text-[13px]">{MOCK_COST_SUMMARY.totalCost}</p>
-        </div>
-      </div>
-      <div className="overflow-x-auto">
-        <table className="w-full min-w-[480px] text-left text-[12px]">
-          <thead>
-            <tr className="border-b border-border/60 bg-muted/15 font-mono text-[10px] uppercase tracking-wide text-muted-foreground">
-              <th className="px-3 py-2 font-medium">Date</th>
-              <th className="px-3 py-2 font-medium">Run</th>
-              <th className="px-3 py-2 font-medium">Input</th>
-              <th className="px-3 py-2 font-medium">Output</th>
-              <th className="px-3 py-2 font-medium">Cost</th>
-            </tr>
-          </thead>
-          <tbody>
-            {MOCK_COST_ROWS.map((row) => (
-              <tr key={row.runId} className="border-b border-border/40 font-mono">
-                <td className="px-3 py-2 text-[11px]">{row.date}</td>
-                <td className="px-3 py-2 text-[11px] text-muted-foreground">{row.runId}</td>
-                <td className="px-3 py-2">{row.input}</td>
-                <td className="px-3 py-2">{row.output}</td>
-                <td className="px-3 py-2 text-muted-foreground">{row.cost}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </section>
-  )
-
   return (
-    <div className="flex flex-col gap-4 p-4">
-      {renderRuns()}
-      {renderCharts()}
-      {renderIssues()}
-      {renderCosts()}
-    </div>
+    <>
+      <div className="flex flex-col gap-4 p-4">
+        {renderNow()}
+        {renderRuns()}
+        {renderCharts()}
+        {renderIssues()}
+      </div>
+      {renderSheet()}
+    </>
   )
 }

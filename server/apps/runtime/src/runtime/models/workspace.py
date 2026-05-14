@@ -7,10 +7,32 @@ class WorkspaceCreate(BaseModel):
     path: str
 
 
+class ScaffoldWorkspaceBody(BaseModel):
+    name: str
+    path: str
+    description: str = ""
+    default_branch: str = "main"
+    stack: list[str] = []
+    agents: list[str] = []
+    skills: list[str] = []
+
+
 class Workspace(BaseModel):
     id: str
     path: str
     registered_at: str
+    agent_count: int = 0
+
+
+class AgentSummary(BaseModel):
+    slug: str
+    name: str
+    adapter_type: str = ""
+    model: str = ""
+    skills: list[str] = Field(default_factory=list)
+    tools: list[str] = Field(default_factory=list)
+    enabled: bool = True
+    mode: str = ""
 
 
 class WorkspaceDetail(Workspace):

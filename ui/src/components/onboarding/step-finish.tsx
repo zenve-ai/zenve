@@ -1,26 +1,27 @@
-import { Check, FolderOpen, GitFork, Bot } from 'lucide-react'
+import { Check, FolderOpen, Folder, Bot, Zap } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 
 interface StepFinishProps {
-  projectName: string
-  projectDescription: string
-  githubRepo: string | null
+  name: string
+  description: string
+  path: string
   selectedAgentCount: number
+  selectedSkillCount: number
   onGetStarted: () => void
   isLoading: boolean
   error: string | null
 }
 
 export function StepFinish({
-  projectName,
-  projectDescription,
-  githubRepo,
+  name,
+  description,
+  path,
   selectedAgentCount,
+  selectedSkillCount,
   onGetStarted,
   isLoading,
   error,
 }: StepFinishProps) {
-  // --- render helpers ---
   const renderSummaryRow = (
     icon: React.ReactNode,
     label: string,
@@ -39,7 +40,6 @@ export function StepFinish({
     </div>
   )
 
-  // --- return ---
   return (
     <div className="flex flex-col gap-6">
       <div>
@@ -55,19 +55,18 @@ export function StepFinish({
       <div className="border border-dashed border-border/60">
         {renderSummaryRow(
           <FolderOpen className="size-4" />,
-          'Project name',
-          projectName,
-        )}
-        {projectDescription && renderSummaryRow(
-          <FolderOpen className="size-4" />,
-          'Description',
-          projectDescription,
+          'Workspace name',
+          name,
         )}
         {renderSummaryRow(
-          <GitFork className="size-4" />,
-          'GitHub',
-          githubRepo ?? 'Not connected',
-          githubRepo !== null,
+          <Folder className="size-4" />,
+          'Path',
+          path,
+        )}
+        {description && renderSummaryRow(
+          <FolderOpen className="size-4" />,
+          'Description',
+          description,
         )}
         {renderSummaryRow(
           <Bot className="size-4" />,
@@ -76,6 +75,14 @@ export function StepFinish({
             ? `${selectedAgentCount} agent${selectedAgentCount !== 1 ? 's' : ''} selected`
             : 'None selected',
           selectedAgentCount > 0,
+        )}
+        {renderSummaryRow(
+          <Zap className="size-4" />,
+          'Skills',
+          selectedSkillCount > 0
+            ? `${selectedSkillCount} skill${selectedSkillCount !== 1 ? 's' : ''} selected`
+            : 'None selected',
+          selectedSkillCount > 0,
         )}
       </div>
 

@@ -1,5 +1,6 @@
 import { useNavigate } from 'react-router'
-import { ListTodo, MessageCircle, Pause, Play } from 'lucide-react'
+import { ListTodo, PowerOff, Zap } from 'lucide-react'
+import { AdapterIcon } from '@/components/agents/adapter-icon'
 import { AgentIcon } from '@/components/agents/agent-icon'
 import { Button } from '@/components/ui/button'
 import {
@@ -47,16 +48,6 @@ function getStatus(s: string) {
   return STATUS_CONFIG[s as StatusKey] ?? STATUS_CONFIG.active
 }
 
-function formatRelativeTime(dateStr: string): string {
-  const diff = Date.now() - new Date(dateStr).getTime()
-  const mins = Math.floor(diff / 60000)
-  if (mins < 1) return 'Just now'
-  if (mins < 60) return `${mins}m ago`
-  const hours = Math.floor(mins / 60)
-  if (hours < 24) return `${hours}h ago`
-  const days = Math.floor(hours / 24)
-  return `${days}d ago`
-}
 
 export function AgentCard({
   agent,
@@ -67,7 +58,7 @@ export function AgentCard({
 }) {
   const navigate = useNavigate()
   const status = getStatus(agent.status)
-  const isPaused = agent.status === 'paused'
+  const isEnabled = agent.enabled
 
   return (
     <div
@@ -94,13 +85,13 @@ export function AgentCard({
       <div className="flex min-w-0 flex-1 flex-col">
         {/* Top row — icon, identity, status */}
         <div className="flex items-center gap-2.5 px-3 py-2">
-          <AgentIcon slug={agent.slug} className="size-6" />
+          <AgentIcon slug={agent.slug} className="size-8" />
 
-          <div className="flex min-w-0 flex-1 items-center gap-2">
+          <div className="grid min-w-0 flex-1">
             <span className="truncate text-[13px] font-semibold leading-none">
               {agent.name}
             </span>
-            <span className="font-mono text-[10px] leading-none text-muted-foreground/60">
+            <span className="truncate font-mono text-[10px] leading-none text-muted-foreground/60 mt-1">
               /{agent.slug}
             </span>
           </div>
@@ -113,19 +104,34 @@ export function AgentCard({
           </div>
         </div>
 
-        {/* Description */}
-        <div className="border-t border-dashed border-border/60 px-3 py-1.5">
-          <p className="text-[11px] leading-snug text-muted-foreground">
-            {agent.adapterType}
-            {agent.skills.length > 0 && ` · ${agent.skills.length} skill${agent.skills.length > 1 ? 's' : ''}`}
-          </p>
-        </div>
-
         {/* Meta strip */}
-        <div className="flex items-center gap-3 border-t border-dashed border-border/60 px-3 py-1.5 font-mono text-[10px] text-muted-foreground/70">
-          <span>{agent.adapterType}</span>
-          <span className="text-border">|</span>
-          <span>Created {formatRelativeTime(agent.createdAt)}</span>
+        <div className="flex items-center gap-2 border-t border-dashed border-border/60 px-3 py-1.5 font-mono text-[10px] text-muted-foreground/70">
+          {agent.adapterType && (
+            <>
+              <AdapterIcon adapterType={agent.adapterType} className="size-3 shrink-0" />
+              <span>{agent.adapterType.replace(/_/g, ' ')}</span>
+              <span className="text-border">|</span>
+            </>
+          )}
+          <span className="truncate">{agent.model || '—'}</span>
+          {agent.skills.length > 0 && (
+            <>
+              <span className="text-border">|</span>
+              <span>{agent.skills.length} skill{agent.skills.length > 1 ? 's' : ''}</span>
+            </>
+          )}
+          {agent.tools.length > 0 && (
+            <>
+              <span className="text-border">|</span>
+              <span>{agent.tools.length} tools</span>
+            </>
+          )}
+          {agent.mode && (
+            <>
+              <span className="text-border">|</span>
+              <span className="shrink-0">{agent.mode.replace(/_/g, ' ')}</span>
+            </>
+          )}
         </div>
 
         {/* Action toolbar */}
@@ -140,7 +146,7 @@ export function AgentCard({
                   onClick={(e) => e.stopPropagation()}
                 >
                   <ListTodo className="size-3" />
-                  Task
+                  Assign Task
                 </Button>
               </TooltipTrigger>
               <TooltipContent side="bottom">
@@ -155,44 +161,20 @@ export function AgentCard({
                 <Button
                   variant="ghost"
                   size="xs"
-                  className="h-7 flex-1 rounded-none text-[11px] font-normal text-muted-foreground hover:text-foreground"
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <MessageCircle className="size-3" />
-                  Chat
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent side="bottom">
-                Chat with {agent.name}
-              </TooltipContent>
-            </Tooltip>
-
-            <div className="h-3.5 w-px bg-border" />
-
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="xs"
                   className={cn(
                     'h-7 flex-1 rounded-none text-[11px] font-normal',
-                    !isPaused &&
-                      'text-amber-600/70 hover:bg-amber-500/10 hover:text-amber-700 dark:text-amber-400/70 dark:hover:text-amber-300',
-                    isPaused &&
-                      'text-emerald-600/70 hover:bg-emerald-500/10 hover:text-emerald-700 dark:text-emerald-400/70 dark:hover:text-emerald-300',
+                    isEnabled
+                      ? 'text-red-600/70 hover:bg-red-500/10 hover:text-red-700 dark:text-red-400/70 dark:hover:text-red-300'
+                      : 'text-emerald-600/70 hover:bg-emerald-500/10 hover:text-emerald-700 dark:text-emerald-400/70 dark:hover:text-emerald-300',
                   )}
                   onClick={(e) => e.stopPropagation()}
                 >
-                  {isPaused ? (
-                    <Play className="size-3" />
-                  ) : (
-                    <Pause className="size-3" />
-                  )}
-                  {isPaused ? 'Resume' : 'Pause'}
+                  {isEnabled ? <PowerOff className="size-3" /> : <Zap className="size-3" />}
+                  {isEnabled ? 'Disable' : 'Enable'}
                 </Button>
               </TooltipTrigger>
               <TooltipContent side="bottom">
-                {isPaused ? `Resume ${agent.name}` : `Pause ${agent.name}`}
+                {isEnabled ? `Disable ${agent.name}` : `Enable ${agent.name}`}
               </TooltipContent>
             </Tooltip>
           </TooltipProvider>
