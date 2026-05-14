@@ -129,7 +129,7 @@ export const runsApi = createApi({
     }),
     getActiveRun: builder.query<{ run_id: string; status: string } | null, { workspaceId: string }>({
       query: ({ workspaceId }) => `/workspaces/${workspaceId}/runs/active-run`,
-      transformErrorResponse: (r) => (r.status === 404 ? null : r),
+      providesTags: ['Run'],
     }),
   }),
 })

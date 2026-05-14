@@ -6,6 +6,7 @@ from runtime.services.run_trigger_service import RunTriggerService
 from runtime.services.snapshot_service import SnapshotService
 from runtime.services.template_service import TemplateService
 from runtime.services.workspace_service import WorkspaceService
+from runtime.ws_manager import WsManager
 
 
 def get_workspace_service(request: Request) -> WorkspaceService:
@@ -30,3 +31,7 @@ def get_snapshot_service(request: Request) -> SnapshotService:
 
 def get_template_service(request: Request) -> TemplateService:
     return request.app.state.template_service
+
+
+def get_ws_manager(request: Request) -> WsManager:
+    return request.app.state.ws_manager

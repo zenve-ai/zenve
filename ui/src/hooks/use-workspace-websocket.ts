@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react'
 import config from '@/config'
 import { useAppDispatch } from '@/store/hooks'
-import { runCreated, runStatusChanged, runEventReceived, runFinished } from '@/store/runs'
+import { runCreated, runStatusChanged, runEventReceived, runFinished, runsApi } from '@/store/runs'
 import { wsConnecting, wsConnected, wsDisconnected, wsReconnecting, wsFailed } from '@/store/ws'
 import type { Run, RunEvent } from '@/types'
 
@@ -47,6 +47,7 @@ export function useWorkspaceWebSocket(workspaceId: string): void {
         switch (msg.type) {
           case 'run.created':
             dispatch(runCreated(msg.data as Run))
+            dispatch(runsApi.util.invalidateTags(['Run']))
             break
           case 'run.status_changed':
             dispatch(runStatusChanged(msg.data as { run_id: string; status: string; started_at: string | null }))
@@ -60,6 +61,7 @@ export function useWorkspaceWebSocket(workspaceId: string): void {
                 msg.data as { run_id: string; status: string; outcome: string | null; finished_at: string },
               ),
             )
+            dispatch(runsApi.util.invalidateTags(['Run']))
             break
         }
       }

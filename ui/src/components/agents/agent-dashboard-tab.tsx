@@ -163,12 +163,12 @@ export function AgentDashboardTab({
 
   const { data: activeRun } = useGetActiveRunQuery(
     { workspaceId },
-    { skip: !workspaceId, pollingInterval: 3000 },
+    { skip: !workspaceId },
   )
 
   const { data: activeRunEvents } = useGetRunEventsQuery(
     { workspaceId, runId: activeRun?.run_id ?? '' },
-    { skip: !activeRun?.run_id, pollingInterval: 2000 },
+    { skip: !activeRun?.run_id },
   )
 
   const runs = stats?.runs ?? []

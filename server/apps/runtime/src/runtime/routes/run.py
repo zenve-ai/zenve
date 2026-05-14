@@ -43,7 +43,7 @@ def get_active_run(
 ):
     record = run_store.get_active_for_workspace(workspace_id)
     if record is None:
-        raise NotFoundError("No active run for this workspace")
+        return None
     return {"run_id": record.run_id, "status": record.status}
 
 

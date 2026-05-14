@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import os
 from contextlib import asynccontextmanager
@@ -14,6 +15,7 @@ from runtime.services.scheduler_service import SchedulerService
 from runtime.services.snapshot_service import SnapshotService
 from runtime.services.template_service import TemplateService
 from runtime.services.workspace_service import WorkspaceService
+from runtime.ws_manager import WsManager
 
 logger = logging.getLogger(__name__)
 
@@ -24,13 +26,16 @@ async def lifespan(app: FastAPI):
     logger.info("Starting Zenve Runtime")
     logger.info("=" * 60)
 
+    loop = asyncio.get_event_loop()
+    ws_manager = WsManager(loop)
     run_store = RunStore()
     workspace_service = WorkspaceService()
     run_service = RunService(workspace_service)
-    trigger_service = RunTriggerService(workspace_service, run_store)
+    trigger_service = RunTriggerService(workspace_service, run_store, ws_manager)
     scheduler_service = SchedulerService(workspace_service, trigger_service)
     snapshot_service = SnapshotService(workspace_service)
     template_service = TemplateService()
+    app.state.ws_manager = ws_manager
     app.state.run_store = run_store
     app.state.workspace_service = workspace_service
     app.state.run_service = run_service

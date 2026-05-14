@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, WebSocket, WebSocketDisconnect, status
 
 from runtime.models.run import AgentStats
 from runtime.models.workspace import AgentSummary, ScaffoldWorkspaceBody, Workspace, WorkspaceCreate, WorkspaceDetail
@@ -64,3 +64,15 @@ def unregister_workspace(
     service: WorkspaceService = Depends(get_workspace_service),
 ):
     service.unregister(workspace_id)
+
+
+@router.websocket("/{workspace_id}/ws")
+async def workspace_ws(workspace_id: str, websocket: WebSocket):
+    ws_manager = websocket.app.state.ws_manager
+    await websocket.accept()
+    ws_manager.connect(workspace_id, websocket)
+    try:
+        while True:
+            await websocket.receive_text()
+    except WebSocketDisconnect:
+        ws_manager.disconnect(workspace_id, websocket)
