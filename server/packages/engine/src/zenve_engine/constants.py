@@ -6,7 +6,7 @@ SETTINGS_FILE = "settings.json"
 AGENTS_SUBDIR = "agents"
 CLAIMS_FILE = "claims.json"
 SNAPSHOT_FILE = "snapshot.json"
-EVENTS_LOG_FILE = "events.log"
+TRANSCRIPTS_SUBDIR = "transcripts"
 AGENTS_SKILLS_DIR = ".agents/skills"
 CLAUDE_SKILLS_DIR = ".claude/skills"
 

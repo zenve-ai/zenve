@@ -8,7 +8,7 @@ from runtime.models.errors import NotFoundError
 from runtime.models.run import WorkspaceRun, WorkspaceRunSummary
 from runtime.services.workspace_service import AGENTS_SUBDIR, ZENVE_DIR, WorkspaceService
 
-EVENTS_LOG_FILE = "events.log"
+TRANSCRIPTS_SUBDIR = "transcripts"
 
 logger = logging.getLogger(__name__)
 
@@ -90,19 +90,20 @@ class RunService:
         )
 
     def get_events(self, workspace_id: str, run_id: str) -> list[dict]:
-        log_path = self.workspace_service.resolve_path(workspace_id) / ZENVE_DIR / EVENTS_LOG_FILE
-        if not log_path.exists():
+        transcript_path = (
+            self.workspace_service.resolve_path(workspace_id)
+            / ZENVE_DIR / TRANSCRIPTS_SUBDIR / f"{run_id}.jsonl"
+        )
+        if not transcript_path.exists():
             return []
         events: list[dict] = []
-        with log_path.open("r", encoding="utf-8") as fh:
+        with transcript_path.open("r", encoding="utf-8") as fh:
             for line in fh:
                 line = line.strip()
                 if not line:
                     continue
                 try:
-                    event = json.loads(line)
-                    if event.get("run_id") == run_id:
-                        events.append(event)
+                    events.append(json.loads(line))
                 except json.JSONDecodeError:
                     pass
         return events

@@ -12,7 +12,7 @@ from pathlib import Path
 import httpx
 
 from zenve_engine.config import zenve_dir
-from zenve_engine.constants import EVENTS_LOG_FILE
+from zenve_engine.constants import TRANSCRIPTS_SUBDIR
 
 logger = logging.getLogger(__name__)
 
@@ -35,8 +35,9 @@ class EventEmitter:
         self._webhook_url = webhook_url
         self._webhook_secret = webhook_secret
         self._on_event = on_event
-        self._log_path = zenve_dir(repo_root) / EVENTS_LOG_FILE
-        self._log_path.parent.mkdir(parents=True, exist_ok=True)
+        transcripts_dir = zenve_dir(repo_root) / TRANSCRIPTS_SUBDIR
+        transcripts_dir.mkdir(parents=True, exist_ok=True)
+        self._log_path = transcripts_dir / f"{run_id}.jsonl"
         self._lock = threading.Lock()
 
     def emit(
