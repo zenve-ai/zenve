@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import base64
 import json
 import subprocess
 from pathlib import Path
@@ -10,22 +9,14 @@ import typer
 from rich.console import Console
 
 from zenve_cli.commands.agent import collect_agents_wizard
-from zenve_cli.commands.skill import (
-    collect_skills_wizard,
-    fetch_and_install_skills,
-    installed_skill_names,
-)
+from zenve_cli.commands.skill import collect_skills_wizard, installed_skill_names
 from zenve_cli.commands.snapshot import git_remote_slug
 from zenve_cli.commands.ui import WIZARD_STYLE, sep
-from zenve_cli.models.errors import ZenveError
 from zenve_cli.models.github_template import GitHubTemplateSummary, SkillSummary
 from zenve_cli.runtime.client import ensure_runtime, report_error, runtime_request
-from zenve_cli.services.agent import build_agent_files
-from zenve_cli.services.agent_lock import AgentLockService
-from zenve_cli.services.scaffolding import ScaffoldingService
 from zenve_cli.utils.scaffolding import slugify
 from zenve_engine.constants import ZENVE_DIR
-from zenve_engine.git.commit import commit_skills, commit_zenve_dir
+from zenve_engine.git.commit import commit_zenve_dir
 
 console = Console()
 
@@ -81,19 +72,6 @@ def fetch_templates() -> list[GitHubTemplateSummary]:
     return [GitHubTemplateSummary(**t) for t in resp.json()]
 
 
-def fetch_template_files(template_id: str) -> tuple[dict[str, bytes], str | None, str]:
-    resp = runtime_request("GET", f"/api/v1/templates/{template_id}/files")
-    if resp.status_code != 200:
-        try:
-            detail = resp.json().get("detail", resp.text)
-        except Exception:
-            detail = resp.text
-        raise ZenveError(f"HTTP {resp.status_code}: {detail}")
-    data = resp.json()
-    files = {k: base64.b64decode(v) for k, v in data["files"].items()}
-    return files, data.get("sha"), data["source"]
-
-
 def fetch_available_skills() -> list[SkillSummary]:
     resp = runtime_request("GET", "/api/v1/skills")
     if resp.status_code != 200:
@@ -116,20 +94,12 @@ def cmd(repo_root: Path = Path("."), description: str | None = None) -> None:
         if agents_dir.exists():
             existing_agent_slugs = {p.name for p in agents_dir.iterdir() if p.is_dir()}
 
-    # Load templates early so the list is ready before prompts begin
     try:
         templates = fetch_templates()
-    except ZenveError as exc:
-        console.print(
-            f"[red]✗[/red] Could not fetch agent templates: {exc.message}", highlight=False
-        )
-        raise typer.Exit(1)  # noqa: B904
-
+    except SystemExit:
+        raise
     if not templates:
-        console.print(
-            "[red]✗[/red] No agent templates found.",
-            highlight=False,
-        )
+        console.print("[red]✗[/red] No agent templates found.", highlight=False)
         raise typer.Exit(1)
 
     detected_branch = git_current_branch()
@@ -143,15 +113,12 @@ def cmd(repo_root: Path = Path("."), description: str | None = None) -> None:
         raise typer.Exit(1)
 
     if update_mode:
-        console.print(
-            "[cyan]◆[/cyan] Updating existing [cyan].zenve/[/cyan] configuration"
-        )
+        console.print("[cyan]◆[/cyan] Updating existing [cyan].zenve/[/cyan] configuration")
         sep()
 
     console.print(f"[cyan]◆[/cyan] Repository  [cyan]{remote_repo}[/cyan]")
     sep()
 
-    # Derive slug from repo name
     slug = slugify(remote_repo.split("/")[-1].removesuffix(".git"))
 
     if description is None:
@@ -173,56 +140,41 @@ def cmd(repo_root: Path = Path("."), description: str | None = None) -> None:
         console.print("[red]✗[/red] No agents selected.", highlight=False)
         raise typer.Exit(1)
 
-    # Scaffolding
-    console.print("[cyan]◆[/cyan] Scaffolding project files...")
+    available_skills = fetch_available_skills()
+    selected_skill_ids: list[str] = []
+    if available_skills:
+        selected_skill_ids = collect_skills_wizard(
+            available_skills,
+            installed=installed_skill_names(repo_root),
+        )
+        sep()
+
+    agent_template_ids = [template_id for _, template_id in agent_specs if template_id]
+
+    console.print("[cyan]◆[/cyan] Initializing workspace via runtime...")
     sep()
 
-    scaffold = ScaffoldingService()
-    lock = AgentLockService(zenve_dir)
-    existing_pipeline: dict = existing_settings.get("pipeline", {}) if update_mode else {}
-    pipeline: dict[str, None] = {}
+    resp = runtime_request(
+        "POST",
+        "/api/v1/workspaces/init",
+        json={
+            "name": slug,
+            "path": str(repo_root.expanduser().resolve()),
+            "description": description,
+            "default_branch": detected_branch,
+            "stack": stack,
+            "agents": agent_template_ids,
+            "skills": selected_skill_ids,
+        },
+    )
+    if resp.status_code not in (200, 201, 409):
+        report_error(resp)
+        raise typer.Exit(1)
 
-    for agent_name, template_id in agent_specs:
-        template_obj = next((t for t in templates if t.id == template_id), None)
-        used_template_id: str | None = template_id
-        try:
-            raw_files, commit_sha, source = fetch_template_files(template_id)
-            agent_slug, files = build_agent_files(agent_name, template_obj, raw_files)
-        except ZenveError as exc:
-            console.print(
-                f"[yellow]Warning:[/yellow] could not fetch template '{template_id}': {exc.message}"
-            )
-            agent_slug, files = build_agent_files(agent_name, None, {})
-            used_template_id = None
-            commit_sha = None
-            source = None
-        pipeline[f"zenve:{agent_slug}"] = None
-        scaffold.write_agent_files(zenve_dir, agent_slug, files)
-        if used_template_id is not None:
-            lock.record_install(
-                slug=agent_slug,
-                template_id=used_template_id,
-                files=files,
-                source=source,
-                commit_sha=commit_sha,
-            )
+    if resp.status_code == 409:
+        console.print("[yellow]◆[/yellow] Workspace already registered")
 
-    # Root settings.json — init-specific (project slug, branch, description from wizard)
-    merged_pipeline = existing_pipeline | pipeline
-    root_settings = {
-        **(existing_settings if update_mode else {}),
-        "project": slug,
-        "description": description,
-        "default_branch": detected_branch,
-        "commit_message_prefix": existing_settings.get("commit_message_prefix", "[zenve]"),
-        "run_timeout_seconds": existing_settings.get("run_timeout_seconds", 600),
-        "pipeline": merged_pipeline,
-        "stack": stack,
-    }
-    (zenve_dir / "settings.json").parent.mkdir(parents=True, exist_ok=True)
-    (zenve_dir / "settings.json").write_bytes(json.dumps(root_settings, indent=2).encode())
-
-    # Append zenve runtime files to .gitignore if not already present
+    # Update .gitignore
     gitignore_path = repo_root / ".gitignore"
     gitignore_entries = [".zenve/snapshot.json", ".zenve/events.log"]
     existing_gitignore = gitignore_path.read_text() if gitignore_path.exists() else ""
@@ -233,35 +185,18 @@ def cmd(repo_root: Path = Path("."), description: str | None = None) -> None:
                 f.write("\n")
             f.write("\n".join(missing_entries) + "\n")
 
-    # Skills step
-    available_skills = fetch_available_skills()
-
-    if available_skills:
-        selected_skill_ids = collect_skills_wizard(
-            available_skills,
-            installed=installed_skill_names(repo_root),
-        )
-        sep()
-        if selected_skill_ids:
-            console.print("[cyan]◆[/cyan] Installing skills...")
-            sep()
-            fetch_and_install_skills(repo_root, selected_skill_ids)
-            sep()
-            commit_skills(repo_root, "[zenve] install skills", branch=detected_branch)
-
-    agent_names = list(pipeline.keys())
+    agent_count = len(agent_template_ids)
+    skill_count = len(selected_skill_ids)
     if update_mode:
-        if agent_names:
-            console.print(
-                f"[cyan]◆[/cyan] Updated settings and added {len(agent_names)} new agent(s): {', '.join(agent_names)}"
-            )
-        else:
-            console.print("[cyan]◆[/cyan] Updated settings (no new agents added)")
+        console.print(
+            f"[cyan]◆[/cyan] Updated: {agent_count} agent(s), {skill_count} skill(s)"
+        )
     else:
         console.print(
-            f"[cyan]◆[/cyan] Initialized with {len(agent_names)} agent(s): {', '.join(agent_names)}"
+            f"[cyan]◆[/cyan] Initialized with {agent_count} agent(s), {skill_count} skill(s)"
         )
     sep()
+
     do_commit = questionary.confirm(
         "Commit and push .zenve/?",
         default=True,
@@ -274,44 +209,10 @@ def cmd(repo_root: Path = Path("."), description: str | None = None) -> None:
         commit_msg = "[zenve] update" if update_mode else "[zenve] init"
         committed = commit_zenve_dir(repo_root, commit_msg, branch=detected_branch)
         if committed:
-            console.print(
-                "[cyan]◆[/cyan] Committed and pushed [cyan].zenve/[/cyan] — activated"
-            )
+            console.print("[cyan]◆[/cyan] Committed and pushed [cyan].zenve/[/cyan] — activated")
         else:
             console.print("[yellow]◆[/yellow] Nothing to commit")
     else:
-        console.print(
-            "[cyan]◆[/cyan] Commit and push [cyan].zenve/[/cyan] to activate"
-        )
+        console.print("[cyan]◆[/cyan] Commit and push [cyan].zenve/[/cyan] to activate")
 
-    register_with_runtime(repo_root)
     console.print()
-
-
-def register_with_runtime(repo_root: Path) -> None:
-    """Best-effort registration of the workspace with the local runtime."""
-    import httpx
-
-    from zenve_cli.runtime.client import runtime_url
-
-    abs_path = repo_root.expanduser().resolve()
-    url = f"{runtime_url()}/api/v1/workspaces"
-    try:
-        with httpx.Client(timeout=5.0) as client:
-            resp = client.post(url, json={"path": str(abs_path)})
-    except httpx.ConnectError:
-        console.print(
-            "[yellow]◆[/yellow] Runtime not running — run [cyan]zenve workspace add .[/cyan] later to register"
-        )
-        return
-
-    if resp.status_code == 201:
-        console.print("[cyan]◆[/cyan] Registered with runtime")
-    elif resp.status_code == 409:
-        console.print("[cyan]◆[/cyan] Already registered with runtime")
-    else:
-        try:
-            detail = resp.json().get("detail", resp.text)
-        except Exception:
-            detail = resp.text
-        console.print(f"[yellow]◆[/yellow] Could not register ({resp.status_code}): {detail}")
