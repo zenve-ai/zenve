@@ -8,9 +8,13 @@ import typer
 from rich import box
 from rich.console import Console
 from rich.table import Table
-from rich.text import Text
 
-from zenve_cli.runtime.client import ensure_runtime, report_error, resolve_workspace_id, runtime_request
+from zenve_cli.runtime.client import (
+    ensure_runtime,
+    report_error,
+    resolve_workspace_id,
+    runtime_request,
+)
 
 console = Console()
 

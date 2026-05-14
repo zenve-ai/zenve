@@ -5,8 +5,6 @@ from pathlib import Path
 
 from fastapi import FastAPI
 
-PID_FILE = Path.home() / ".zenve" / "runtime.pid"
-
 from runtime.run_store import RunStore
 from runtime.services.run_service import RunService
 from runtime.services.run_trigger_service import RunTriggerService
@@ -14,6 +12,8 @@ from runtime.services.scheduler_service import SchedulerService
 from runtime.services.snapshot_service import SnapshotService
 from runtime.services.template_service import TemplateService
 from runtime.services.workspace_service import WorkspaceService
+
+PID_FILE = Path.home() / ".zenve" / "runtime.pid"
 
 logger = logging.getLogger(__name__)
 

@@ -16,7 +16,14 @@ from runtime.models.errors import (
     ValidationError,
     ZenveError,
 )
-from runtime.routes import core_router, run_router, skill_router, snapshot_router, template_router, workspace_router
+from runtime.routes import (
+    core_router,
+    run_router,
+    skill_router,
+    snapshot_router,
+    template_router,
+    workspace_router,
+)
 from zenve_engine.github.client import GitHubError
 
 app = FastAPI(lifespan=lifespan)

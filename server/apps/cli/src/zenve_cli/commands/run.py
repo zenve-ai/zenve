@@ -19,7 +19,13 @@ from zenve_adapters.claude_code import ClaudeCodeAdapter
 from zenve_adapters.open_code import OpenCodeAdapter
 from zenve_cli.commands.snapshot import git_remote_slug
 from zenve_cli.console import ZenveTUI
-from zenve_cli.runtime.client import ensure_runtime, report_error, resolve_workspace_id, runtime_request, runtime_url
+from zenve_cli.runtime.client import (
+    ensure_runtime,
+    report_error,
+    resolve_workspace_id,
+    runtime_request,
+    runtime_url,
+)
 from zenve_engine.config import ConfigError, load_project_settings
 from zenve_engine.discovery import DiscoveryError, discover_agents
 from zenve_engine.env import EnvError, load_env

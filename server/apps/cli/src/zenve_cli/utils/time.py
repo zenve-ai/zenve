@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 
 def time_ago(dt: datetime | str) -> str:
@@ -9,16 +9,16 @@ def time_ago(dt: datetime | str) -> str:
         dt = dt.rstrip("Z")
         for fmt in ("%Y-%m-%dT%H:%M:%S.%f", "%Y-%m-%dT%H:%M:%S", "%Y-%m-%d %H:%M:%S"):
             try:
-                dt = datetime.strptime(dt, fmt).replace(tzinfo=timezone.utc)
+                dt = datetime.strptime(dt, fmt).replace(tzinfo=UTC)
                 break
             except ValueError:
                 continue
         if isinstance(dt, str):
             return dt
 
-    now = datetime.now(tz=timezone.utc)
+    now = datetime.now(tz=UTC)
     if dt.tzinfo is None:
-        dt = dt.replace(tzinfo=timezone.utc)
+        dt = dt.replace(tzinfo=UTC)
 
     diff = now - dt
     seconds = int(diff.total_seconds())

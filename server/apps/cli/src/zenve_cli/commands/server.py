@@ -72,7 +72,7 @@ def stop() -> None:
         console.print(f"[yellow]◆[/yellow] Process {pid} was not running. Cleaned up.")
     except PermissionError:
         console.print(f"[red]✗[/red] No permission to stop process {pid}.")
-        raise typer.Exit(1)
+        raise typer.Exit(1)  # noqa: B904
 
 
 @server_app.command("logs")

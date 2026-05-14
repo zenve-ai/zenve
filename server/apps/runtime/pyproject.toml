@@ -1,6 +1,6 @@
 [project]
 name = "zenve-runtime"
-version = "0.1.6"
+version = "0.1.7"
 description = "Zenve runtime daemon — local FastAPI service that owns workspaces and runs"
 readme = "README.md"
 requires-python = ">=3.13"
@@ -22,7 +22,7 @@ dependencies = [
     "pydantic>=2",
     "croniter>=2.0",
     "pyyaml",
-    "zenve-engine>=0.1.6",
+    "zenve-engine>=0.1.7",
 ]
 
 [project.scripts]

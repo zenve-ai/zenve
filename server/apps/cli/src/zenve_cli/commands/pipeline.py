@@ -67,5 +67,5 @@ def cmd(repo_root: Path = Path(".")) -> None:
             console.print(f"  [yellow]⚠[/yellow] cycle: {' → '.join(cyc)}", highlight=False)
         console.print()
     if report.ok:
-        console.print(f"  [green]✓[/green] pipeline is valid")
+        console.print("  [green]✓[/green] pipeline is valid")
         console.print()

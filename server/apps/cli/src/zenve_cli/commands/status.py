@@ -5,17 +5,15 @@ import os
 from pathlib import Path
 
 import httpx
-import typer
 from rich import box
 from rich.console import Console
 from rich.table import Table
 from rich.text import Text
 
-from zenve_engine.config import ConfigError, zenve_dir
-
 from zenve_cli.commands.agent import iter_agent_dirs, load_agent_settings
 from zenve_cli.runtime.client import runtime_url
 from zenve_cli.utils.time import time_ago
+from zenve_engine.config import zenve_dir
 
 console = Console()
 

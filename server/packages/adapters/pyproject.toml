@@ -1,6 +1,6 @@
 [project]
 name = "zenve-adapters"
-version = "0.1.6"
+version = "0.1.7"
 description = "Zenve agent adapter framework — base types for adapters that run agents (Claude Code, opencode, etc.)"
 readme = "README.md"
 requires-python = ">=3.13"

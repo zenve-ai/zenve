@@ -189,7 +189,7 @@ def show_skill(
     console.print(f"  [dim]NAME[/dim]         {skill.name}")
     console.print(f"  [dim]DESCRIPTION[/dim]  {skill.description or '—'}")
     status_text = Text("● installed", style="green") if installed else Text("○ not installed", style="dim")
-    console.print(f"  [dim]STATUS[/dim]       ", end="")
+    console.print("  [dim]STATUS[/dim]       ", end="")
     console.print(status_text)
     console.print()
 
