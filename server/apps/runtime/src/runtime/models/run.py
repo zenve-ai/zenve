@@ -62,6 +62,14 @@ class WorkspaceRun(BaseModel):
     agents: list[WorkspaceRunSummary]
 
 
+class AgentStats(BaseModel):
+    agent: str
+    total_runs: int
+    completed_runs: int
+    failed_runs: int
+    runs: list[WorkspaceRunDetail]
+
+
 class RunTriggerRequest(BaseModel):
     only_agent: str | None = None
     env_vars: dict[str, str] | None = None
