@@ -16,12 +16,12 @@ import { useCreateRunMutation } from '@/store/runs'
 import type { Agent } from '@/types'
 
 export default function AgentDetail() {
-  const { projectSlug, agentSlug } = useParams<{ projectSlug: string; agentSlug: string }>()
-  const base = projectSlug ? `/${projectSlug}` : ''
+  const { workspaceId, agentSlug } = useParams<{ workspaceId: string; agentSlug: string }>()
+  const base = workspaceId ? `/${workspaceId}` : ''
   const [tab, setTab] = useState('dashboard')
   const [assignOpen, setAssignOpen] = useState(false)
 
-  const skip = !projectSlug || !agentSlug
+  const skip = !workspaceId || !agentSlug
   const {
     data: agent,
     isLoading,
@@ -29,7 +29,7 @@ export default function AgentDetail() {
     error,
     refetch,
   } = useGetAgentQuery(
-    { projectSlug: projectSlug!, agentSlug: agentSlug! },
+    { workspaceId: workspaceId!, agentSlug: agentSlug! },
     { skip },
   )
 
@@ -42,11 +42,11 @@ export default function AgentDetail() {
   const heartbeatLoading = createRunLoading && runAction === 'heartbeat'
 
   const handleAssignSubmit = async (message: string) => {
-    if (!projectSlug || !agent) return
+    if (!workspaceId || !agent) return
     setRunAction('assign')
     try {
       await createRun({
-        projectSlug,
+        workspaceId,
         body: { agent: agent.slug, message },
       }).unwrap()
       toast.success('Run queued')
@@ -59,11 +59,11 @@ export default function AgentDetail() {
   }
 
   const handleHeartbeat = async () => {
-    if (!projectSlug || !agent) return
+    if (!workspaceId || !agent) return
     setRunAction('heartbeat')
     try {
       await createRun({
-        projectSlug,
+        workspaceId,
         body: { agent: agent.slug, message: null },
       }).unwrap()
       toast.success('Heartbeat run queued')
@@ -75,11 +75,11 @@ export default function AgentDetail() {
   }
 
   const handleTogglePause = async () => {
-    if (!projectSlug || !agent) return
+    if (!workspaceId || !agent) return
     const next = agent.status === 'paused' ? 'active' : 'paused'
     try {
       await updateAgent({
-        projectSlug,
+        workspaceId,
         agentIdOrSlug: agent.slug,
         body: { status: next },
       }).unwrap()
@@ -122,7 +122,7 @@ export default function AgentDetail() {
         <TabsTrigger value="budget">Budget</TabsTrigger>
       </TabsList>
       <TabsContent value="dashboard" className="mt-0 min-h-0 flex-1">
-        <AgentDashboardTab projectSlug={projectSlug!} agentId={a.id} onViewRunDetails={() => setTab('runs')} />
+        <AgentDashboardTab workspaceId={workspaceId!} agentId={a.id} onViewRunDetails={() => setTab('runs')} />
       </TabsContent>
       <TabsContent value="instructions" className="mt-0 min-h-0 flex-1">
         <PlaceholderTab title="Instructions">

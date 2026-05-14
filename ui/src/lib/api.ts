@@ -23,3 +23,8 @@ export const createBaseQueryWithReauth = (
 
     return result
   }
+
+export const createRuntimeBaseQuery = (
+  baseUrl: string,
+): BaseQueryFn<string | FetchArgs, unknown, FetchBaseQueryError> =>
+  fetchBaseQuery({ baseUrl })

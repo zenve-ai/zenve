@@ -3,20 +3,17 @@ import { useAppSelector } from '@/store/hooks'
 import { useListWorkspacesQuery, selectCurrentWorkspace } from '@/store/workspace'
 import { WorkspaceLoading } from './workspace-loading'
 
-export function RootPathRedirect() {
-  const { isLoading, isFetching, isSuccess, isError, data } = useListWorkspacesQuery()
+export default function NoWorkspacePage() {
+  const { isLoading, isFetching, isSuccess, data } = useListWorkspacesQuery()
   const current = useAppSelector(selectCurrentWorkspace)
 
   const waiting = isLoading || isFetching
   if (waiting) return <WorkspaceLoading />
 
-  const empty = isError || (isSuccess && (!data || data.length === 0))
-  if (empty) return <Navigate to="/no-workspace" replace />
-
   if (isSuccess && data && data.length > 0) {
-    const id = current?.id ?? data[0]?.id
-    if (id) return <Navigate to={`/${id}`} replace />
+    const id = current?.id ?? data[0].id
+    return <Navigate to={`/${id}`} replace />
   }
 
-  return <WorkspaceLoading />
+  return <Navigate to="/onboarding" replace />
 }

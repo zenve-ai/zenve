@@ -1,99 +1,131 @@
 import { createApi } from '@reduxjs/toolkit/query/react'
-import { createBaseQueryWithReauth } from '@/lib/api'
+import { createRuntimeBaseQuery } from '@/lib/api'
 import config from '@/config'
 import type { Run, RunCreateBody, RunEvent } from '@/types'
 
-interface RunResponse {
-  id: string
-  project_id?: string
-  org_id?: string
-  agent_id: string
-  trigger: string
-  status: string
-  adapter_type: string
-  message: string | null
-  started_at: string | null
-  finished_at: string | null
-  exit_code: number | null
-  error_summary: string | null
-  token_usage: Record<string, unknown> | null
-  transcript_path: string | null
-  outcome: string | null
-  created_at: string
-}
-
-interface RunEventResponse {
-  id: string
+interface WorkspaceRunSummaryResponse {
   run_id: string
-  event_type: string
-  content: string | null
-  meta: Record<string, unknown> | null
-  created_at: string
+  agent: string
+  started_at: string
+  finished_at: string
+  duration_seconds: number
+  status: string
+  exit_code: number
 }
 
-function toRunEvent(r: RunEventResponse): RunEvent {
-  return {
-    id: r.id,
-    runId: r.run_id,
-    eventType: r.event_type as RunEvent['eventType'],
-    content: r.content,
-    meta: r.meta,
-    createdAt: r.created_at,
+interface WorkspaceRunResponse {
+  run_id: string
+  started_at: string
+  finished_at: string
+  status: string
+  agents: WorkspaceRunSummaryResponse[]
+}
+
+interface WorkspaceRunDetailResponse extends WorkspaceRunSummaryResponse {
+  item?: { type: string; number: number; title: string } | null
+  output?: string | null
+  pipeline_transition?: { from_label: string; to_label: string[] | null } | null
+  token_usage?: { input_tokens: number; output_tokens: number; cost_usd: number | null } | null
+  error?: string | null
+}
+
+interface RunTriggerResponse {
+  run_id: string
+  status: string
+}
+
+function flatten(workspaceId: string, runs: WorkspaceRunResponse[]): Run[] {
+  const out: Run[] = []
+  for (const wr of runs) {
+    for (const agent of wr.agents) {
+      out.push({
+        id: `${wr.run_id}:${agent.agent}`,
+        workspaceId,
+        agentId: agent.agent,
+        trigger: 'manual',
+        status: agent.status,
+        adapterType: '',
+        message: null,
+        startedAt: agent.started_at || null,
+        finishedAt: agent.finished_at || null,
+        exitCode: agent.exit_code,
+        errorSummary: null,
+        tokenUsage: null,
+        transcriptPath: null,
+        outcome: null,
+        createdAt: agent.started_at || wr.started_at || '',
+      })
+    }
   }
+  return out
 }
 
-function toRun(r: RunResponse): Run {
+function detailToRun(workspaceId: string, d: WorkspaceRunDetailResponse): Run {
   return {
-    id: r.id,
-    projectId: r.project_id ?? r.org_id ?? '',
-    agentId: r.agent_id,
-    trigger: r.trigger,
-    status: r.status,
-    adapterType: r.adapter_type,
-    message: r.message,
-    startedAt: r.started_at,
-    finishedAt: r.finished_at,
-    exitCode: r.exit_code,
-    errorSummary: r.error_summary,
-    tokenUsage: r.token_usage,
-    transcriptPath: r.transcript_path,
-    outcome: r.outcome,
-    createdAt: r.created_at,
+    id: `${d.run_id}:${d.agent}`,
+    workspaceId,
+    agentId: d.agent,
+    trigger: 'manual',
+    status: d.status,
+    adapterType: '',
+    message: null,
+    startedAt: d.started_at || null,
+    finishedAt: d.finished_at || null,
+    exitCode: d.exit_code,
+    errorSummary: d.error ?? null,
+    tokenUsage: d.token_usage
+      ? {
+          input_tokens: d.token_usage.input_tokens,
+          output_tokens: d.token_usage.output_tokens,
+          cost_usd: d.token_usage.cost_usd,
+        }
+      : null,
+    transcriptPath: null,
+    outcome: d.output ?? null,
+    createdAt: d.started_at || '',
   }
 }
 
 export const runsApi = createApi({
   reducerPath: 'runsApi',
-  baseQuery: createBaseQueryWithReauth(config.apiUrl),
+  baseQuery: createRuntimeBaseQuery(config.runtimeUrl),
   tagTypes: ['Run'],
   endpoints: (builder) => ({
-    listRuns: builder.query<Run[], { projectSlug: string; agentId?: string; status?: string }>({
-      query: ({ projectSlug, agentId, status }) => {
-        const params = new URLSearchParams()
-        if (agentId) params.set('agent_id', agentId)
-        if (status) params.set('status', status)
-        const qs = params.toString()
-        return `/v1/projects/${projectSlug}/runs${qs ? `?${qs}` : ''}`
+    listRuns: builder.query<Run[], { workspaceId: string; agentId?: string; status?: string }>({
+      query: ({ workspaceId }) => `/workspaces/${workspaceId}/runs`,
+      transformResponse: (response: WorkspaceRunResponse[], _meta, arg) => {
+        const flat = flatten(arg.workspaceId, response)
+        return flat.filter((r) => {
+          if (arg.agentId && r.agentId !== arg.agentId) return false
+          if (arg.status && r.status !== arg.status) return false
+          return true
+        })
       },
-      transformResponse: (response: RunResponse[]) => response.map(toRun),
       providesTags: ['Run'],
     }),
-    getRun: builder.query<Run, { projectSlug: string; runId: string }>({
-      query: ({ projectSlug, runId }) => `/v1/projects/${projectSlug}/runs/${runId}`,
-      transformResponse: (response: RunResponse) => toRun(response),
-      providesTags: (_result, _err, { runId }) => [{ type: 'Run', id: runId }],
+    getRun: builder.query<Run, { workspaceId: string; runId: string }>({
+      query: ({ workspaceId, runId }) => `/workspaces/${workspaceId}/runs/${runId}`,
+      transformResponse: (response: WorkspaceRunDetailResponse, _meta, arg) =>
+        detailToRun(arg.workspaceId, response),
+      providesTags: (_r, _e, { runId }) => [{ type: 'Run', id: runId }],
     }),
-    createRun: builder.mutation<Run, { projectSlug: string; body: RunCreateBody }>({
-      query: ({ projectSlug, body }) => ({
-        url: `/v1/projects/${projectSlug}/runs`,
+    createRun: builder.mutation<
+      { runId: string; status: string },
+      { workspaceId: string; body: RunCreateBody }
+    >({
+      query: ({ workspaceId, body }) => ({
+        url: `/workspaces/${workspaceId}/runs`,
         method: 'POST',
-        body,
+        body: { only_agent: body.agent ?? null },
       }),
-      transformResponse: (response: RunResponse) => toRun(response),
+      transformResponse: (response: RunTriggerResponse) => ({
+        runId: response.run_id,
+        status: response.status,
+      }),
+      invalidatesTags: ['Run'],
     }),
-    getRunEvents: builder.query<RunEvent[], { projectSlug: string; runId: string }>({
-      query: ({ projectSlug, runId }) => `/v1/projects/${projectSlug}/runs/${runId}/events`,
-      transformResponse: (response: RunEventResponse[]) => response.map(toRunEvent),
+    getRunEvents: builder.query<RunEvent[], { workspaceId: string; runId: string }>({
+      queryFn: () => ({ data: [] }),
     }),
   }),
 })

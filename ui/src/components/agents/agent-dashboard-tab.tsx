@@ -185,17 +185,17 @@ function formatUsd(v: number): string {
 // ─── main component ──────────────────────────────────────────────────────────
 
 export function AgentDashboardTab({
-  projectSlug,
+  workspaceId,
   agentId,
   onViewRunDetails,
 }: {
-  projectSlug: string
+  workspaceId: string
   agentId: string
   onViewRunDetails?: () => void
 }) {
   const { data: runs = [], isLoading: runsLoading } = useListRunsQuery(
-    { projectSlug, agentId },
-    { skip: !projectSlug || !agentId },
+    { workspaceId, agentId },
+    { skip: !workspaceId || !agentId },
   )
 
   const dayGroups = groupRunsByDay(runs)

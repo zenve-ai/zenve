@@ -13,11 +13,11 @@ import {
 import { useListAgentsQuery } from '@/store/agents'
 
 export default function AgentsList() {
-  const { projectSlug } = useParams<{ projectSlug: string }>()
-  const base = projectSlug ? `/${projectSlug}` : ''
+  const { workspaceId } = useParams<{ workspaceId: string }>()
+  const base = workspaceId ? `/${workspaceId}` : ''
   const { data: agents = [], isLoading } = useListAgentsQuery(
-    { projectSlug: projectSlug! },
-    { skip: !projectSlug },
+    { workspaceId: workspaceId! },
+    { skip: !workspaceId },
   )
 
   return (
@@ -60,7 +60,7 @@ export default function AgentsList() {
               <EmptyTitle>No agents yet</EmptyTitle>
               <EmptyDescription>
                 Create an agent to run automations and workflows for this
-                project.
+                workspace.
               </EmptyDescription>
             </EmptyHeader>
             <EmptyContent>

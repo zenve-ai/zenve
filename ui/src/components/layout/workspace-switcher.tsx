@@ -23,10 +23,10 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { SidebarMenu, SidebarMenuButton, SidebarMenuItem } from '@/components/ui/sidebar'
 import { useAppDispatch, useAppSelector } from '@/store/hooks'
-import { selectCurrentProject, selectProjects, setCurrentProject } from '@/store/project'
-import type { ProjectIconKey } from '@/types'
+import { selectCurrentWorkspace, selectWorkspaces, setCurrentWorkspace } from '@/store/workspace'
+import type { WorkspaceIconKey } from '@/types'
 
-const PROJECT_ICONS: Record<ProjectIconKey, LucideIcon> = {
+const WORKSPACE_ICONS: Record<WorkspaceIconKey, LucideIcon> = {
   zap: Zap,
   triangle: Triangle,
   box: Box,
@@ -48,11 +48,11 @@ const MOD_SYMBOL =
     ? '⌘'
     : 'Ctrl+'
 
-export function ProjectSwitcher() {
+export function WorkspaceSwitcher() {
   const dispatch = useAppDispatch()
   const navigate = useNavigate()
-  const projects = useAppSelector(selectProjects)
-  const current = useAppSelector(selectCurrentProject)
+  const workspaces = useAppSelector(selectWorkspaces)
+  const current = useAppSelector(selectCurrentWorkspace)
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
@@ -62,19 +62,19 @@ export function ProjectSwitcher() {
       const match = /^Digit([1-9])$/.exec(e.code)
       if (!match) return
       const index = Number(match[1]) - 1
-      const project = projects[index]
-      if (!project) return
+      const workspace = workspaces[index]
+      if (!workspace) return
       e.preventDefault()
-      dispatch(setCurrentProject(project.id))
-      navigate(`/${project.slug}`)
+      dispatch(setCurrentWorkspace(workspace.id))
+      navigate(`/${workspace.id}`)
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [dispatch, navigate, projects])
+  }, [dispatch, navigate, workspaces])
 
   if (!current) return null
 
-  const CurrentIcon = PROJECT_ICONS[current.iconKey] ?? Box
+  const CurrentIcon = WORKSPACE_ICONS[current.iconKey] ?? Box
 
   return (
     <SidebarMenu>
@@ -90,32 +90,32 @@ export function ProjectSwitcher() {
               </div>
               <div className="grid min-w-0 flex-1 text-left text-sm leading-tight">
                 <span className="truncate font-medium">{current.name}</span>
-                <span className="truncate text-xs text-muted-foreground">{current.role}</span>
+                <span className="truncate text-xs text-muted-foreground">{current.path}</span>
               </div>
               <ChevronsUpDown className="ml-auto size-4 shrink-0 opacity-50" />
             </SidebarMenuButton>
           </DropdownMenuTrigger>
           <DropdownMenuContent className="w-[--radix-dropdown-menu-trigger-width] min-w-56" align="start">
             <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">
-              Projects
+              Workspaces
             </DropdownMenuLabel>
             <DropdownMenuGroup>
-              {projects.map((project, i) => {
-                const Icon = PROJECT_ICONS[project.iconKey] ?? Box
+              {workspaces.map((workspace, i) => {
+                const Icon = WORKSPACE_ICONS[workspace.iconKey] ?? Box
                 const shortcut = i < 9 ? `${MOD_SYMBOL}${i + 1}` : undefined
                 return (
                   <DropdownMenuItem
-                    key={project.id}
+                    key={workspace.id}
                     className="gap-2"
                     onSelect={() => {
-                      dispatch(setCurrentProject(project.id))
-                      navigate(`/${project.slug}`)
+                      dispatch(setCurrentWorkspace(workspace.id))
+                      navigate(`/${workspace.id}`)
                     }}
                   >
                     <div className="flex size-8 shrink-0 items-center justify-center rounded-md border bg-muted/40">
                       <Icon className="size-4 text-muted-foreground" />
                     </div>
-                    <span className="min-w-0 flex-1 truncate">{project.name}</span>
+                    <span className="min-w-0 flex-1 truncate">{workspace.name}</span>
                     {shortcut ? <DropdownMenuShortcut>{shortcut}</DropdownMenuShortcut> : null}
                   </DropdownMenuItem>
                 )
@@ -126,7 +126,7 @@ export function ProjectSwitcher() {
               <div className="flex size-8 shrink-0 items-center justify-center rounded-md border bg-muted/40">
                 <Plus className="size-4 text-muted-foreground" />
               </div>
-              <span>Create project</span>
+              <span>Create workspace</span>
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>

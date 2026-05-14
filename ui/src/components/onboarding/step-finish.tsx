@@ -1,10 +1,10 @@
-import { Check, FolderOpen, GitFork, Bot } from 'lucide-react'
+import { Check, FolderOpen, Folder, Bot } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 
 interface StepFinishProps {
-  projectName: string
-  projectDescription: string
-  githubRepo: string | null
+  name: string
+  description: string
+  path: string
   selectedAgentCount: number
   onGetStarted: () => void
   isLoading: boolean
@@ -12,15 +12,14 @@ interface StepFinishProps {
 }
 
 export function StepFinish({
-  projectName,
-  projectDescription,
-  githubRepo,
+  name,
+  description,
+  path,
   selectedAgentCount,
   onGetStarted,
   isLoading,
   error,
 }: StepFinishProps) {
-  // --- render helpers ---
   const renderSummaryRow = (
     icon: React.ReactNode,
     label: string,
@@ -39,12 +38,11 @@ export function StepFinish({
     </div>
   )
 
-  // --- return ---
   return (
     <div className="flex flex-col gap-6">
       <div>
         <p className="font-mono text-[10px] tracking-widest uppercase text-muted-foreground/50">
-          Step 04 / 04
+          Step 03 / 03
         </p>
         <h2 className="mt-1 text-lg font-semibold leading-tight">Ready to launch</h2>
         <p className="mt-1 text-[13px] text-muted-foreground">
@@ -55,19 +53,18 @@ export function StepFinish({
       <div className="border border-dashed border-border/60">
         {renderSummaryRow(
           <FolderOpen className="size-4" />,
-          'Project name',
-          projectName,
-        )}
-        {projectDescription && renderSummaryRow(
-          <FolderOpen className="size-4" />,
-          'Description',
-          projectDescription,
+          'Workspace name',
+          name,
         )}
         {renderSummaryRow(
-          <GitFork className="size-4" />,
-          'GitHub',
-          githubRepo ?? 'Not connected',
-          githubRepo !== null,
+          <Folder className="size-4" />,
+          'Path',
+          path,
+        )}
+        {description && renderSummaryRow(
+          <FolderOpen className="size-4" />,
+          'Description',
+          description,
         )}
         {renderSummaryRow(
           <Bot className="size-4" />,

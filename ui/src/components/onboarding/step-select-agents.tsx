@@ -60,11 +60,11 @@ export function StepSelectAgents({ templates, isLoading, selectedAgents, onToggl
     <div className="flex flex-col gap-6">
       <div>
         <p className="font-mono text-[10px] tracking-widest uppercase text-muted-foreground/50">
-          Step 03 / 04
+          Step 02 / 03
         </p>
         <h2 className="mt-1 text-lg font-semibold leading-tight">Select agents</h2>
         <p className="mt-1 text-[13px] text-muted-foreground">
-          Pick the agents to activate for this project. You can change this later.
+          Pick the agents to activate for this workspace. You can change this later.
         </p>
       </div>
 

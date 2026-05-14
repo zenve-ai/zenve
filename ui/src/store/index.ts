@@ -1,6 +1,6 @@
 import { configureStore } from '@reduxjs/toolkit'
 import { authReducer, authApi } from './auth'
-import { projectReducer, projectApi } from './project'
+import { workspaceReducer, workspaceApi } from './workspace'
 import { agentsApi } from './agents'
 import { runsApi, runsReducer } from './runs'
 import { wsReducer } from './ws'
@@ -8,18 +8,18 @@ import { wsReducer } from './ws'
 export const store = configureStore({
   reducer: {
     auth: authReducer,
-    project: projectReducer,
+    workspace: workspaceReducer,
     runs: runsReducer,
     ws: wsReducer,
     [authApi.reducerPath]: authApi.reducer,
-    [projectApi.reducerPath]: projectApi.reducer,
+    [workspaceApi.reducerPath]: workspaceApi.reducer,
     [agentsApi.reducerPath]: agentsApi.reducer,
     [runsApi.reducerPath]: runsApi.reducer,
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware().concat(
       authApi.middleware,
-      projectApi.middleware,
+      workspaceApi.middleware,
       agentsApi.middleware,
       runsApi.middleware,
     ),

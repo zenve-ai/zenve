@@ -13,54 +13,51 @@ import { SidebarInset, SidebarProvider, SidebarTrigger } from '@/components/ui/s
 import { AppSidebar } from '@/components/layout'
 import { useAppDispatch, useAppSelector } from '@/store/hooks'
 import {
-  useListProjectsQuery,
-  resolveProjectFromSlug,
-  selectCurrentProjectId,
-  selectProjects,
-  setCurrentProject,
-} from '@/store/project'
+  useListWorkspacesQuery,
+  resolveWorkspaceFromId,
+  selectCurrentWorkspaceId,
+  selectWorkspaces,
+  setCurrentWorkspace,
+} from '@/store/workspace'
 import { useListAgentsQuery } from '@/store/agents'
 import { selectWsStatus } from '@/store/ws'
-import { useProjectWebSocket } from '@/hooks/use-project-websocket'
-import { ProjectLoading } from './project-loading'
+import { useWorkspaceWebSocket } from '@/hooks/use-workspace-websocket'
+import { WorkspaceLoading } from './workspace-loading'
 
-export default function ProjectLayout() {
-  // --- declarations ---
-  const { projectSlug } = useParams<{ projectSlug: string }>()
+export default function WorkspaceLayout() {
+  const { workspaceId } = useParams<{ workspaceId: string }>()
   const location = useLocation()
   const navigate = useNavigate()
   const dispatch = useAppDispatch()
-  const { isLoading, isFetching, isSuccess, isError, data } = useListProjectsQuery()
-  const projects = useAppSelector(selectProjects)
-  const currentProjectId = useAppSelector(selectCurrentProjectId)
+  const { isLoading, isFetching, isSuccess, isError, data } = useListWorkspacesQuery()
+  const workspaces = useAppSelector(selectWorkspaces)
+  const currentWorkspaceId = useAppSelector(selectCurrentWorkspaceId)
   const { data: agents = [] } = useListAgentsQuery(
-    { projectSlug: projectSlug! },
-    { skip: !projectSlug },
+    { workspaceId: workspaceId! },
+    { skip: !workspaceId },
   )
   const waiting = isLoading || isFetching
   const empty = isError || (isSuccess && (!data || data.length === 0))
-  const base = projectSlug ? `/${projectSlug}` : ''
-  const detailMatch = matchPath({ path: '/:projectSlug/agents/:agentSlug', end: true }, location.pathname)
-  const listMatch = matchPath({ path: '/:projectSlug/agents', end: true }, location.pathname)
+  const base = workspaceId ? `/${workspaceId}` : ''
+  const detailMatch = matchPath({ path: '/:workspaceId/agents/:agentSlug', end: true }, location.pathname)
+  const listMatch = matchPath({ path: '/:workspaceId/agents', end: true }, location.pathname)
   const agent = detailMatch?.params.agentSlug
     ? agents.find((a) => a.slug === detailMatch.params.agentSlug)
     : undefined
   const wsStatus = useAppSelector(selectWsStatus)
 
-  useProjectWebSocket(currentProjectId ?? '')
+  useWorkspaceWebSocket(currentWorkspaceId ?? '')
 
-  // --- effects ---
   useEffect(() => {
-    if (!isSuccess || !projects.length || !projectSlug) return
-    const match = resolveProjectFromSlug(projects, projectSlug)
+    if (!isSuccess || !workspaces.length || !workspaceId) return
+    const match = resolveWorkspaceFromId(workspaces, workspaceId)
     if (match) {
-      if (match.id !== currentProjectId) dispatch(setCurrentProject(match.id))
+      if (match.id !== currentWorkspaceId) dispatch(setCurrentWorkspace(match.id))
     } else {
-      navigate(`/${projects[0].slug}`, { replace: true })
+      navigate(`/${workspaces[0].id}`, { replace: true })
     }
-  }, [projectSlug, projects, isSuccess, currentProjectId, dispatch, navigate])
+  }, [workspaceId, workspaces, isSuccess, currentWorkspaceId, dispatch, navigate])
 
-  // --- render helpers ---
   const renderBreadcrumbTrail = () => {
     if (listMatch || detailMatch) {
       return (
@@ -147,16 +144,10 @@ export default function ProjectLayout() {
   )
 
   const renderMain = () => {
-    if (waiting) return <ProjectLoading />
-    if (empty) return <Navigate to="/no-project" replace />
-    const project = projectSlug ? resolveProjectFromSlug(projects, projectSlug) : undefined
-    const isGithubRoute = location.pathname.includes('/github/')
-    if (project && !project.githubRepo && !isGithubRoute) {
-      return <Navigate to={`/${projectSlug}/github/setup`} replace />
-    }
+    if (waiting) return <WorkspaceLoading />
+    if (empty) return <Navigate to="/no-workspace" replace />
     return renderContent()
   }
 
-  // --- main render ---
   return renderMain()
 }

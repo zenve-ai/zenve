@@ -1,78 +1,60 @@
 import { createApi } from '@reduxjs/toolkit/query/react'
-import { createBaseQueryWithReauth } from '@/lib/api'
+import { createRuntimeBaseQuery } from '@/lib/api'
 import config from '@/config'
 import type { Agent, AgentTemplate, AgentUpdateBody } from '@/types'
 
-interface AgentResponse {
+interface WorkspaceDetailResponse {
   id: string
-  project_id?: string
-  org_id?: string
-  name: string
-  slug: string
-  dir_path: string
-  adapter_type: string
-  adapter_config: Record<string, unknown>
-  skills: string[]
-  tools?: string[]
-  status: string
-  heartbeat_interval_seconds: number
-  last_heartbeat_at: string | null
-  created_at: string
-  updated_at: string
+  agents: string[]
 }
 
-function toAgent(r: AgentResponse): Agent {
+function slugToAgent(workspaceId: string, slug: string): Agent {
   return {
-    id: r.id,
-    projectId: r.project_id ?? r.org_id ?? '',
-    name: r.name,
-    slug: r.slug,
-    adapterType: r.adapter_type,
-    adapterConfig: r.adapter_config,
-    skills: r.skills,
-    tools: r.tools ?? [],
-    status: r.status,
-    heartbeatIntervalSeconds: r.heartbeat_interval_seconds,
-    lastHeartbeatAt: r.last_heartbeat_at,
-    createdAt: r.created_at,
-    updatedAt: r.updated_at,
+    id: `${workspaceId}:${slug}`,
+    workspaceId,
+    name: slug,
+    slug,
+    adapterType: '',
+    adapterConfig: {},
+    skills: [],
+    tools: [],
+    status: 'active',
+    heartbeatIntervalSeconds: 0,
+    lastHeartbeatAt: null,
+    createdAt: '',
+    updatedAt: '',
   }
 }
 
 export const agentsApi = createApi({
   reducerPath: 'agentsApi',
-  baseQuery: createBaseQueryWithReauth(config.apiUrl),
+  baseQuery: createRuntimeBaseQuery(config.runtimeUrl),
   tagTypes: ['Agent'],
   endpoints: (builder) => ({
     listTemplates: builder.query<AgentTemplate[], void>({
-      query: () => '/templates',
-      transformResponse: (response: { id: string; name: string; description: string }[]) =>
-        response.map(({ id, name, description }) => ({ id, name, description })),
+      queryFn: () => ({ data: [] }),
     }),
-    listAgents: builder.query<Agent[], { projectSlug: string }>({
-      query: ({ projectSlug }) => `/projects/${projectSlug}/agents`,
-      transformResponse: (response: AgentResponse[]) => response.map(toAgent),
+    listAgents: builder.query<Agent[], { workspaceId: string }>({
+      query: ({ workspaceId }) => `/workspaces/${workspaceId}`,
+      transformResponse: (response: WorkspaceDetailResponse) =>
+        response.agents.map((slug) => slugToAgent(response.id, slug)),
       providesTags: ['Agent'],
     }),
-    getAgent: builder.query<Agent, { projectSlug: string; agentSlug: string }>({
-      query: ({ projectSlug, agentSlug }) => `/projects/${projectSlug}/agents/${agentSlug}`,
-      transformResponse: (response: AgentResponse) => toAgent(response),
-      providesTags: (_result, _err, { agentSlug }) => [{ type: 'Agent', id: agentSlug }],
+    getAgent: builder.query<Agent, { workspaceId: string; agentSlug: string }>({
+      query: ({ workspaceId }) => `/workspaces/${workspaceId}`,
+      transformResponse: (response: WorkspaceDetailResponse, _meta, arg) => {
+        const slug = response.agents.find((s) => s === arg.agentSlug)
+        return slugToAgent(response.id, slug ?? arg.agentSlug)
+      },
+      providesTags: (_r, _e, { agentSlug }) => [{ type: 'Agent', id: agentSlug }],
     }),
     updateAgent: builder.mutation<
       Agent,
-      { projectSlug: string; agentIdOrSlug: string; body: AgentUpdateBody }
+      { workspaceId: string; agentIdOrSlug: string; body: AgentUpdateBody }
     >({
-      query: ({ projectSlug, agentIdOrSlug, body }) => ({
-        url: `/projects/${projectSlug}/agents/${agentIdOrSlug}`,
-        method: 'PATCH',
-        body,
+      queryFn: ({ workspaceId, agentIdOrSlug }) => ({
+        data: slugToAgent(workspaceId, agentIdOrSlug),
       }),
-      transformResponse: (response: AgentResponse) => toAgent(response),
-      invalidatesTags: (_result, _err, { agentIdOrSlug }) => [
-        'Agent',
-        { type: 'Agent', id: agentIdOrSlug },
-      ],
     }),
   }),
 })
