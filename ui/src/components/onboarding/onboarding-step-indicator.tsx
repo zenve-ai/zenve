@@ -1,4 +1,4 @@
-import { Check, FolderOpen, Bot, Flag } from 'lucide-react'
+import { Check, FolderOpen, Bot, Flag, Zap } from 'lucide-react'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { cn } from '@/lib/utils'
 
@@ -9,6 +9,7 @@ interface OnboardingStepIndicatorProps {
 const STEPS = [
   { label: 'Workspace', icon: FolderOpen },
   { label: 'Agents', icon: Bot },
+  { label: 'Skills', icon: Zap },
   { label: 'Finish', icon: Flag },
 ]
 

@@ -1,4 +1,4 @@
-import { Check, FolderOpen, Folder, Bot } from 'lucide-react'
+import { Check, FolderOpen, Folder, Bot, Zap } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 
 interface StepFinishProps {
@@ -6,6 +6,7 @@ interface StepFinishProps {
   description: string
   path: string
   selectedAgentCount: number
+  selectedSkillCount: number
   onGetStarted: () => void
   isLoading: boolean
   error: string | null
@@ -16,6 +17,7 @@ export function StepFinish({
   description,
   path,
   selectedAgentCount,
+  selectedSkillCount,
   onGetStarted,
   isLoading,
   error,
@@ -42,7 +44,7 @@ export function StepFinish({
     <div className="flex flex-col gap-6">
       <div>
         <p className="font-mono text-[10px] tracking-widest uppercase text-muted-foreground/50">
-          Step 03 / 03
+          Step 04 / 04
         </p>
         <h2 className="mt-1 text-lg font-semibold leading-tight">Ready to launch</h2>
         <p className="mt-1 text-[13px] text-muted-foreground">
@@ -73,6 +75,14 @@ export function StepFinish({
             ? `${selectedAgentCount} agent${selectedAgentCount !== 1 ? 's' : ''} selected`
             : 'None selected',
           selectedAgentCount > 0,
+        )}
+        {renderSummaryRow(
+          <Zap className="size-4" />,
+          'Skills',
+          selectedSkillCount > 0
+            ? `${selectedSkillCount} skill${selectedSkillCount !== 1 ? 's' : ''} selected`
+            : 'None selected',
+          selectedSkillCount > 0,
         )}
       </div>
 

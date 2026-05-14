@@ -56,7 +56,7 @@ function NavMainCollapsibleItem({ item, pathname }: { item: NavItem; pathname: s
         <SidebarMenuButton asChild tooltip={item.title}>
           <Link to={item.url}>
             <item.icon />
-            <span>{item.title}</span>
+            <span className="font-semibold">{item.title}</span>
           </Link>
         </SidebarMenuButton>
         {item.items?.length ? (

@@ -90,7 +90,9 @@ export function WorkspaceSwitcher() {
               </div>
               <div className="grid min-w-0 flex-1 text-left text-sm leading-tight">
                 <span className="truncate font-medium">{current.name}</span>
-                <span className="truncate text-xs text-muted-foreground">{current.path}</span>
+                <span className="truncate font-mono text-[10px] tracking-widest uppercase text-muted-foreground">
+                  {current.agentCount} {current.agentCount === 1 ? 'agent' : 'agents'}
+                </span>
               </div>
               <ChevronsUpDown className="ml-auto size-4 shrink-0 opacity-50" />
             </SidebarMenuButton>
@@ -115,7 +117,12 @@ export function WorkspaceSwitcher() {
                     <div className="flex size-8 shrink-0 items-center justify-center rounded-md border bg-muted/40">
                       <Icon className="size-4 text-muted-foreground" />
                     </div>
-                    <span className="min-w-0 flex-1 truncate">{workspace.name}</span>
+                    <div className="grid min-w-0 flex-1 leading-tight">
+                      <span className="truncate">{workspace.name}</span>
+                      <span className="truncate font-mono text-[10px] tracking-widest uppercase text-muted-foreground">
+                        {workspace.agentCount} {workspace.agentCount === 1 ? 'agent' : 'agents'}
+                      </span>
+                    </div>
                     {shortcut ? <DropdownMenuShortcut>{shortcut}</DropdownMenuShortcut> : null}
                   </DropdownMenuItem>
                 )

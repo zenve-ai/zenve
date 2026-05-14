@@ -7,6 +7,7 @@ interface WorkspaceResponse {
   id: string
   path: string
   registered_at: string
+  agent_count: number
 }
 
 interface WorkspaceDetailResponse extends WorkspaceResponse {
@@ -43,6 +44,7 @@ function toWorkspaceSummary(w: WorkspaceResponse): WorkspaceSummary {
     path: w.path,
     registeredAt: w.registered_at,
     iconKey: assignIconKey(w.id),
+    agentCount: w.agent_count ?? 0,
   }
 }
 
@@ -53,6 +55,7 @@ function toWorkspaceDetail(w: WorkspaceDetailResponse): WorkspaceDetail {
     path: w.path,
     registeredAt: w.registered_at,
     iconKey: assignIconKey(w.id),
+    agentCount: w.agents.length,
     description: w.description,
     defaultBranch: w.default_branch,
     runSchedule: w.run_schedule,
@@ -68,6 +71,7 @@ interface ScaffoldWorkspaceBody {
   path: string
   description: string
   agents: string[]
+  skills: string[]
 }
 
 export const workspaceApi = createApi({
@@ -91,7 +95,7 @@ export const workspaceApi = createApi({
       invalidatesTags: ['Workspace'],
     }),
     scaffoldWorkspace: builder.mutation<WorkspaceSummary, ScaffoldWorkspaceBody>({
-      query: (body) => ({ url: '/workspaces/scaffold', method: 'POST', body }),
+      query: (body) => ({ url: '/workspaces/init', method: 'POST', body }),
       transformResponse: (response: WorkspaceResponse) => toWorkspaceSummary(response),
       invalidatesTags: ['Workspace'],
     }),

@@ -122,7 +122,7 @@ export default function AgentDetail() {
         <TabsTrigger value="budget">Budget</TabsTrigger>
       </TabsList>
       <TabsContent value="dashboard" className="mt-0 min-h-0 flex-1">
-        <AgentDashboardTab workspaceId={workspaceId!} agentId={a.id} onViewRunDetails={() => setTab('runs')} />
+        <AgentDashboardTab workspaceId={workspaceId!} agentSlug={agentSlug!} onViewRunDetails={() => setTab('runs')} />
       </TabsContent>
       <TabsContent value="instructions" className="mt-0 min-h-0 flex-1">
         <PlaceholderTab title="Instructions">

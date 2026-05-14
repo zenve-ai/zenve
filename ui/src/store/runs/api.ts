@@ -1,7 +1,7 @@
 import { createApi } from '@reduxjs/toolkit/query/react'
 import { createRuntimeBaseQuery } from '@/lib/api'
 import config from '@/config'
-import type { Run, RunCreateBody, RunEvent } from '@/types'
+import type { RawRunEvent, Run, RunCreateBody } from '@/types'
 
 interface WorkspaceRunSummaryResponse {
   run_id: string
@@ -124,8 +124,12 @@ export const runsApi = createApi({
       }),
       invalidatesTags: ['Run'],
     }),
-    getRunEvents: builder.query<RunEvent[], { workspaceId: string; runId: string }>({
-      queryFn: () => ({ data: [] }),
+    getRunEvents: builder.query<RawRunEvent[], { workspaceId: string; runId: string }>({
+      query: ({ workspaceId, runId }) => `/workspaces/${workspaceId}/runs/${runId}/events`,
+    }),
+    getActiveRun: builder.query<{ run_id: string; status: string } | null, { workspaceId: string }>({
+      query: ({ workspaceId }) => `/workspaces/${workspaceId}/runs/active-run`,
+      transformErrorResponse: (r) => (r.status === 404 ? null : r),
     }),
   }),
 })
@@ -135,4 +139,5 @@ export const {
   useGetRunQuery,
   useCreateRunMutation,
   useGetRunEventsQuery,
+  useGetActiveRunQuery,
 } = runsApi

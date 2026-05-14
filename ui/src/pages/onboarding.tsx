@@ -6,18 +6,13 @@ import {
   OnboardingStepIndicator,
   StepWorkspace,
   StepSelectAgents,
+  StepSelectSkills,
   StepFinish,
 } from '@/components/onboarding'
 import { useScaffoldWorkspaceMutation } from '@/store/workspace'
-import type { AgentTemplate } from '@/types'
+import { useListTemplatesQuery, useListSkillsQuery } from '@/store/agents'
 
-const TOTAL_STEPS = 3
-
-const AGENT_TEMPLATES: AgentTemplate[] = [
-  { id: 'dev', name: 'dev', description: 'Implements features and fixes from open issues.' },
-  { id: 'reviewer', name: 'reviewer', description: 'Reviews pull requests and posts feedback.' },
-  { id: 'qa', name: 'qa', description: 'Runs tests and reports failures.' },
-]
+const TOTAL_STEPS = 4
 
 export default function OnboardingPage() {
   const { step } = useParams<{ step: string }>()
@@ -30,7 +25,10 @@ export default function OnboardingPage() {
   const [pathError, setPathError] = useState<string | null>(null)
   const [finishError, setFinishError] = useState<string | null>(null)
   const [selectedAgents, setSelectedAgents] = useState<Set<string>>(new Set())
+  const [selectedSkills, setSelectedSkills] = useState<Set<string>>(new Set())
   const [scaffoldWorkspace, { isLoading: isScaffolding }] = useScaffoldWorkspaceMutation()
+  const { data: templates = [], isLoading: isLoadingTemplates } = useListTemplatesQuery()
+  const { data: skills = [], isLoading: isLoadingSkills } = useListSkillsQuery()
 
   const isLastStep = currentStep === TOTAL_STEPS - 1
 
@@ -74,6 +72,15 @@ export default function OnboardingPage() {
     })
   }
 
+  const handleToggleSkill = (id: string) => {
+    setSelectedSkills((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
   const handleFinish = async () => {
     setFinishError(null)
     const result = await scaffoldWorkspace({
@@ -81,6 +88,7 @@ export default function OnboardingPage() {
       path: path.trim(),
       description: description.trim(),
       agents: Array.from(selectedAgents),
+      skills: Array.from(selectedSkills),
     })
     if ('error' in result && result.error) {
       const err = result.error
@@ -113,19 +121,29 @@ export default function OnboardingPage() {
       case 1:
         return (
           <StepSelectAgents
-            templates={AGENT_TEMPLATES}
-            isLoading={false}
+            templates={templates}
+            isLoading={isLoadingTemplates}
             selectedAgents={selectedAgents}
             onToggle={handleToggleAgent}
           />
         )
       case 2:
         return (
+          <StepSelectSkills
+            skills={skills}
+            isLoading={isLoadingSkills}
+            selectedSkills={selectedSkills}
+            onToggle={handleToggleSkill}
+          />
+        )
+      case 3:
+        return (
           <StepFinish
             name={name}
             description={description}
             path={path}
             selectedAgentCount={selectedAgents.size}
+            selectedSkillCount={selectedSkills.size}
             onGetStarted={handleFinish}
             isLoading={isScaffolding}
             error={finishError}
