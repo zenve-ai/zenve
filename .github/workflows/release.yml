@@ -48,6 +48,12 @@ jobs:
             ## Install
 
             ```bash
+            curl -fsSL https://raw.githubusercontent.com/zenve-ai/zenve/main/scripts/install.sh | sh
+            ```
+
+            Or install manually:
+
+            ```bash
             uv tool install zenve-cli       # recommended
             pipx install zenve-cli          # alternative
             ```
