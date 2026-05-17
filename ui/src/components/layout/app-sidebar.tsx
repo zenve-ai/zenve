@@ -1,6 +1,6 @@
 import { useMemo } from 'react'
 import { useParams } from 'react-router'
-import { BookOpen, Bot, Settings2, Users } from 'lucide-react'
+import { BookOpen, Bot, Server, Settings2, Users } from 'lucide-react'
 import { useListAgentsQuery } from '@/store/agents'
 import { NavMain, type NavItem } from './nav-main'
 import { NavUser } from './nav-user'
@@ -61,7 +61,12 @@ export function AppSidebar(props: React.ComponentProps<typeof Sidebar>) {
         url: `${prefix}/agents/${a.slug}`,
       })),
     }
-    return [agentsBlock, ...demoNavTail]
+    const runtimeBlock: NavItem = {
+      title: 'Runtime',
+      url: `${prefix}/runtime`,
+      icon: Server,
+    }
+    return [agentsBlock, runtimeBlock, ...demoNavTail]
   }, [workspaceId, agents])
 
   return (

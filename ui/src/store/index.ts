@@ -4,6 +4,7 @@ import { workspaceReducer, workspaceApi } from './workspace'
 import { agentsApi } from './agents'
 import { runsApi, runsReducer } from './runs'
 import { wsReducer } from './ws'
+import { runtimeApi } from './runtime'
 
 export const store = configureStore({
   reducer: {
@@ -15,6 +16,7 @@ export const store = configureStore({
     [workspaceApi.reducerPath]: workspaceApi.reducer,
     [agentsApi.reducerPath]: agentsApi.reducer,
     [runsApi.reducerPath]: runsApi.reducer,
+    [runtimeApi.reducerPath]: runtimeApi.reducer,
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware().concat(
@@ -22,6 +24,7 @@ export const store = configureStore({
       workspaceApi.middleware,
       agentsApi.middleware,
       runsApi.middleware,
+      runtimeApi.middleware,
     ),
 })
 

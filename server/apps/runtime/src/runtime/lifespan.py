@@ -2,9 +2,11 @@ import asyncio
 import logging
 import os
 from contextlib import asynccontextmanager
+from datetime import datetime, timezone
 from pathlib import Path
 
 from fastapi import FastAPI
+from zenve_engine.api import build_default_registry
 
 from runtime.run_store import RunStore
 from runtime.services.run_service import RunService
@@ -43,6 +45,8 @@ async def lifespan(app: FastAPI):
     app.state.scheduler_service = scheduler_service
     app.state.snapshot_service = snapshot_service
     app.state.template_service = template_service
+    app.state.adapter_registry = build_default_registry()
+    app.state.started_at = datetime.now(timezone.utc)
 
     logger.info(f"Registry loaded: {len(workspace_service.list())} workspace(s) registered")
     PID_FILE.parent.mkdir(exist_ok=True)
