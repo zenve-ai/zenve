@@ -163,3 +163,17 @@ export interface RawRunEvent {
   agent: string | null
   data: Record<string, unknown>
 }
+
+export interface RuntimeInfo {
+  version: string
+  status: string
+  uptimeSeconds: number
+  pid: number
+}
+
+export interface AdapterItem {
+  type: string
+  name: string
+  healthy: boolean
+  defaultModel: string
+}
