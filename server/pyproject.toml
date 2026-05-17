@@ -21,6 +21,7 @@ members = [
     "apps/runtime",
     "packages/adapters",
     "packages/engine",
+    "packages/issues",
 ]
 
 [tool.uv.sources]
@@ -60,6 +61,7 @@ ignore = ["E501", "B008"]
 known-first-party = [
     "zenve_adapters",
     "zenve_engine",
+    "zenve_issues",
     "api",
     "runtime",
     "zenve_cli",
