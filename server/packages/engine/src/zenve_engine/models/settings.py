@@ -7,6 +7,17 @@ from pydantic import BaseModel, Field, model_validator
 PicksUp = Literal["issues", "pull_requests", "both", "none"]
 
 
+class IssuesConfig(BaseModel):
+    """Per-workspace issues adapter override in `.zenve/settings.json`.
+
+    When `adapter` is None the runtime's default adapter is used.
+    """
+
+    model_config = {"extra": "ignore"}
+
+    adapter: str | None = None
+
+
 class ProjectSettings(BaseModel):
     """Shape of `.zenve/settings.json`."""
 
@@ -20,6 +31,7 @@ class ProjectSettings(BaseModel):
     run_schedule: str | None = None
     pipeline: dict[str, str | None] = Field(default_factory=dict)
     stack: list[str] = Field(default_factory=list)
+    issues: IssuesConfig = Field(default_factory=IssuesConfig)
 
 
 class AgentSettings(BaseModel):
