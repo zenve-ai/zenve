@@ -21,6 +21,7 @@ dependencies = [
     "pydantic>=2",
     "python-dotenv>=1.0",
     "zenve-adapters>=0.1.7",
+    "zenve-issues>=0.1.0",
 ]
 
 [project.urls]
@@ -37,3 +38,4 @@ packages = ["src/zenve_engine"]
 
 [tool.uv.sources]
 zenve-adapters = { workspace = true }
+zenve-issues = { workspace = true }

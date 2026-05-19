@@ -41,6 +41,9 @@ from zenve_engine.github.client import GitHubClient
 from zenve_engine.github.snapshot import build_snapshot, write_snapshot
 from zenve_engine.models.run_result import RunResultFile
 from zenve_engine.models.snapshot import Snapshot
+from zenve_issues import BaseIssueAdapter
+from zenve_issues.github import GitHubIssueAdapter
+from zenve_issues.models import GitHubIssueConfig
 
 
 @dataclass
@@ -65,10 +68,12 @@ def snapshot(
     run_id: str,
     github_token: str,
     repo: str,
+    issues_adapter: BaseIssueAdapter | None = None,
 ) -> Snapshot:
-    """Fetch a GitHub snapshot and write it to `.zenve/snapshot.json`."""
+    """Fetch issues snapshot and write it to `.zenve/snapshot.json`."""
+    adapter = issues_adapter or GitHubIssueAdapter(GitHubIssueConfig(token=github_token, repo=repo))
     with GitHubClient(github_token, repo) as gh:
-        snap = build_snapshot(gh, run_id)
+        snap = build_snapshot(adapter, gh, run_id)
     write_snapshot(project_dir, snap)
     return snap
 
@@ -86,6 +91,7 @@ def run(
     on_event: Callable[[dict], None] | None = None,
     registry: AdapterRegistry | None = None,
     auto_commit_zenve: bool = False,
+    issues_adapter: BaseIssueAdapter | None = None,
 ) -> RunReport:
     """Execute a full live run against `project_dir`.
 
@@ -153,9 +159,10 @@ def run(
         base_env = {**env_vars, **base_env}
 
     reg = registry or build_default_registry()
+    adapter = issues_adapter or GitHubIssueAdapter(GitHubIssueConfig(token=github_token, repo=repo))
 
     with GitHubClient(github_token, repo) as gh:
-        snap = build_snapshot(gh, run_id)
+        snap = build_snapshot(adapter, gh, run_id)
         write_snapshot(project_dir, snap)
         emitter.emit(
             et.SNAPSHOT_FETCHED,
@@ -166,7 +173,7 @@ def run(
             },
         )
 
-        reconcile_claims(gh, snap, project_dir)
+        reconcile_claims(adapter, snap, project_dir)
 
         results = asyncio.run(
             run_all(
@@ -176,6 +183,7 @@ def run(
                 repo_root=project_dir,
                 run_id=run_id,
                 registry=reg,
+                issues_adapter=adapter,
                 gh=gh,
                 emitter=emitter,
                 env_vars=base_env,
