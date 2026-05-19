@@ -12,6 +12,7 @@ from runtime.run_store import RunStore
 from runtime.services.workspace_service import WorkspaceService
 from runtime.ws_manager import WsManager
 from zenve_engine import DirtyTreeError, EngineError, MissingRemoteBranchError
+from zenve_engine.config import load_project_settings
 from zenve_engine.env import resolve_github_token
 
 logger = logging.getLogger(__name__)
@@ -22,15 +23,19 @@ def utcnow_iso() -> str:
 
 
 class RunTriggerService:
-    def __init__(self, workspace_service: WorkspaceService, run_store: RunStore, ws_manager: WsManager) -> None:
+    def __init__(self, workspace_service: WorkspaceService, run_store: RunStore, ws_manager: WsManager, issues_adapter_type: str = "github") -> None:
         self.workspace_service = workspace_service
         self.run_store = run_store
         self.ws_manager = ws_manager
+        self.issues_adapter_type = issues_adapter_type
         self._executor = ThreadPoolExecutor(max_workers=4)
 
     def trigger(self, workspace_id: str, req: RunTriggerRequest) -> RunTriggerResponse:
         detail = self.workspace_service.detail(workspace_id)
         github_token = resolve_github_token() or ""
+        project_dir = Path(detail.path)
+        project = load_project_settings(project_dir)
+        adapter_type = project.issues.adapter or self.issues_adapter_type
         run_id = uuid4().hex
         self.run_store.create(run_id, workspace_id)
         self.ws_manager.broadcast(workspace_id, {
@@ -38,7 +43,7 @@ class RunTriggerService:
             "data": {"run_id": run_id, "workspace_id": workspace_id, "status": "queued"},
         })
         self._executor.submit(
-            self.execute_run, run_id, Path(detail.path), detail.repo or detail.project, github_token, req
+            self.execute_run, run_id, project_dir, detail.repo or detail.project, github_token, adapter_type, req
         )
         return RunTriggerResponse(run_id=run_id, status="queued")
 
@@ -48,6 +53,7 @@ class RunTriggerService:
         project_dir: Path,
         repo: str,
         github_token: str,
+        issues_adapter_type: str,
         req: RunTriggerRequest,
     ) -> None:
         workspace_id = self.run_store.get(run_id).workspace_id
@@ -73,6 +79,7 @@ class RunTriggerService:
                 only_agent=req.only_agent,
                 env_vars=req.env_vars,
                 on_event=on_event,
+                issues_adapter_type=issues_adapter_type,
             )
             self.run_store.update_status(run_id, "done")
             self.ws_manager.broadcast(workspace_id, {

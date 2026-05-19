@@ -5,12 +5,14 @@ import zenve_engine
 from runtime.models.errors import ExternalError, ValidationError
 from runtime.models.snapshot import SnapshotResponse
 from runtime.services.workspace_service import WorkspaceService
+from zenve_engine.config import load_project_settings
 from zenve_engine.env import resolve_github_token
 
 
 class SnapshotService:
-    def __init__(self, workspace_service: WorkspaceService) -> None:
+    def __init__(self, workspace_service: WorkspaceService, issues_adapter_type: str = "github") -> None:
         self.workspace_service = workspace_service
+        self.issues_adapter_type = issues_adapter_type
 
     def take(self, workspace_id: str) -> SnapshotResponse:
         detail = self.workspace_service.detail(workspace_id)
@@ -23,12 +25,17 @@ class SnapshotService:
                 f"Could not detect GitHub remote origin for workspace at {detail.path}"
             )
 
+        project_dir = Path(detail.path)
+        project = load_project_settings(project_dir)
+        adapter_type = project.issues.adapter or self.issues_adapter_type
+
         run_id = uuid4().hex
         snap = zenve_engine.snapshot(
-            project_dir=Path(detail.path),
+            project_dir=project_dir,
             run_id=run_id,
             github_token=github_token,
             repo=detail.repo,
+            issues_adapter_type=adapter_type,
         )
         return SnapshotResponse(
             run_id=snap.run_id,

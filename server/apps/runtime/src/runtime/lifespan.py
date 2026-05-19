@@ -7,7 +7,9 @@ from pathlib import Path
 
 from fastapi import FastAPI
 
+from runtime.models.config import RuntimeConfig
 from runtime.run_store import RunStore
+from runtime.services.issue_service import IssueService
 from runtime.services.run_service import RunService
 from runtime.services.run_trigger_service import RunTriggerService
 from runtime.services.scheduler_service import SchedulerService
@@ -28,14 +30,18 @@ async def lifespan(app: FastAPI):
     logger.info("Starting Zenve Runtime")
     logger.info("=" * 60)
 
+    config = RuntimeConfig.load()
+    logger.info("Issues adapter: %s", config.issues_adapter)
+
     loop = asyncio.get_event_loop()
     ws_manager = WsManager(loop)
     run_store = RunStore()
     workspace_service = WorkspaceService()
     run_service = RunService(workspace_service)
-    trigger_service = RunTriggerService(workspace_service, run_store, ws_manager)
+    trigger_service = RunTriggerService(workspace_service, run_store, ws_manager, config.issues_adapter)
     scheduler_service = SchedulerService(workspace_service, trigger_service)
-    snapshot_service = SnapshotService(workspace_service)
+    snapshot_service = SnapshotService(workspace_service, config.issues_adapter)
+    issue_service = IssueService(workspace_service, config.issues_adapter)
     template_service = TemplateService()
     app.state.ws_manager = ws_manager
     app.state.run_store = run_store
@@ -44,6 +50,7 @@ async def lifespan(app: FastAPI):
     app.state.trigger_service = trigger_service
     app.state.scheduler_service = scheduler_service
     app.state.snapshot_service = snapshot_service
+    app.state.issue_service = issue_service
     app.state.template_service = template_service
     app.state.adapter_registry = build_default_registry()
     app.state.started_at = datetime.now(UTC)
