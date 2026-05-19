@@ -13,49 +13,32 @@ from zenve_issues.models import (
 
 
 class BaseIssueAdapter(ABC):
-    """Contract that every issue backend adapter must fulfill.
-
-    An adapter is stateless — it holds no per-call state. A single instance
-    is created and reused across all operations. Config is passed into each
-    method call.
-    """
-
     adapter_type: ClassVar[str]
+
+    def __init__(self, config: IssueAdapterConfigBase) -> None:
+        self.config = config
 
     def name(self) -> str:
         return self.__class__.adapter_type
 
     @classmethod
     @abstractmethod
-    def get_default_config(cls) -> IssueAdapterConfigBase: ...
-
-    @classmethod
-    @abstractmethod
     def validate_config(cls, raw_config: dict) -> IssueAdapterConfigBase: ...
 
     @abstractmethod
-    def create(self, config: IssueAdapterConfigBase, data: IssueCreate) -> Issue: ...
+    def create(self, data: IssueCreate) -> Issue: ...
 
     @abstractmethod
-    def list(
-        self,
-        config: IssueAdapterConfigBase,
-        filters: IssueListFilter | None = None,
-    ) -> list[Issue]: ...
+    def list(self, filters: IssueListFilter | None = None) -> list[Issue]: ...
 
     @abstractmethod
-    def get(self, config: IssueAdapterConfigBase, issue_id: int) -> Issue: ...
+    def get(self, issue_id: int) -> Issue: ...
 
     @abstractmethod
-    def update(
-        self,
-        config: IssueAdapterConfigBase,
-        issue_id: int,
-        data: IssueUpdate,
-    ) -> Issue: ...
+    def update(self, issue_id: int, data: IssueUpdate) -> Issue: ...
 
     @abstractmethod
-    def delete(self, config: IssueAdapterConfigBase, issue_id: int) -> None:
+    def delete(self, issue_id: int) -> None:
         """Remove the issue from the backend.
 
         GitHub does not support deleting issues — this closes the issue instead
@@ -65,6 +48,6 @@ class BaseIssueAdapter(ABC):
         ...
 
     @abstractmethod
-    def health_check(self, config: IssueAdapterConfigBase) -> bool:
+    def health_check(self) -> bool:
         """Return True if the backend is reachable. Must never raise."""
         ...

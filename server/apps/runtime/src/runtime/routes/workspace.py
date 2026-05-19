@@ -1,7 +1,13 @@
 from fastapi import APIRouter, Depends, WebSocket, WebSocketDisconnect, status
 
 from runtime.models.run import AgentStats
-from runtime.models.workspace import AgentSummary, ScaffoldWorkspaceBody, Workspace, WorkspaceCreate, WorkspaceDetail
+from runtime.models.workspace import (
+    AgentSummary,
+    ScaffoldWorkspaceBody,
+    Workspace,
+    WorkspaceCreate,
+    WorkspaceDetail,
+)
 from runtime.services import get_template_service, get_workspace_service
 from runtime.services.template_service import TemplateService
 from runtime.services.workspace_service import WorkspaceService

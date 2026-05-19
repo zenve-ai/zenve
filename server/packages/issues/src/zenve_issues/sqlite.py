@@ -2,14 +2,14 @@ from __future__ import annotations
 
 import json
 import sqlite3
+from collections.abc import Generator
 from contextlib import contextmanager
-from datetime import datetime, timezone
-from typing import ClassVar, Generator
+from datetime import UTC, datetime
+from typing import ClassVar
 
 from zenve_issues.base import BaseIssueAdapter
 from zenve_issues.models import (
     Issue,
-    IssueAdapterConfigBase,
     IssueCreate,
     IssueListFilter,
     IssueNotFoundError,
@@ -32,45 +32,45 @@ CREATE TABLE IF NOT EXISTS issues (
 
 
 def now_iso() -> str:
-    return datetime.now(timezone.utc).isoformat()
+    return datetime.now(UTC).isoformat()
 
 
 class SQLiteIssueAdapter(BaseIssueAdapter):
     adapter_type: ClassVar[str] = "sqlite"
 
-    def __init__(self) -> None:
+    def __init__(self, config: SQLiteIssueConfig) -> None:
+        super().__init__(config)
         # Cached connection for :memory: databases — sqlite3 creates a fresh DB
         # on every sqlite3.connect(":memory:") call, so we reuse one connection.
         self._mem_conn: sqlite3.Connection | None = None
 
     @classmethod
-    def get_default_config(cls) -> SQLiteIssueConfig:
-        return SQLiteIssueConfig(db_path=":memory:")
-
-    @classmethod
     def validate_config(cls, raw_config: dict) -> SQLiteIssueConfig:
         return SQLiteIssueConfig.model_validate(raw_config)
 
-    def create(self, config: IssueAdapterConfigBase, data: IssueCreate) -> Issue:
-        cfg = SQLiteIssueConfig.model_validate(config.model_dump())
+    def create(self, data: IssueCreate) -> Issue:
+        cfg: SQLiteIssueConfig = self.config  # type: ignore[assignment]
         ts = now_iso()
         with self._connect(cfg) as conn:
             self._ensure_schema(conn)
             cur = conn.execute(
                 "INSERT INTO issues (title, body, state, labels, assignees, created_at, updated_at)"
                 " VALUES (?, ?, 'open', ?, ?, ?, ?)",
-                (data.title, data.body, json.dumps(data.labels), json.dumps(data.assignees), ts, ts),
+                (
+                    data.title,
+                    data.body,
+                    json.dumps(data.labels),
+                    json.dumps(data.assignees),
+                    ts,
+                    ts,
+                ),
             )
             conn.commit()
             row = conn.execute("SELECT * FROM issues WHERE id = ?", (cur.lastrowid,)).fetchone()
         return self._row_to_issue(row)
 
-    def list(
-        self,
-        config: IssueAdapterConfigBase,
-        filters: IssueListFilter | None = None,
-    ) -> list[Issue]:
-        cfg = SQLiteIssueConfig.model_validate(config.model_dump())
+    def list(self, filters: IssueListFilter | None = None) -> list[Issue]:
+        cfg: SQLiteIssueConfig = self.config  # type: ignore[assignment]
         f = filters or IssueListFilter()
         with self._connect(cfg) as conn:
             self._ensure_schema(conn)
@@ -91,8 +91,8 @@ class SQLiteIssueAdapter(BaseIssueAdapter):
             rows = conn.execute(query, params).fetchall()
         return [self._row_to_issue(row) for row in rows]
 
-    def get(self, config: IssueAdapterConfigBase, issue_id: int) -> Issue:
-        cfg = SQLiteIssueConfig.model_validate(config.model_dump())
+    def get(self, issue_id: int) -> Issue:
+        cfg: SQLiteIssueConfig = self.config  # type: ignore[assignment]
         with self._connect(cfg) as conn:
             self._ensure_schema(conn)
             row = conn.execute("SELECT * FROM issues WHERE id = ?", (issue_id,)).fetchone()
@@ -100,16 +100,11 @@ class SQLiteIssueAdapter(BaseIssueAdapter):
             raise IssueNotFoundError(issue_id)
         return self._row_to_issue(row)
 
-    def update(
-        self,
-        config: IssueAdapterConfigBase,
-        issue_id: int,
-        data: IssueUpdate,
-    ) -> Issue:
-        cfg = SQLiteIssueConfig.model_validate(config.model_dump())
+    def update(self, issue_id: int, data: IssueUpdate) -> Issue:
+        cfg: SQLiteIssueConfig = self.config  # type: ignore[assignment]
         updates = data.model_dump(exclude_none=True)
         if not updates:
-            return self.get(config, issue_id)
+            return self.get(issue_id)
         if "labels" in updates:
             updates["labels"] = json.dumps(updates["labels"])
         if "assignees" in updates:
@@ -126,8 +121,8 @@ class SQLiteIssueAdapter(BaseIssueAdapter):
             row = conn.execute("SELECT * FROM issues WHERE id = ?", (issue_id,)).fetchone()
         return self._row_to_issue(row)
 
-    def delete(self, config: IssueAdapterConfigBase, issue_id: int) -> None:
-        cfg = SQLiteIssueConfig.model_validate(config.model_dump())
+    def delete(self, issue_id: int) -> None:
+        cfg: SQLiteIssueConfig = self.config  # type: ignore[assignment]
         with self._connect(cfg) as conn:
             self._ensure_schema(conn)
             cur = conn.execute("DELETE FROM issues WHERE id = ?", (issue_id,))
@@ -135,9 +130,9 @@ class SQLiteIssueAdapter(BaseIssueAdapter):
         if cur.rowcount == 0:
             raise IssueNotFoundError(issue_id)
 
-    def health_check(self, config: IssueAdapterConfigBase) -> bool:
+    def health_check(self) -> bool:
         try:
-            cfg = SQLiteIssueConfig.model_validate(config.model_dump())
+            cfg: SQLiteIssueConfig = self.config  # type: ignore[assignment]
             with self._connect(cfg) as conn:
                 self._ensure_schema(conn)
             return True
@@ -145,7 +140,7 @@ class SQLiteIssueAdapter(BaseIssueAdapter):
             return False
 
     @contextmanager
-    def _connect(self, cfg: SQLiteIssueConfig) -> Generator[sqlite3.Connection, None, None]:
+    def _connect(self, cfg: SQLiteIssueConfig) -> Generator[sqlite3.Connection]:
         if cfg.db_path == ":memory:":
             if self._mem_conn is None:
                 self._mem_conn = sqlite3.connect(":memory:")

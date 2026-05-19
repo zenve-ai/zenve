@@ -12,7 +12,13 @@ from pathlib import Path
 
 from runtime.models.errors import ConflictError, ExternalError, NotFoundError, ValidationError
 from runtime.models.run import AgentStats, WorkspaceRunDetail
-from runtime.models.workspace import AgentSummary, ScaffoldWorkspaceBody, Workspace, WorkspaceCreate, WorkspaceDetail
+from runtime.models.workspace import (
+    AgentSummary,
+    ScaffoldWorkspaceBody,
+    Workspace,
+    WorkspaceCreate,
+    WorkspaceDetail,
+)
 
 
 def git_remote_slug(repo_root: Path) -> str | None:

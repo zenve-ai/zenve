@@ -10,7 +10,6 @@ from zenve_issues.base import BaseIssueAdapter
 from zenve_issues.models import (
     GitHubIssueConfig,
     Issue,
-    IssueAdapterConfigBase,
     IssueAdapterError,
     IssueCreate,
     IssueListFilter,
@@ -58,16 +57,15 @@ def resolve_token(config: GitHubIssueConfig) -> str:
 class GitHubIssueAdapter(BaseIssueAdapter):
     adapter_type: ClassVar[str] = "github"
 
-    @classmethod
-    def get_default_config(cls) -> GitHubIssueConfig:
-        return GitHubIssueConfig(repo="")
+    def __init__(self, config: GitHubIssueConfig) -> None:
+        super().__init__(config)
 
     @classmethod
     def validate_config(cls, raw_config: dict) -> GitHubIssueConfig:
         return GitHubIssueConfig.model_validate(raw_config)
 
-    def create(self, config: IssueAdapterConfigBase, data: IssueCreate) -> Issue:
-        cfg = GitHubIssueConfig.model_validate(config.model_dump())
+    def create(self, data: IssueCreate) -> Issue:
+        cfg: GitHubIssueConfig = self.config  # type: ignore[assignment]
         token = resolve_token(cfg)
         payload: dict = {"title": data.title, "body": data.body}
         if data.labels:
@@ -78,12 +76,8 @@ class GitHubIssueAdapter(BaseIssueAdapter):
             raw = self._request(client, "POST", f"/repos/{cfg.repo}/issues", json=payload)
         return self._raw_to_issue(raw)
 
-    def list(
-        self,
-        config: IssueAdapterConfigBase,
-        filters: IssueListFilter | None = None,
-    ) -> list[Issue]:
-        cfg = GitHubIssueConfig.model_validate(config.model_dump())
+    def list(self, filters: IssueListFilter | None = None) -> list[Issue]:
+        cfg: GitHubIssueConfig = self.config  # type: ignore[assignment]
         token = resolve_token(cfg)
         f = filters or IssueListFilter()
         params: dict = {"state": f.state, "per_page": 100, "page": 1}
@@ -107,8 +101,8 @@ class GitHubIssueAdapter(BaseIssueAdapter):
                 params["page"] += 1
         return issues
 
-    def get(self, config: IssueAdapterConfigBase, issue_id: int) -> Issue:
-        cfg = GitHubIssueConfig.model_validate(config.model_dump())
+    def get(self, issue_id: int) -> Issue:
+        cfg: GitHubIssueConfig = self.config  # type: ignore[assignment]
         token = resolve_token(cfg)
         with self._client(cfg, token) as client:
             try:
@@ -119,25 +113,20 @@ class GitHubIssueAdapter(BaseIssueAdapter):
                 raise IssueAdapterError(str(e)) from e
         return self._raw_to_issue(raw)
 
-    def update(
-        self,
-        config: IssueAdapterConfigBase,
-        issue_id: int,
-        data: IssueUpdate,
-    ) -> Issue:
-        cfg = GitHubIssueConfig.model_validate(config.model_dump())
+    def update(self, issue_id: int, data: IssueUpdate) -> Issue:
+        cfg: GitHubIssueConfig = self.config  # type: ignore[assignment]
         token = resolve_token(cfg)
         payload = data.model_dump(exclude_none=True)
         with self._client(cfg, token) as client:
             raw = self._request(client, "PATCH", f"/repos/{cfg.repo}/issues/{issue_id}", json=payload)
         return self._raw_to_issue(raw)
 
-    def delete(self, config: IssueAdapterConfigBase, issue_id: int) -> None:
-        self.update(config, issue_id, IssueUpdate(state="closed"))
+    def delete(self, issue_id: int) -> None:
+        self.update(issue_id, IssueUpdate(state="closed"))
 
-    def health_check(self, config: IssueAdapterConfigBase) -> bool:
+    def health_check(self) -> bool:
         try:
-            cfg = GitHubIssueConfig.model_validate(config.model_dump())
+            cfg: GitHubIssueConfig = self.config  # type: ignore[assignment]
             token = resolve_token(cfg)
             with self._client(cfg, token) as client:
                 self._request(client, "GET", "/user")
