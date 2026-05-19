@@ -18,6 +18,7 @@ from runtime.models.errors import (
 )
 from runtime.routes import (
     core_router,
+    issue_router,
     run_router,
     skill_router,
     snapshot_router,
@@ -88,6 +89,7 @@ app.include_router(core_router)
 app.include_router(workspace_router)
 app.include_router(run_router)
 app.include_router(snapshot_router)
+app.include_router(issue_router)
 app.include_router(template_router)
 app.include_router(skill_router)
 
