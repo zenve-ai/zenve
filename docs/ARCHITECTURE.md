@@ -99,6 +99,51 @@ Scheduling is **owned by the runtime daemon**, not the CLI or TUI.
 - The CLI `status` command reads schedule state from the runtime; it does not drive it
 - The current in-process cron loop in the TUI (`tui.py`) is **technical debt** to be migrated
 
+## Issues Adapter
+
+Issue tracking is pluggable via `zenve-issues`. PR/branch/worktree operations always go through GitHub — only the issues layer is swappable.
+
+### Configuration
+
+**Runtime-level default** — applies to all workspaces unless overridden:
+
+`~/.zenve/config.json`:
+```json
+{ "issues_adapter": "sqlite" }
+```
+
+Or via env var (takes priority over the file):
+```
+ZENVE_ISSUES_ADAPTER=sqlite
+```
+
+**Per-workspace override** — set in the workspace's `.zenve/settings.json`:
+```json
+{
+  "issues": { "adapter": "github" }
+}
+```
+`null` / absent means inherit the runtime default.
+
+### Adapters
+
+| Adapter | DB location | Notes |
+|---------|-------------|-------|
+| `github` (default) | GitHub REST API | Requires `ZENVE_GH_TOKEN` or `gh auth login` |
+| `sqlite` | `{workspace}/.zenve/issues.db` | Path is automatic — no extra config needed |
+
+Each workspace always gets its own isolated SQLite file — there is no shared database across workspaces.
+
+### Resolution order
+
+```
+workspace .zenve/settings.json  →  ~/.zenve/config.json  →  env var  →  "github"
+```
+
+### Where the factory lives
+
+`build_issues_adapter(adapter_type, workspace_path, github_token, repo)` in `zenve_engine.api`. The runtime services (`SnapshotService`, `RunTriggerService`) resolve the effective adapter type, then call the factory before passing the adapter into `zenve_engine.snapshot()` / `zenve_engine.run()`.
+
 ## Runtime Files
 
 The daemon writes to `~/.zenve/` on the host machine:
@@ -107,6 +152,7 @@ The daemon writes to `~/.zenve/` on the host machine:
 |------|-----------|---------|
 | `~/.zenve/runtime.pid` | runtime lifespan startup / shutdown | PID for `zenve server stop` |
 | `~/.zenve/runtime.log` | runtime `logging.basicConfig` file handler | Persistent log, always written regardless of start method |
+| `~/.zenve/config.json` | user / operator | Runtime configuration — issues adapter default, future settings |
 
 ## Current Status
 

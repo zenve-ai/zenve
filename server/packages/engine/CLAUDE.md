@@ -7,7 +7,7 @@ The engine is the **read+write owner of `.zenve/` at runtime**. The CLI's `init`
 ## Public API
 
 ```python
-from zenve_engine import run, snapshot, RunReport, RunResultFile, Snapshot
+from zenve_engine import run, snapshot, build_issues_adapter, RunReport, RunResultFile, Snapshot
 
 run(
     project_dir: Path,
@@ -21,6 +21,8 @@ run(
     env_vars: dict[str, str] | None = None,
     on_event: Callable[[dict], None] | None = None,
     registry: AdapterRegistry | None = None,
+    issues_adapter: BaseIssueAdapter | None = None,   # explicit override (tests / custom callers)
+    issues_adapter_type: str = "github",              # passed by the runtime; falls back to ProjectSettings
 ) -> RunReport
 
 snapshot(
@@ -29,10 +31,28 @@ snapshot(
     run_id: str,
     github_token: str,
     repo: str,
+    issues_adapter: BaseIssueAdapter | None = None,
+    issues_adapter_type: str = "github",
 ) -> Snapshot
+
+build_issues_adapter(
+    adapter_type: str,       # "github" | "sqlite"
+    workspace_path: Path,    # used for sqlite DB path: {workspace}/.zenve/issues.db
+    github_token: str,
+    repo: str,
+) -> BaseIssueAdapter
 ```
 
-`run()` does: **preflight** (clean working tree outside `.zenve/`, clean `.zenve/` unless `auto_commit_zenve=True`, `origin/<default_branch>` exists after fetch) → load settings → discover agents → snapshot GitHub → reconcile claims → run all agents in parallel → commit `.zenve/agents/` → emit `RUN_COMPLETED`.
+`run()` does: **preflight** (clean working tree outside `.zenve/`, clean `.zenve/` unless `auto_commit_zenve=True`, `origin/<default_branch>` exists after fetch) → load settings → **resolve issues adapter** → discover agents → snapshot → reconcile claims → run all agents in parallel → commit `.zenve/agents/` → emit `RUN_COMPLETED`.
+
+### Issues adapter resolution (inside `run()` / `snapshot()`)
+
+```
+issues_adapter param (explicit)
+  → ProjectSettings.issues.adapter  (.zenve/settings.json)
+    → issues_adapter_type param     (passed by the runtime from ~/.zenve/config.json)
+      → "github"                    (hard default)
+```
 
 Preflight raises `DirtyTreeError` or `MissingRemoteBranchError` from `zenve_engine.errors` before any side effects. Reason the dirty check matters: a successful `artifact_pr` merge runs `git reset --hard origin/<branch>` in the parent repo, which would silently wipe uncommitted work; and `commit_agents` at the end would otherwise bundle unrelated edits into the auto-commit.
 
@@ -44,9 +64,9 @@ Preflight raises `DirtyTreeError` or `MissingRemoteBranchError` from `zenve_engi
 |---|---|
 | `git` CLI on PATH | worktree create/remove, commit, push, fetch |
 | `gh` CLI on PATH | PR create/merge in `artifact_pr` / `code_pr` / `review_pr` modes |
-| `httpx` + `GITHUB_TOKEN` | snapshot reads + label transitions via REST |
+| `httpx` + `GITHUB_TOKEN` | PR/branch ops via GitHub REST; issues go through `zenve_issues` |
 | `zenve_adapters` | `AdapterRegistry`, `BaseAdapter` — actual subprocess that runs an agent |
-| `zenve_models` | `RunContext`, `RunResult` — adapter input/output shape |
+| `zenve_issues` | Pluggable issue tracker — `github` and `sqlite` adapters built-in |
 
 ## Structure
 
