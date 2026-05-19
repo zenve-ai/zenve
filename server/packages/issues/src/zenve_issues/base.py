@@ -4,6 +4,9 @@ from abc import ABC, abstractmethod
 from typing import ClassVar
 
 from zenve_issues.models import (
+    Comment,
+    CommentCreate,
+    CommentUpdate,
     Issue,
     IssueAdapterConfigBase,
     IssueCreate,
@@ -51,3 +54,18 @@ class BaseIssueAdapter(ABC):
     def health_check(self) -> bool:
         """Return True if the backend is reachable. Must never raise."""
         ...
+
+    @abstractmethod
+    def add_comment(self, issue_id: int, data: CommentCreate) -> Comment: ...
+
+    @abstractmethod
+    def list_comments(self, issue_id: int) -> list[Comment]: ...
+
+    @abstractmethod
+    def get_comment(self, comment_id: int) -> Comment: ...
+
+    @abstractmethod
+    def update_comment(self, comment_id: int, data: CommentUpdate) -> Comment: ...
+
+    @abstractmethod
+    def delete_comment(self, comment_id: int) -> None: ...

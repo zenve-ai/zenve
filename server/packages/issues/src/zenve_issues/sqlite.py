@@ -9,6 +9,10 @@ from typing import ClassVar
 
 from zenve_issues.base import BaseIssueAdapter
 from zenve_issues.models import (
+    Comment,
+    CommentCreate,
+    CommentNotFoundError,
+    CommentUpdate,
     Issue,
     IssueCreate,
     IssueListFilter,
@@ -25,6 +29,17 @@ CREATE TABLE IF NOT EXISTS issues (
     state      TEXT NOT NULL DEFAULT 'open',
     labels     TEXT NOT NULL DEFAULT '[]',
     assignees  TEXT NOT NULL DEFAULT '[]',
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+)
+"""
+
+CREATE_COMMENTS_TABLE = """
+CREATE TABLE IF NOT EXISTS comments (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    issue_id   INTEGER NOT NULL REFERENCES issues(id),
+    body       TEXT NOT NULL DEFAULT '',
+    author     TEXT NOT NULL DEFAULT '',
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL
 )
@@ -156,6 +171,79 @@ class SQLiteIssueAdapter(BaseIssueAdapter):
 
     def _ensure_schema(self, conn: sqlite3.Connection) -> None:
         conn.execute(CREATE_TABLE)
+        conn.execute(CREATE_COMMENTS_TABLE)
+
+    def _row_to_comment(self, row: sqlite3.Row) -> Comment:
+        return Comment(
+            id=row["id"],
+            issue_id=row["issue_id"],
+            body=row["body"],
+            author=row["author"],
+            created_at=row["created_at"],
+            updated_at=row["updated_at"],
+        )
+
+    def add_comment(self, issue_id: int, data: CommentCreate) -> Comment:
+        cfg: SQLiteIssueConfig = self.config  # type: ignore[assignment]
+        ts = now_iso()
+        with self._connect(cfg) as conn:
+            self._ensure_schema(conn)
+            exists = conn.execute("SELECT id FROM issues WHERE id = ?", (issue_id,)).fetchone()
+            if exists is None:
+                raise IssueNotFoundError(issue_id)
+            cur = conn.execute(
+                "INSERT INTO comments (issue_id, body, author, created_at, updated_at)"
+                " VALUES (?, ?, '', ?, ?)",
+                (issue_id, data.body, ts, ts),
+            )
+            conn.commit()
+            row = conn.execute("SELECT * FROM comments WHERE id = ?", (cur.lastrowid,)).fetchone()
+        return self._row_to_comment(row)
+
+    def list_comments(self, issue_id: int) -> list[Comment]:
+        cfg: SQLiteIssueConfig = self.config  # type: ignore[assignment]
+        with self._connect(cfg) as conn:
+            self._ensure_schema(conn)
+            rows = conn.execute(
+                "SELECT * FROM comments WHERE issue_id = ? ORDER BY id",
+                (issue_id,),
+            ).fetchall()
+        return [self._row_to_comment(row) for row in rows]
+
+    def get_comment(self, comment_id: int) -> Comment:
+        cfg: SQLiteIssueConfig = self.config  # type: ignore[assignment]
+        with self._connect(cfg) as conn:
+            self._ensure_schema(conn)
+            row = conn.execute("SELECT * FROM comments WHERE id = ?", (comment_id,)).fetchone()
+        if row is None:
+            raise CommentNotFoundError(comment_id)
+        return self._row_to_comment(row)
+
+    def update_comment(self, comment_id: int, data: CommentUpdate) -> Comment:
+        cfg: SQLiteIssueConfig = self.config  # type: ignore[assignment]
+        updates = data.model_dump(exclude_none=True)
+        if not updates:
+            return self.get_comment(comment_id)
+        updates["updated_at"] = now_iso()
+        set_clause = ", ".join(f"{k} = ?" for k in updates)
+        values = list(updates.values()) + [comment_id]
+        with self._connect(cfg) as conn:
+            self._ensure_schema(conn)
+            cur = conn.execute(f"UPDATE comments SET {set_clause} WHERE id = ?", values)
+            conn.commit()
+            if cur.rowcount == 0:
+                raise CommentNotFoundError(comment_id)
+            row = conn.execute("SELECT * FROM comments WHERE id = ?", (comment_id,)).fetchone()
+        return self._row_to_comment(row)
+
+    def delete_comment(self, comment_id: int) -> None:
+        cfg: SQLiteIssueConfig = self.config  # type: ignore[assignment]
+        with self._connect(cfg) as conn:
+            self._ensure_schema(conn)
+            cur = conn.execute("DELETE FROM comments WHERE id = ?", (comment_id,))
+            conn.commit()
+        if cur.rowcount == 0:
+            raise CommentNotFoundError(comment_id)
 
     def _row_to_issue(self, row: sqlite3.Row) -> Issue:
         return Issue(

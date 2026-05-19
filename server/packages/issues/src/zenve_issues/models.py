@@ -45,6 +45,25 @@ class IssueUpdate(BaseModel):
     assignees: list[str] | None = None
 
 
+class Comment(BaseModel):
+    model_config = {"extra": "ignore"}
+
+    id: int
+    issue_id: int
+    body: str
+    author: str = ""
+    created_at: str = ""
+    updated_at: str = ""
+
+
+class CommentCreate(BaseModel):
+    body: str
+
+
+class CommentUpdate(BaseModel):
+    body: str | None = None
+
+
 class IssueListFilter(BaseModel):
     state: str = "open"
     labels: list[str] = Field(default_factory=list)
@@ -55,6 +74,11 @@ class IssueListFilter(BaseModel):
 class IssueNotFoundError(RuntimeError):
     def __init__(self, issue_id: int) -> None:
         super().__init__(f"Issue not found: {issue_id}")
+
+
+class CommentNotFoundError(RuntimeError):
+    def __init__(self, comment_id: int) -> None:
+        super().__init__(f"Comment not found: {comment_id}")
 
 
 class IssueAdapterError(RuntimeError):

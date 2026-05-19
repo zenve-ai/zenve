@@ -1,6 +1,10 @@
 from .base import BaseIssueAdapter
 from .github import GitHubIssueAdapter
 from .models import (
+    Comment,
+    CommentCreate,
+    CommentNotFoundError,
+    CommentUpdate,
     GitHubIssueConfig,
     Issue,
     IssueAdapterConfigBase,
@@ -16,6 +20,10 @@ from .sqlite import SQLiteIssueAdapter
 
 __all__ = [
     "BaseIssueAdapter",
+    "Comment",
+    "CommentCreate",
+    "CommentNotFoundError",
+    "CommentUpdate",
     "GitHubIssueAdapter",
     "GitHubIssueConfig",
     "Issue",
