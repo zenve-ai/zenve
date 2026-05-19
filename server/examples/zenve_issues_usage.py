@@ -9,11 +9,9 @@ Usage (from server/):
     uv run python examples/zenve_issues_usage.py
 """
 
-import os
-
 from zenve_issues import (
-    GitHubIssueAdapter,
-    GitHubIssueConfig,
+    CommentCreate,
+    CommentUpdate,
     IssueAdapterRegistry,
     IssueCreate,
     IssueListFilter,
@@ -23,7 +21,7 @@ from zenve_issues import (
 )
 
 registry = IssueAdapterRegistry()
-registry.add(SQLiteIssueAdapter(SQLiteIssueConfig(db_path=":memory:")))
+registry.add(SQLiteIssueAdapter(SQLiteIssueConfig(db_path="./test.db")))
 
 # --- SQLite: full CRUD against an in-memory database ---
 print("=== SQLite ===")
@@ -35,14 +33,34 @@ print(f"Created:  #{issue.id} — {issue.title}")
 issues = adapter.list(IssueListFilter(state="open"))
 print(f"Listed:   {len(issues)} open issue(s)")
 
+for i in issues:
+    print(f"  #{i.id} — {i.title}")
+
+
 fetched = adapter.get(issue.id)
 print(f"Fetched:  #{fetched.id} state={fetched.state}")
 
 updated = adapter.update(issue.id, IssueUpdate(title="Updated title"))
 print(f"Updated:  #{updated.id} — {updated.title}")
 
-adapter.delete(issue.id)
-print("Deleted.  SQLite CRUD complete.")
+# --- Comments ---
+comment = adapter.add_comment(issue.id, CommentCreate(body="First comment"))
+print(f"Comment:  #{comment.id} on issue #{comment.issue_id} — {comment.body!r}")
+
+comments = adapter.list_comments(issue.id)
+print(f"Listed:   {len(comments)} comment(s) on issue #{issue.id}")
+
+fetched_comment = adapter.get_comment(comment.id)
+print(f"Fetched:  comment #{fetched_comment.id} — {fetched_comment.body!r}")
+
+# updated_comment = adapter.update_comment(comment.id, CommentUpdate(body="Updated comment"))
+# print(f"Updated:  comment #{updated_comment.id} — {updated_comment.body!r}")
+
+# adapter.delete_comment(comment.id)
+# print(f"Deleted:  comment #{comment.id}")
+
+# adapter.delete(issue.id)
+# print("Deleted.  SQLite CRUD complete.")
 
 # --- GitHub: same interface, different backend ---
 # print("\n=== GitHub ===")
