@@ -1,5 +1,5 @@
 import os
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from fastapi import APIRouter, Request
 from pydantic import BaseModel
@@ -41,7 +41,7 @@ def healthz():
 @router.get("/api/v1/runtime/info", response_model=RuntimeInfo)
 def get_runtime_info(request: Request) -> RuntimeInfo:
     started_at: datetime = request.app.state.started_at
-    uptime = (datetime.now(timezone.utc) - started_at).total_seconds()
+    uptime = (datetime.now(UTC) - started_at).total_seconds()
     return RuntimeInfo(
         version=VERSION,
         status="running",

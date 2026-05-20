@@ -8,40 +8,33 @@ from zenve_engine.config import zenve_dir
 from zenve_engine.constants import SNAPSHOT_FILE
 from zenve_engine.github.client import GitHubClient
 from zenve_engine.models.snapshot import Snapshot, SnapshotComment, SnapshotIssue, SnapshotPR
-
-
-def label_names(labels: list[dict]) -> list[str]:
-    return [lbl.get("name", "") for lbl in labels if isinstance(lbl, dict)]
+from zenve_issues import BaseIssueAdapter, IssueListFilter
 
 
 def assignee_logins(assignees: list[dict]) -> list[str]:
     return [a.get("login", "") for a in assignees if isinstance(a, dict)]
 
 
-def build_snapshot(client: GitHubClient, run_id: str) -> Snapshot:
-    issues_raw = client.list_open_issues()
-    pulls_raw = client.list_open_pulls()
-    branches = client.list_branches()
+def build_snapshot(issues_adapter: BaseIssueAdapter, gh: GitHubClient, run_id: str) -> Snapshot:
+    issues_raw = issues_adapter.list(IssueListFilter(state="open"))
+    pulls_raw = gh.list_open_pulls()
+    branches = gh.list_branches()
 
     issues = [
         SnapshotIssue(
-            number=raw.get("number", 0),
-            title=raw.get("title", ""),
-            body=raw.get("body") or "",
-            labels=label_names(raw.get("labels", [])),
-            assignees=assignee_logins(raw.get("assignees", [])),
-            state=raw.get("state", "open"),
-            created_at=raw.get("created_at", "") or "",
+            number=issue.id,
+            title=issue.title,
+            body=issue.body,
+            labels=issue.labels,
+            assignees=issue.assignees,
+            state=issue.state,
+            created_at=issue.created_at,
             comments=[
-                SnapshotComment(
-                    author=c["user"]["login"],
-                    body=c["body"],
-                    created_at=c["created_at"],
-                )
-                for c in client.get_comments(raw["number"])
+                SnapshotComment(author=c.author, body=c.body, created_at=c.created_at)
+                for c in issues_adapter.list_comments(issue.id)
             ],
         )
-        for raw in issues_raw
+        for issue in issues_raw
     ]
 
     pulls = [
@@ -49,7 +42,7 @@ def build_snapshot(client: GitHubClient, run_id: str) -> Snapshot:
             number=raw.get("number", 0),
             title=raw.get("title", ""),
             body=raw.get("body") or "",
-            labels=label_names(raw.get("labels", [])),
+            labels=[lbl.get("name", "") for lbl in raw.get("labels", []) if isinstance(lbl, dict)],
             assignees=assignee_logins(raw.get("assignees", [])),
             state=raw.get("state", "open"),
             head=(raw.get("head") or {}).get("ref", ""),
@@ -62,7 +55,7 @@ def build_snapshot(client: GitHubClient, run_id: str) -> Snapshot:
                     body=c["body"],
                     created_at=c["created_at"],
                 )
-                for c in client.get_comments(raw["number"])
+                for c in gh.get_comments(raw["number"])
             ],
         )
         for raw in pulls_raw

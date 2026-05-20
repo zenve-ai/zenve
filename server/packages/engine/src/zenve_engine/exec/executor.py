@@ -38,6 +38,7 @@ from zenve_engine.models.run_result import (
 from zenve_engine.models.settings import AgentSettings, ProjectSettings
 from zenve_engine.models.snapshot import Snapshot, SnapshotIssue, SnapshotPR
 from zenve_engine.pipeline import next_label, prev_labels
+from zenve_issues import BaseIssueAdapter, CommentCreate, IssueUpdate
 
 logger = logging.getLogger(__name__)
 
@@ -208,6 +209,7 @@ def now_iso() -> str:
 
 
 def apply_pipeline_transition(
+    issues_adapter: BaseIssueAdapter,
     gh: GitHubClient,
     project: ProjectSettings,
     agent: DiscoveredAgent,
@@ -217,7 +219,7 @@ def apply_pipeline_transition(
 ) -> PipelineTransition | None:
     to_label = next_label(project.pipeline, agent.settings.github_label)
     if created_pr_number is not None:
-        transition(gh, item.number, agent.settings.github_label, None)
+        transition(issues_adapter, item.number, item.labels, agent.settings.github_label, None)
         if to_label is not None:
             try:
                 gh.add_labels(created_pr_number, [to_label])
@@ -225,7 +227,7 @@ def apply_pipeline_transition(
                 pass
         target_number = created_pr_number
     else:
-        transition(gh, item.number, agent.settings.github_label, to_label)
+        transition(issues_adapter, item.number, item.labels, agent.settings.github_label, to_label)
         target_number = item.number
     emitter.emit(
         et.PIPELINE_END if to_label is None else et.PIPELINE_TRANSITION,
@@ -243,16 +245,16 @@ def apply_pipeline_transition(
 
 
 def reconcile_claims(
-    gh: GitHubClient,
+    issues_adapter: BaseIssueAdapter,
     snapshot: Snapshot,
     repo_root: Path,
 ) -> None:
     """Clean up expired and orphaned claims before agents run.
 
-    For each stale claim (expired TTL or present on GitHub but absent from
-    claims.json), removes zenve:claimed from GitHub, removes from claims.json,
-    and strips the label from the in-memory snapshot so pick_unclaimed sees
-    the item as free.
+    For each stale claim (expired TTL or present in the issue tracker but absent
+    from claims.json), removes zenve:claimed via the adapter, removes from
+    claims.json, and strips the label from the in-memory snapshot so
+    pick_unclaimed sees the item as free.
     """
     stale = expired_claims(repo_root)
     stale_numbers = {c.number for c in stale}
@@ -273,14 +275,15 @@ def reconcile_claims(
         return
 
     for number in to_release:
-        unclaim_item(gh, number)
-        remove_claim(repo_root, number)
         for issue in snapshot.issues:
             if issue.number == number:
+                unclaim_item(issues_adapter, number, issue.labels)
                 issue.labels = [lbl for lbl in issue.labels if lbl != CLAIMED_LABEL]
         for pr in snapshot.pull_requests:
             if pr.number == number:
+                unclaim_item(issues_adapter, number, pr.labels)
                 pr.labels = [lbl for lbl in pr.labels if lbl != CLAIMED_LABEL]
+        remove_claim(repo_root, number)
 
 
 def extract_failed_reason(outcome: str) -> str | None:
@@ -392,6 +395,7 @@ def handle_worktree_pr(
 
 
 def handle_github_post_run(
+    issues_adapter: BaseIssueAdapter,
     gh: GitHubClient,
     item: PlannedItem,
     agent: DiscoveredAgent,
@@ -406,16 +410,17 @@ def handle_github_post_run(
     pipeline_transition: PipelineTransition | None = None
     if status == "completed":
         pipeline_transition = apply_pipeline_transition(
-            gh, project, agent, item, emitter, created_pr_number=created_pr_number
+            issues_adapter, gh, project, agent, item, emitter, created_pr_number=created_pr_number
         )
     elif status == "changes_requested":
         back_labels = prev_labels(project.pipeline, agent.settings.github_label)
-        unclaim_item(gh, item.number)
-        transition(gh, item.number, agent.settings.github_label, None)
+        unclaim_item(issues_adapter, item.number, item.labels)
+        transition(issues_adapter, item.number, item.labels, agent.settings.github_label, None)
         if back_labels:
             try:
-                gh.add_labels(item.number, back_labels)
-            except GitHubError:
+                new_labels = [lbl for lbl in item.labels if lbl not in {CLAIMED_LABEL, agent.settings.github_label, FAILED_LABEL, NEEDS_INPUT_LABEL}] + back_labels
+                issues_adapter.update(item.number, IssueUpdate(labels=new_labels))
+            except Exception:
                 pass
         emitter.emit(
             et.PIPELINE_TRANSITION,
@@ -431,16 +436,18 @@ def handle_github_post_run(
             to_label=back_labels or None,
         )
     elif status == "needs_input":
-        unclaim_item(gh, item.number)
+        unclaim_item(issues_adapter, item.number, item.labels)
         try:
-            gh.add_labels(item.number, [NEEDS_INPUT_LABEL])
-        except GitHubError:
+            new_labels = [lbl for lbl in item.labels if lbl != CLAIMED_LABEL] + [NEEDS_INPUT_LABEL]
+            issues_adapter.update(item.number, IssueUpdate(labels=new_labels))
+        except Exception:
             pass
     else:
-        unclaim_item(gh, item.number)
+        unclaim_item(issues_adapter, item.number, item.labels)
         try:
-            gh.add_labels(item.number, [FAILED_LABEL])
-        except GitHubError:
+            new_labels = [lbl for lbl in item.labels if lbl != CLAIMED_LABEL] + [FAILED_LABEL]
+            issues_adapter.update(item.number, IssueUpdate(labels=new_labels))
+        except Exception:
             pass
 
     if status == "completed":
@@ -452,8 +459,8 @@ def handle_github_post_run(
     else:
         comment_body = f"Run failed\n\n{error_text}" if error_text else "Run failed"
     try:
-        gh.post_comment(item.number, comment_body)
-    except GitHubError:
+        issues_adapter.add_comment(item.number, CommentCreate(body=comment_body))
+    except Exception:
         pass
     remove_claim(repo_root, item.number)
     return pipeline_transition
@@ -526,6 +533,7 @@ async def run_agent(
     repo_root: Path,
     run_id: str,
     registry: AdapterRegistry,
+    issues_adapter: BaseIssueAdapter,
     gh: GitHubClient,
     emitter: EventEmitter,
     env_vars: dict[str, str],
@@ -575,7 +583,7 @@ async def run_agent(
             return None
 
     if item is not None:
-        claimed = claim_item(gh, item.number)
+        claimed = claim_item(issues_adapter, item.number, item.labels)
         if not claimed:
             emitter.emit(
                 et.AGENT_NOTHING_TO_DO,
@@ -620,7 +628,7 @@ async def run_agent(
                 create_worktree(repo_root, worktree_path, worktree_branch, project.default_branch)
         except GitError as exc:
             emitter.emit(et.AGENT_FAILED, agent=agent.name, data={"error": str(exc)})
-            unclaim_item(gh, item.number)
+            unclaim_item(issues_adapter, item.number, item.labels)
             remove_claim(repo_root, item.number)
             worktree_path = None
             run_result = RunResultFile(
@@ -679,11 +687,11 @@ async def run_agent(
             data={"error": str(exc)},
         )
         if item is not None:
-            unclaim_item(gh, item.number)
+            unclaim_item(issues_adapter, item.number, item.labels)
             remove_claim(repo_root, item.number)
             try:
-                gh.post_comment(item.number, f"Run failed\n\n{exc!s}")
-            except GitHubError:
+                issues_adapter.add_comment(item.number, CommentCreate(body=f"Run failed\n\n{exc!s}"))
+            except Exception:
                 pass
         run_result = RunResultFile(
             run_id=run_id,
@@ -745,7 +753,7 @@ async def run_agent(
     pipeline_transition: PipelineTransition | None = None
     if item is not None:
         pipeline_transition = handle_github_post_run(
-            gh, item, agent, project, status, result.outcome, error_text, emitter, repo_root,
+            issues_adapter, gh, item, agent, project, status, result.outcome, error_text, emitter, repo_root,
             created_pr_number=created_pr_number,
         )
 

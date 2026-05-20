@@ -11,6 +11,7 @@ from zenve_engine.github.client import GitHubClient
 from zenve_engine.models.run_result import RunResultFile
 from zenve_engine.models.settings import ProjectSettings
 from zenve_engine.models.snapshot import Snapshot
+from zenve_issues import BaseIssueAdapter
 
 
 async def run_all(
@@ -20,6 +21,7 @@ async def run_all(
     repo_root: Path,
     run_id: str,
     registry: AdapterRegistry,
+    issues_adapter: BaseIssueAdapter,
     gh: GitHubClient,
     emitter: EventEmitter,
     env_vars: dict[str, str],
@@ -34,6 +36,7 @@ async def run_all(
             repo_root=repo_root,
             run_id=run_id,
             registry=registry,
+            issues_adapter=issues_adapter,
             gh=gh,
             emitter=emitter,
             env_vars=env_vars,

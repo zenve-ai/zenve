@@ -12,6 +12,7 @@ src/runtime/
 ├── lifespan.py              # constructs all services, stashes on app.state
 ├── run_store.py             # in-memory run state + SSE broadcast
 ├── models/
+│   ├── config.py            # RuntimeConfig — loads ~/.zenve/config.json + env vars
 │   ├── errors.py            # ZenveError + domain exceptions
 │   ├── workspace.py         # Workspace, WorkspaceCreate, WorkspaceDetail
 │   ├── run.py               # WorkspaceRunSummary, WorkspaceRunDetail, RunItem, TokenUsage, PipelineTransition
@@ -20,9 +21,9 @@ src/runtime/
 │   ├── __init__.py          # get_*_service dependency factories
 │   ├── workspace_service.py
 │   ├── run_service.py
-│   ├── run_trigger_service.py
+│   ├── run_trigger_service.py  # issues_adapter_type resolved here; passed to zenve_engine.run()
 │   ├── scheduler_service.py
-│   └── snapshot_service.py  # SnapshotService.take() — calls zenve_engine.snapshot()
+│   └── snapshot_service.py     # issues_adapter_type resolved here; passed to zenve_engine.snapshot()
 └── routes/
     ├── core.py              # GET / and /healthz
     ├── workspace.py         # /api/v1/workspaces
@@ -84,6 +85,30 @@ The runtime is a **reader** of the format the CLI writes. See [`apps/cli/CLAUDE.
 - `<path>/.zenve/agents/{slug}/runs/{run_id}.json` (`RunResultFile` shape) → `WorkspaceRunSummary` / `WorkspaceRunDetail`
 
 The runtime DTOs are intentionally decoupled from `zenve_cli` Python code — the JSON format is the contract.
+
+## Runtime Configuration
+
+`RuntimeConfig` is loaded at lifespan startup from `~/.zenve/config.json`, with env vars taking priority.
+
+```json
+// ~/.zenve/config.json
+{
+  "issues_adapter": "sqlite"
+}
+```
+
+| Setting | Env var override | Default | Description |
+|---------|-----------------|---------|-------------|
+| `issues_adapter` | `ZENVE_ISSUES_ADAPTER` | `"github"` | Default issues backend for all workspaces |
+
+### Issues adapter resolution
+
+The runtime resolves the effective adapter type per-workspace before calling the engine:
+
+1. `{workspace}/.zenve/settings.json` → `issues.adapter` (workspace override)
+2. `RuntimeConfig.issues_adapter` (runtime default)
+
+For `sqlite`, the DB is always at `{workspace}/.zenve/issues.db` — one file per workspace, no shared state.
 
 ## Dev Commands
 

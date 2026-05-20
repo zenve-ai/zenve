@@ -23,7 +23,7 @@ from zenve_adapters.claude_code import ClaudeCodeAdapter
 from zenve_adapters.open_code import OpenCodeAdapter
 from zenve_engine.config import load_project_settings
 from zenve_engine.discovery import DiscoveredAgent, discover_agents
-from zenve_engine.errors import DirtyTreeError, MissingRemoteBranchError
+from zenve_engine.errors import DirtyTreeError, EngineError, MissingRemoteBranchError
 from zenve_engine.events import types as et
 from zenve_engine.events.emitter import EventEmitter
 from zenve_engine.exec.executor import reconcile_claims
@@ -41,6 +41,9 @@ from zenve_engine.github.client import GitHubClient
 from zenve_engine.github.snapshot import build_snapshot, write_snapshot
 from zenve_engine.models.run_result import RunResultFile
 from zenve_engine.models.snapshot import Snapshot
+from zenve_issues import BaseIssueAdapter, SQLiteIssueAdapter
+from zenve_issues.github import GitHubIssueAdapter
+from zenve_issues.models import GitHubIssueConfig, SQLiteIssueConfig
 
 
 @dataclass
@@ -50,6 +53,25 @@ class RunReport:
     results: list[RunResultFile] = field(default_factory=list)
     committed: bool = False
     summary: str = ""
+
+
+def build_issues_adapter(
+    adapter_type: str,
+    workspace_path: Path,
+    github_token: str,
+    repo: str,
+) -> BaseIssueAdapter:
+    """Build an issues adapter from an adapter type string.
+
+    - "sqlite": DB at `{workspace_path}/.zenve/issues.db` — no extra config needed.
+    - "github" (default): uses `github_token` and `repo`.
+    """
+    if adapter_type == "sqlite":
+        db_path = workspace_path / ".zenve" / "issues.db"
+        return SQLiteIssueAdapter(SQLiteIssueConfig(db_path=str(db_path)))
+    if adapter_type == "github":
+        return GitHubIssueAdapter(GitHubIssueConfig(token=github_token, repo=repo))
+    raise EngineError(f"Unknown issues adapter type: {adapter_type!r}")
 
 
 def build_default_registry() -> AdapterRegistry:
@@ -65,10 +87,15 @@ def snapshot(
     run_id: str,
     github_token: str,
     repo: str,
+    issues_adapter: BaseIssueAdapter | None = None,
+    issues_adapter_type: str = "github",
 ) -> Snapshot:
-    """Fetch a GitHub snapshot and write it to `.zenve/snapshot.json`."""
+    """Fetch issues snapshot and write it to `.zenve/snapshot.json`."""
+    project = load_project_settings(project_dir)
+    effective_type = project.issues.adapter or issues_adapter_type
+    adapter = issues_adapter or build_issues_adapter(effective_type, project_dir, github_token, repo)
     with GitHubClient(github_token, repo) as gh:
-        snap = build_snapshot(gh, run_id)
+        snap = build_snapshot(adapter, gh, run_id)
     write_snapshot(project_dir, snap)
     return snap
 
@@ -86,6 +113,8 @@ def run(
     on_event: Callable[[dict], None] | None = None,
     registry: AdapterRegistry | None = None,
     auto_commit_zenve: bool = False,
+    issues_adapter: BaseIssueAdapter | None = None,
+    issues_adapter_type: str = "github",
 ) -> RunReport:
     """Execute a full live run against `project_dir`.
 
@@ -153,9 +182,11 @@ def run(
         base_env = {**env_vars, **base_env}
 
     reg = registry or build_default_registry()
+    effective_type = project.issues.adapter or issues_adapter_type
+    adapter = issues_adapter or build_issues_adapter(effective_type, project_dir, github_token, repo)
 
     with GitHubClient(github_token, repo) as gh:
-        snap = build_snapshot(gh, run_id)
+        snap = build_snapshot(adapter, gh, run_id)
         write_snapshot(project_dir, snap)
         emitter.emit(
             et.SNAPSHOT_FETCHED,
@@ -166,7 +197,7 @@ def run(
             },
         )
 
-        reconcile_claims(gh, snap, project_dir)
+        reconcile_claims(adapter, snap, project_dir)
 
         results = asyncio.run(
             run_all(
@@ -176,6 +207,7 @@ def run(
                 repo_root=project_dir,
                 run_id=run_id,
                 registry=reg,
+                issues_adapter=adapter,
                 gh=gh,
                 emitter=emitter,
                 env_vars=base_env,
