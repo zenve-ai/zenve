@@ -5,6 +5,7 @@ import { agentsApi } from './agents'
 import { runsApi, runsReducer } from './runs'
 import { wsReducer } from './ws'
 import { runtimeApi } from './runtime'
+import { issuesApi } from './issues'
 
 export const store = configureStore({
   reducer: {
@@ -17,6 +18,7 @@ export const store = configureStore({
     [agentsApi.reducerPath]: agentsApi.reducer,
     [runsApi.reducerPath]: runsApi.reducer,
     [runtimeApi.reducerPath]: runtimeApi.reducer,
+    [issuesApi.reducerPath]: issuesApi.reducer,
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware().concat(
@@ -25,6 +27,7 @@ export const store = configureStore({
       agentsApi.middleware,
       runsApi.middleware,
       runtimeApi.middleware,
+      issuesApi.middleware,
     ),
 })
 

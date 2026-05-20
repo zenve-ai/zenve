@@ -177,3 +177,23 @@ export interface AdapterItem {
   healthy: boolean
   defaultModel: string
 }
+
+export interface Issue {
+  id: number
+  title: string
+  body: string | null
+  state: 'open' | 'closed'
+  labels: string[]
+  assignees: string[]
+  createdAt: string
+  updatedAt: string
+}
+
+export interface IssueComment {
+  id: number
+  issueId: number
+  body: string
+  author: string
+  createdAt: string
+  updatedAt: string
+}

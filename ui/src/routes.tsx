@@ -3,6 +3,8 @@ import AgentDetail from './pages/agent-detail'
 import AgentsList from './pages/agents-list'
 import Dashboard from './pages/dashboard'
 import RuntimesPage from './pages/runtimes'
+import IssuesList from './pages/issues-list'
+import IssueDetail from './pages/issue-detail'
 import AuthOAuthCallback from './pages/github-auth-callback'
 import Login from './pages/login'
 import NoWorkspacePage from './pages/no-workspace'
@@ -35,6 +37,8 @@ export default function AppRoutes() {
         <Route path="agents" element={<AgentsList />} />
         <Route path="agents/:agentSlug" element={<AgentDetail />} />
         <Route path="runtime" element={<RuntimesPage />} />
+        <Route path="issues" element={<IssuesList />} />
+        <Route path="issues/:issueId" element={<IssueDetail />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
