@@ -140,3 +140,7 @@ class IssueService:
             adapter.delete_comment(comment_id)
         except CommentNotFoundError:
             raise NotFoundError(f"Comment #{comment_id} not found")
+
+    def list_labels(self, workspace_id: str) -> list[str]:
+        adapter = self.get_adapter(workspace_id)
+        return adapter.list_labels()

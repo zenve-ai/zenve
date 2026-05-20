@@ -244,6 +244,21 @@ class GitHubIssueAdapter(BaseIssueAdapter):
                     raise CommentNotFoundError(comment_id) from e
                 raise IssueAdapterError(str(e)) from e
 
+    def list_labels(self) -> list[str]:
+        cfg: GitHubIssueConfig = self.config  # type: ignore[assignment]
+        token = resolve_token(cfg)
+        params: dict = {"per_page": 100, "page": 1}
+        labels: list[str] = []
+        with self._client(cfg, token) as client:
+            while True:
+                raw_list = self._request(client, "GET", f"/repos/{cfg.repo}/labels", params=params)
+                for raw in raw_list:
+                    labels.append(raw["name"])
+                if len(raw_list) < 100:
+                    break
+                params["page"] += 1
+        return labels
+
     def _raw_to_issue(self, raw: dict) -> Issue:
         return Issue(
             id=raw["number"],

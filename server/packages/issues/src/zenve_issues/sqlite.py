@@ -245,6 +245,15 @@ class SQLiteIssueAdapter(BaseIssueAdapter):
         if cur.rowcount == 0:
             raise CommentNotFoundError(comment_id)
 
+    def list_labels(self) -> list[str]:
+        cfg: SQLiteIssueConfig = self.config  # type: ignore[assignment]
+        with self._connect(cfg) as conn:
+            self._ensure_schema(conn)
+            rows = conn.execute(
+                "SELECT DISTINCT value FROM issues, json_each(issues.labels) ORDER BY value"
+            ).fetchall()
+        return [row[0] for row in rows]
+
     def _row_to_issue(self, row: sqlite3.Row) -> Issue:
         return Issue(
             id=row["id"],

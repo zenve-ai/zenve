@@ -7,6 +7,7 @@ import { LabelsEditor } from './labels-editor'
 import type { Issue } from '@/types'
 
 interface Props {
+  workspaceId: string
   issue: Issue
   onToggleState: () => void
   onUpdateLabels: (labels: string[]) => void
@@ -55,7 +56,7 @@ function PropRow({ label, children }: { label: string; children: React.ReactNode
   )
 }
 
-export function IssueMetaPanel({ issue, onToggleState, onUpdateLabels, isUpdating }: Props) {
+export function IssueMetaPanel({ workspaceId, issue, onToggleState, onUpdateLabels, isUpdating }: Props) {
   return (
     <div className="flex flex-col text-sm">
       <Section label="Properties">
@@ -94,6 +95,7 @@ export function IssueMetaPanel({ issue, onToggleState, onUpdateLabels, isUpdatin
 
         <PropRow label="Labels">
           <LabelsEditor
+            workspaceId={workspaceId}
             labels={issue.labels}
             onUpdate={onUpdateLabels}
             disabled={isUpdating}

@@ -33,6 +33,14 @@ def create_issue(
     return service.create_issue(workspace_id, body)
 
 
+@router.get("/labels", response_model=list[str])
+def list_labels(
+    workspace_id: str,
+    service: IssueService = Depends(get_issue_service),
+):
+    return service.list_labels(workspace_id)
+
+
 @router.get("/{issue_id}", response_model=IssueResponse)
 def get_issue(
     workspace_id: str,

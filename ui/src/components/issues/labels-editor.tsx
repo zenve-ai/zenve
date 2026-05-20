@@ -2,23 +2,28 @@ import { useRef, useState } from 'react'
 import { Check, Plus, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { useListLabelsQuery } from '@/store/issues'
 
 interface Props {
+  workspaceId: string
   labels: string[]
   onUpdate: (labels: string[]) => void
   disabled?: boolean
 }
 
-export function LabelsEditor({ labels, onUpdate, disabled }: Props) {
+export function LabelsEditor({ workspaceId, labels, onUpdate, disabled }: Props) {
   const [open, setOpen] = useState(false)
   const [input, setInput] = useState('')
   const inputRef = useRef<HTMLInputElement>(null)
 
+  const { data: availableLabels = [] } = useListLabelsQuery({ workspaceId }, { skip: !open })
+
+  const allKnown = Array.from(new Set([...availableLabels, ...labels])).sort()
   const filtered = input.trim()
-    ? labels.filter((l) => l.toLowerCase().includes(input.toLowerCase()))
-    : labels
+    ? allKnown.filter((l) => l.toLowerCase().includes(input.toLowerCase()))
+    : allKnown
   const inputVal = input.trim()
-  const canCreate = inputVal.length > 0 && !labels.some((l) => l.toLowerCase() === inputVal.toLowerCase())
+  const canCreate = inputVal.length > 0 && !allKnown.some((l) => l.toLowerCase() === inputVal.toLowerCase())
 
   const toggle = (label: string) => {
     if (labels.includes(label)) {

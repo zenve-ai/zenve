@@ -69,3 +69,6 @@ class BaseIssueAdapter(ABC):
 
     @abstractmethod
     def delete_comment(self, comment_id: int) -> None: ...
+
+    @abstractmethod
+    def list_labels(self) -> list[str]: ...

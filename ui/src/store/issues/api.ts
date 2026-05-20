@@ -50,8 +50,12 @@ function toComment(r: CommentResponse): IssueComment {
 export const issuesApi = createApi({
   reducerPath: 'issuesApi',
   baseQuery: createRuntimeBaseQuery(config.runtimeUrl),
-  tagTypes: ['Issue', 'IssueComment'],
+  tagTypes: ['Issue', 'IssueComment', 'IssueLabel'],
   endpoints: (builder) => ({
+    listLabels: builder.query<string[], { workspaceId: string }>({
+      query: ({ workspaceId }) => `/workspaces/${workspaceId}/issues/labels`,
+      providesTags: ['IssueLabel'],
+    }),
     listIssues: builder.query<Issue[], { workspaceId: string; state?: string; limit?: number }>({
       query: ({ workspaceId, state = 'open', limit }) => ({
         url: `/workspaces/${workspaceId}/issues`,
@@ -75,7 +79,7 @@ export const issuesApi = createApi({
         body,
       }),
       transformResponse: (r: IssueResponse) => toIssue(r),
-      invalidatesTags: ['Issue'],
+      invalidatesTags: ['Issue', 'IssueLabel'],
     }),
     updateIssue: builder.mutation<
       Issue,
@@ -91,7 +95,7 @@ export const issuesApi = createApi({
         body,
       }),
       transformResponse: (r: IssueResponse) => toIssue(r),
-      invalidatesTags: (_r, _e, { issueId }) => [{ type: 'Issue', id: issueId }, 'Issue'],
+      invalidatesTags: (_r, _e, { issueId }) => [{ type: 'Issue', id: issueId }, 'Issue', 'IssueLabel'],
     }),
     deleteIssue: builder.mutation<void, { workspaceId: string; issueId: number }>({
       query: ({ workspaceId, issueId }) => ({
@@ -137,6 +141,7 @@ export const issuesApi = createApi({
 })
 
 export const {
+  useListLabelsQuery,
   useListIssuesQuery,
   useGetIssueQuery,
   useCreateIssueMutation,

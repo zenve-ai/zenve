@@ -1,5 +1,6 @@
 export { issuesApi } from './api'
 export {
+  useListLabelsQuery,
   useListIssuesQuery,
   useGetIssueQuery,
   useCreateIssueMutation,

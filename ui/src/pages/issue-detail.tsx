@@ -157,7 +157,7 @@ export default function IssueDetail() {
 
         {/* Right column — meta panel */}
         <div className="w-64 shrink-0 border-l border-border/60">
-          <IssueMetaPanel issue={issue} onToggleState={handleToggleState} onUpdateLabels={handleUpdateLabels} isUpdating={isUpdating} />
+          <IssueMetaPanel workspaceId={workspaceId!} issue={issue} onToggleState={handleToggleState} onUpdateLabels={handleUpdateLabels} isUpdating={isUpdating} />
         </div>
       </div>
     )
