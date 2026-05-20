@@ -32,6 +32,7 @@ jobs:
           rm -rf dist
           uv build --package zenve-adapters
           uv build --package zenve-engine
+          uv build --package zenve-issues
           uv build --package zenve-runtime
           uv build --package zenve-cli
           ls -lh dist/
