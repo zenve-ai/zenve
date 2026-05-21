@@ -12,6 +12,7 @@ interface IssueResponse {
   assignees: string[]
   created_at: string
   updated_at: string
+  url: string | null
 }
 
 interface CommentResponse {
@@ -33,6 +34,7 @@ function toIssue(r: IssueResponse): Issue {
     assignees: r.assignees,
     createdAt: r.created_at,
     updatedAt: r.updated_at,
+    url: r.url,
   }
 }
 

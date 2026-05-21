@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { ChevronDown } from 'lucide-react'
+import { ChevronDown, ExternalLink } from 'lucide-react'
 import { cn, relativeTime } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { IssueStateBadge } from './issue-state-badge'
@@ -50,7 +50,7 @@ function Section({
 function PropRow({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="flex items-start gap-3 px-4 py-1.5 hover:bg-muted/10">
-      <span className="w-20 shrink-0 pt-0.5 font-mono text-[11px] text-muted-foreground/50">{label}</span>
+      <span className="w-20 shrink-0 pt-0.5 font-mono text-[11px] text-muted-foreground">{label}</span>
       <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1">{children}</div>
     </div>
   )
@@ -77,7 +77,7 @@ export function IssueMetaPanel({ workspaceId, issue, onToggleState, onUpdateLabe
 
         <PropRow label="Assignees">
           {issue.assignees.length === 0 ? (
-            <span className="font-mono text-[11px] text-muted-foreground/30">No assignees</span>
+            <span className="font-mono text-[11px] text-muted-foreground/60">No assignees</span>
           ) : (
             issue.assignees.map((a) => (
               <div key={a} className="flex items-center gap-1.5">
@@ -87,7 +87,7 @@ export function IssueMetaPanel({ workspaceId, issue, onToggleState, onUpdateLabe
                 >
                   {initials(a)}
                 </span>
-                <span className="text-[12px]">{a}</span>
+                <span className="text-[12px] text-foreground">{a}</span>
               </div>
             ))
           )}
@@ -102,6 +102,20 @@ export function IssueMetaPanel({ workspaceId, issue, onToggleState, onUpdateLabe
           />
         </PropRow>
       </Section>
+
+      {issue.url && (
+        <div className="border-b border-border/60 px-4 py-2">
+          <a
+            href={issue.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-1.5 font-mono text-[11px] text-muted-foreground hover:text-foreground"
+          >
+            <ExternalLink className="size-3 shrink-0" />
+            View on GitHub
+          </a>
+        </div>
+      )}
 
       <Section label="Details">
         <PropRow label="Created">

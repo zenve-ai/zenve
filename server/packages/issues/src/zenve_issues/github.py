@@ -269,4 +269,5 @@ class GitHubIssueAdapter(BaseIssueAdapter):
             assignees=[a["login"] for a in raw.get("assignees", [])],
             created_at=raw.get("created_at", ""),
             updated_at=raw.get("updated_at", ""),
+            url=raw.get("html_url"),
         )

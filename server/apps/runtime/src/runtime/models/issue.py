@@ -12,6 +12,7 @@ class IssueResponse(BaseModel):
     assignees: list[str] = Field(default_factory=list)
     created_at: str = ""
     updated_at: str = ""
+    url: str | None = None
 
 
 class IssueCreateRequest(BaseModel):

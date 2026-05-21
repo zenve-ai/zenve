@@ -37,6 +37,7 @@ def issue_to_response(issue) -> IssueResponse:
         assignees=issue.assignees,
         created_at=issue.created_at,
         updated_at=issue.updated_at,
+        url=issue.url,
     )
 
 

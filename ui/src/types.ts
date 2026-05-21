@@ -187,6 +187,7 @@ export interface Issue {
   assignees: string[]
   createdAt: string
   updatedAt: string
+  url: string | null
 }
 
 export interface IssueComment {
