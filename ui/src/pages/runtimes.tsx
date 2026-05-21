@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Cpu, Loader2, Search, Server, Wifi, WifiOff } from 'lucide-react'
+import { Loader2, Search, Server, Wifi, WifiOff } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { useGetRuntimeInfoQuery, useListAdaptersQuery } from '@/store/runtime'
@@ -43,7 +43,7 @@ export default function RuntimesPage() {
   const offlineCount = adapters.filter((a) => !a.healthy).length
 
   const renderDaemonCard = (info: RuntimeInfo) => (
-    <div className="border border-dashed border-border/60 bg-muted/10 mx-4 mt-4">
+    <div className="border-b border-dashed border-border/60 bg-muted/10">
       <div className="flex items-center justify-between px-4 py-2.5">
         <div className="flex items-center gap-3">
           <Server className="size-4 text-muted-foreground" />
@@ -89,7 +89,7 @@ export default function RuntimesPage() {
       key={value}
       onClick={() => setHealthFilter(value)}
       className={cn(
-        'flex items-center gap-1.5 px-2 py-0.5 font-mono text-[10px] font-bold tracking-widest border',
+        'flex items-center gap-1.5 px-2.5 py-1 text-[12px] border transition-colors',
         healthFilter === value
           ? 'border-border bg-muted text-foreground'
           : 'border-transparent text-muted-foreground/60 hover:text-muted-foreground',
@@ -97,94 +97,65 @@ export default function RuntimesPage() {
     >
       {value === 'online' && <span className="size-1.5 rounded-full bg-emerald-500" />}
       {value === 'offline' && <span className="size-1.5 rounded-full bg-red-500" />}
-      {label} {count}
+      {label}
+      <span className={cn(
+        'font-mono text-[10px]',
+        healthFilter === value ? 'text-muted-foreground' : 'text-muted-foreground/40',
+      )}>
+        {count}
+      </span>
     </button>
   )
 
   const renderAdapterRow = (adapter: AdapterItem) => (
-    <tr key={adapter.type} className="border-b border-dashed border-border/40 hover:bg-muted/20">
-      <td className="px-4 py-2.5">
-        <div className="flex flex-col">
-          <span className="text-sm font-medium">{adapter.name}</span>
-          <span className="font-mono text-[10px] text-muted-foreground/60">{adapter.type}</span>
-        </div>
-      </td>
-      <td className="px-4 py-2.5">
-        <div className="flex items-center gap-1.5">
-          {adapter.healthy ? (
-            <>
-              <Wifi className="size-3 text-emerald-500" />
-              <span className="font-mono text-[10px] font-bold tracking-widest text-emerald-600">
-                Online
-              </span>
-            </>
-          ) : (
-            <>
-              <WifiOff className="size-3 text-red-500" />
-              <span className="font-mono text-[10px] font-bold tracking-widest text-red-600">
-                Offline
-              </span>
-            </>
-          )}
-        </div>
-      </td>
-      <td className="px-4 py-2.5">
-        <span className="font-mono text-[11px] text-muted-foreground">
-          {adapter.defaultModel || '—'}
-        </span>
-      </td>
-    </tr>
+    <div
+      key={adapter.type}
+      className="flex items-center gap-3 border border-border/60 px-4 py-2.5 transition-colors hover:bg-muted/20"
+    >
+      {/* Name — flex-1 */}
+      <div className="flex min-w-0 flex-1 flex-col">
+        <span className="text-[13px] font-semibold leading-none">{adapter.name}</span>
+        <span className="font-mono text-[10px] text-muted-foreground/50 mt-0.5 leading-none">{adapter.type}</span>
+      </div>
+
+      {/* Health — w-24 */}
+      <div className="flex w-24 shrink-0 items-center gap-1.5">
+        {adapter.healthy ? (
+          <>
+            <Wifi className="size-3 text-emerald-500" />
+            <span className="text-[12px] text-emerald-600 dark:text-emerald-400">Online</span>
+          </>
+        ) : (
+          <>
+            <WifiOff className="size-3 text-red-500" />
+            <span className="text-[12px] text-red-600 dark:text-red-400">Offline</span>
+          </>
+        )}
+      </div>
+
+      {/* Default model — w-64 */}
+      <div className="w-64 shrink-0">
+        <span className="font-mono text-[11px] text-muted-foreground">{adapter.defaultModel || '—'}</span>
+      </div>
+    </div>
   )
 
   const renderTable = () => (
-    <div className="mx-4 mt-3 border border-dashed border-border/60">
-      <div className="flex items-center justify-between border-b border-dashed border-border/40 px-3 py-2 bg-muted/10">
-        <div className="flex items-center gap-2">
-          <div className="relative">
-            <Search className="absolute left-2 top-1/2 -translate-y-1/2 size-3 text-muted-foreground/60" />
-            <Input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search adapters..."
-              className="h-6 rounded-none border-border/60 pl-6 text-xs w-40 bg-background"
-            />
-          </div>
-          <div className="flex items-center">
-            {renderFilterChip('All', 'all', adapters.length)}
-            {renderFilterChip('Online', 'online', onlineCount)}
-            {renderFilterChip('Offline', 'offline', offlineCount)}
-          </div>
-        </div>
+    <div className="flex flex-col gap-1.5 p-4">
+      {/* Header card */}
+      <div className="flex items-center gap-3 border border-border/40 bg-muted/20 px-4 py-1.5">
+        <div className="flex-1 font-mono text-[10px] font-bold tracking-widest text-muted-foreground/50">ADAPTER</div>
+        <div className="w-24 shrink-0 font-mono text-[10px] font-bold tracking-widest text-muted-foreground/50">HEALTH</div>
+        <div className="w-64 shrink-0 font-mono text-[10px] font-bold tracking-widest text-muted-foreground/50">DEFAULT MODEL</div>
       </div>
 
-      <table className="w-full">
-        <thead>
-          <tr className="border-b border-dashed border-border/40 bg-muted/20">
-            <th className="px-4 py-1.5 text-left font-mono text-[10px] font-bold tracking-widest text-muted-foreground/60">
-              ADAPTER
-            </th>
-            <th className="px-4 py-1.5 text-left font-mono text-[10px] font-bold tracking-widest text-muted-foreground/60">
-              HEALTH
-            </th>
-            <th className="px-4 py-1.5 text-left font-mono text-[10px] font-bold tracking-widest text-muted-foreground/60">
-              DEFAULT MODEL
-            </th>
-          </tr>
-        </thead>
-        <tbody>
-          {filteredAdapters.length === 0 ? (
-            <tr>
-              <td colSpan={3} className="px-4 py-6 text-center">
-                <span className="font-mono text-[10px] text-muted-foreground/60">
-                  NO ADAPTERS MATCH
-                </span>
-              </td>
-            </tr>
-          ) : (
-            filteredAdapters.map(renderAdapterRow)
-          )}
-        </tbody>
-      </table>
+      {filteredAdapters.length === 0 ? (
+        <div className="py-8 text-center">
+          <span className="font-mono text-[10px] text-muted-foreground/50">NO ADAPTERS MATCH</span>
+        </div>
+      ) : (
+        filteredAdapters.map(renderAdapterRow)
+      )}
     </div>
   )
 
@@ -194,13 +165,13 @@ export default function RuntimesPage() {
         <div className="flex flex-1 flex-col items-center justify-center gap-2">
           <Loader2 className="size-4 animate-spin text-muted-foreground" />
           <span className="font-mono text-[10px] font-bold tracking-widest text-muted-foreground/60">
-            LOADING...
+            LOADING…
           </span>
         </div>
       )
     }
     return (
-      <div className="flex min-h-0 flex-1 flex-col pb-4">
+      <div className="flex min-h-0 flex-1 flex-col">
         {info && renderDaemonCard(info)}
         {renderTable()}
       </div>
@@ -211,7 +182,6 @@ export default function RuntimesPage() {
     <div className="flex min-w-0 flex-1 flex-col">
       <div className="flex items-center justify-between border-b border-dashed border-border/60 px-4 py-1 bg-muted/20">
         <div className="flex items-center gap-2.5">
-          <Cpu className="size-4 text-muted-foreground" />
           <h1 className="text-lg font-semibold tracking-tight">Runtime</h1>
           {!isLoading && (
             <span className="font-mono text-[10px] font-bold tracking-widest text-muted-foreground/60">
@@ -220,6 +190,26 @@ export default function RuntimesPage() {
           )}
         </div>
       </div>
+
+      {!isLoading && (
+        <div className="flex items-center gap-2 border-b border-border/40 px-4 py-1.5">
+          <div className="relative">
+            <Search className="absolute left-2 top-1/2 -translate-y-1/2 size-3 text-muted-foreground/50" />
+            <Input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search adapters..."
+              className="h-6 rounded-none border-border/60 pl-6 text-xs w-44 bg-background"
+            />
+          </div>
+          <div className="h-3.5 w-px bg-border/60" />
+          <div className="flex items-center">
+            {renderFilterChip('All', 'all', adapters.length)}
+            {renderFilterChip('Online', 'online', onlineCount)}
+            {renderFilterChip('Offline', 'offline', offlineCount)}
+          </div>
+        </div>
+      )}
 
       {renderMain()}
     </div>
