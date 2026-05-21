@@ -67,7 +67,7 @@ export default function IssueDetail() {
   const renderLoading = () => (
     <div className="flex flex-1 items-center justify-center gap-2">
       <Loader2 className="size-4 animate-spin text-muted-foreground" />
-      <span className="font-mono text-[10px] font-bold tracking-widest text-muted-foreground/60">LOADING...</span>
+      <span className="font-mono text-[10px] font-bold tracking-widest text-muted-foreground/60">LOADING…</span>
     </div>
   )
 
@@ -82,7 +82,7 @@ export default function IssueDetail() {
       {commentsLoading ? (
         <div className="flex items-center gap-2">
           <Loader2 className="size-3 animate-spin text-muted-foreground" />
-          <span className="font-mono text-[10px] text-muted-foreground/60">LOADING...</span>
+          <span className="font-mono text-[10px] text-muted-foreground/60">LOADING…</span>
         </div>
       ) : (
         comments.map((c) => <CommentItem key={c.id} comment={c} />)
@@ -92,7 +92,7 @@ export default function IssueDetail() {
         <textarea
           value={commentBody}
           onChange={(e) => setCommentBody(e.target.value)}
-          placeholder="Leave a comment..."
+          placeholder="Leave a comment…"
           rows={3}
           className="w-full resize-none border border-border/60 bg-transparent px-3 py-2 text-sm placeholder:text-muted-foreground/40 focus:border-border focus:outline-none"
         />
@@ -134,7 +134,7 @@ export default function IssueDetail() {
           </div>
 
           {/* Body */}
-          <div className="border-b border-border/60 px-4 py-4">
+          <div className="border-b border-border/60 p-4">
             {issue.body ? (
               <p className="whitespace-pre-wrap text-sm leading-relaxed">{issue.body}</p>
             ) : (
@@ -156,7 +156,7 @@ export default function IssueDetail() {
         </div>
 
         {/* Right column — meta panel */}
-        <div className="w-64 shrink-0 border-l border-border/60">
+        <div className="w-64 xl:w-80 2xl:w-96 shrink-0 border-l border-border/60">
           <IssueMetaPanel workspaceId={workspaceId!} issue={issue} onToggleState={handleToggleState} onUpdateLabels={handleUpdateLabels} isUpdating={isUpdating} />
         </div>
       </div>

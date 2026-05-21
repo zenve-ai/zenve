@@ -44,7 +44,7 @@ export default function AuthOAuthCallback() {
           <AlertTriangle className="size-4 text-red-400" />
           <p className="text-sm font-mono font-medium text-red-400">Authentication failed</p>
         </div>
-        <p className="px-4 py-4 text-[13px] font-mono text-muted-foreground">
+        <p className="p-4 text-[13px] font-mono text-muted-foreground">
           {!token
             ? <>No token was returned from GitHub.</>
             : <>Could not verify your account.</>
@@ -58,7 +58,7 @@ export default function AuthOAuthCallback() {
   const renderLoading = () => (
     <div className="flex min-h-screen items-center justify-center bg-background p-8">
       <div className="w-full max-w-md border border-dashed border-border/60">
-        <div className="flex items-center gap-3 px-4 py-4">
+        <div className="flex items-center gap-3 p-4">
           <Loader2 className="size-4 animate-spin text-muted-foreground/50" />
           <p className="text-[13px] font-mono text-muted-foreground">Signing you in…</p>
         </div>

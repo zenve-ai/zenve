@@ -23,7 +23,7 @@ export function OnboardingStepIndicator({ currentStep }: OnboardingStepIndicator
           const active = index === currentStep
           return (
             <TabsTrigger
-              key={index}
+              key={step.label}
               value={index.toString()}
               disabled
               className={cn(

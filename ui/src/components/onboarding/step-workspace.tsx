@@ -45,7 +45,6 @@ export function StepWorkspace({
             value={name}
             onChange={(e) => onNameChange(e.target.value)}
             aria-invalid={!!nameError}
-            autoFocus
           />
           {nameError && <FieldError>{nameError}</FieldError>}
         </Field>

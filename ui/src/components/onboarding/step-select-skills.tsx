@@ -36,7 +36,7 @@ export function StepSelectSkills({ skills, isLoading, selectedSkills, onToggle }
     if (isLoading) {
       return (
         <p className="font-mono text-[10px] tracking-widest uppercase text-muted-foreground/40">
-          Loading skills...
+          Loading skills…
         </p>
       )
     }

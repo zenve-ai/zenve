@@ -85,6 +85,7 @@ export function LabelsEditor({ workspaceId, labels, onUpdate, disabled }: Props)
         align="end"
         sideOffset={6}
         className="w-56 rounded-none border border-border p-0 shadow-md"
+        onOpenAutoFocus={(e) => { e.preventDefault(); inputRef.current?.focus() }}
       >
         {/* Search / create input */}
         <div className="border-b border-border px-3 py-2">
@@ -97,7 +98,6 @@ export function LabelsEditor({ workspaceId, labels, onUpdate, disabled }: Props)
               if (e.key === 'Escape') setOpen(false)
             }}
             placeholder="Search or create…"
-            autoFocus
             className="w-full bg-transparent font-mono text-[11px] placeholder:text-muted-foreground/40 focus:outline-none"
           />
         </div>

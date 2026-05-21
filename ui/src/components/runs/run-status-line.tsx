@@ -24,7 +24,7 @@ export function RunStatusLine({ line }: { line: StatusLine }) {
         return <span className="text-red-500">✗ failed  {err.slice(0, 120)}</span>
       }
       case 'agent.nothing_to_do':
-        return <span className="text-slate-400">— nothing to do</span>
+        return <span className="text-slate-400">nothing to do</span>
 
       case 'agent.started':
         return <span className="text-slate-500">● started</span>

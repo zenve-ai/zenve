@@ -67,12 +67,12 @@ export function LoginForm({
               <Field>
                 <div className="flex items-center">
                   <FieldLabel htmlFor="password">Password</FieldLabel>
-                  <a
-                    href="#"
+                  <button
+                    type="button"
                     className="ml-auto text-sm underline-offset-4 hover:underline"
                   >
                     Forgot your password?
-                  </a>
+                  </button>
                 </div>
                 <Input
                   id="password"
@@ -88,7 +88,7 @@ export function LoginForm({
                   {isLoading ? "Signing in..." : "Login"}
                 </Button>
                 <FieldDescription className="text-center">
-                  Don&apos;t have an account? <a href="#">Sign up</a>
+                  Don&apos;t have an account? <button type="button" className="underline-offset-4 hover:underline">Sign up</button>
                 </FieldDescription>
               </Field>
             </FieldGroup>
@@ -96,8 +96,8 @@ export function LoginForm({
         </CardContent>
       </Card>
       <FieldDescription className="px-6 text-center">
-        By clicking continue, you agree to our <a href="#">Terms of Service</a>{" "}
-        and <a href="#">Privacy Policy</a>.
+        By clicking continue, you agree to our <button type="button" className="underline-offset-4 hover:underline">Terms of Service</button>{" "}
+        and <button type="button" className="underline-offset-4 hover:underline">Privacy Policy</button>.
       </FieldDescription>
     </div>
   )

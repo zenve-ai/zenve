@@ -37,7 +37,7 @@ export function StepSelectAgents({ templates, isLoading, selectedAgents, onToggl
     if (isLoading) {
       return (
         <p className="font-mono text-[10px] tracking-widest uppercase text-muted-foreground/40">
-          Loading templates...
+          Loading templates…
         </p>
       )
     }

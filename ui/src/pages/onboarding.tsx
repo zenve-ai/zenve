@@ -188,7 +188,7 @@ export default function OnboardingPage() {
         <OnboardingStepIndicator currentStep={currentStep} />
       </div>
 
-      <div className="flex-1 overflow-y-auto px-8 py-8">
+      <div className="flex-1 overflow-y-auto p-8">
         {renderStep()}
       </div>
 

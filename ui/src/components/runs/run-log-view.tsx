@@ -56,7 +56,7 @@ export function RunLogView({ workspaceId, runId, isActive, agentFilter }: RunLog
       const { scrollTop, scrollHeight, clientHeight } = container
       isAtBottomRef.current = scrollHeight - scrollTop - clientHeight < 40
     }
-    container.addEventListener('scroll', onScroll)
+    container.addEventListener('scroll', onScroll, { passive: true })
     return () => container.removeEventListener('scroll', onScroll)
   }, [])
 

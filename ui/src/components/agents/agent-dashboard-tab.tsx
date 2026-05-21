@@ -228,15 +228,15 @@ export function AgentDashboardTab({
         }
       />
       {isLoading ? (
-        <div className="flex items-center gap-2 px-3 py-3">
+        <div className="flex items-center gap-2 p-3">
           <Loader2 className="size-3 animate-spin text-muted-foreground" />
-          <span className="font-mono text-[10px] tracking-widest text-muted-foreground">LOADING...</span>
+          <span className="font-mono text-[10px] tracking-widest text-muted-foreground">LOADING…</span>
         </div>
       ) : runs.length === 0 ? (
-        <p className="px-3 py-3 font-mono text-[11px] text-muted-foreground">No runs yet.</p>
+        <p className="p-3 font-mono text-[11px] text-muted-foreground">No runs yet.</p>
       ) : (
         <ul className="divide-y divide-border/60">
-          {[...runs].sort((a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime()).slice(0, 5).map((run) => (
+          {runs.toSorted((a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime()).slice(0, 5).map((run) => (
             <li key={run.runId}>
               <RunRow run={run} onViewDetails={() => openSheet(run.runId)} />
             </li>
@@ -316,8 +316,7 @@ export function AgentDashboardTab({
         }
       />
       <ul className="divide-y divide-border/60">
-        {[...MOCK_ISSUE_ROWS]
-          .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+        {MOCK_ISSUE_ROWS.toSorted((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
           .map((row) => (
             <li key={row.id} className="flex items-start gap-3 px-3 py-2">
               <span className="shrink-0 font-mono text-[10px] text-muted-foreground">{row.id}</span>
