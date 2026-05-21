@@ -1,4 +1,5 @@
 export { AgentCard } from './agent-card'
+export { AgentRow } from './agent-row'
 export { AgentIcon, assignIconKey, getAgentLucideIcon } from './agent-icon'
 export { AgentDetailHeader } from './agent-detail-header'
 export { AgentDashboardBarChartCard } from './agent-dashboard-bar-chart-card'
