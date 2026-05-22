@@ -13,6 +13,7 @@ from runtime.services.issue_service import IssueService
 from runtime.services.run_service import RunService
 from runtime.services.run_trigger_service import RunTriggerService
 from runtime.services.scheduler_service import SchedulerService
+from runtime.services.settings_service import SettingsService
 from runtime.services.snapshot_service import SnapshotService
 from runtime.services.template_service import TemplateService
 from runtime.services.workspace_service import WorkspaceService
@@ -36,6 +37,7 @@ async def lifespan(app: FastAPI):
     loop = asyncio.get_event_loop()
     ws_manager = WsManager(loop)
     run_store = RunStore()
+    settings_service = SettingsService()
     workspace_service = WorkspaceService()
     run_service = RunService(workspace_service)
     trigger_service = RunTriggerService(workspace_service, run_store, ws_manager, config.issues_adapter)
@@ -45,6 +47,7 @@ async def lifespan(app: FastAPI):
     template_service = TemplateService()
     app.state.ws_manager = ws_manager
     app.state.run_store = run_store
+    app.state.settings_service = settings_service
     app.state.workspace_service = workspace_service
     app.state.run_service = run_service
     app.state.trigger_service = trigger_service

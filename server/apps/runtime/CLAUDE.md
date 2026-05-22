@@ -88,10 +88,10 @@ The runtime DTOs are intentionally decoupled from `zenve_cli` Python code — th
 
 ## Runtime Configuration
 
-`RuntimeConfig` is loaded at lifespan startup from `~/.zenve/config.json`, with env vars taking priority.
+`RuntimeConfig` is loaded at lifespan startup from `~/.zenve/settings.json`, with env vars taking priority.
 
 ```json
-// ~/.zenve/config.json
+// ~/.zenve/settings.json
 {
   "issues_adapter": "sqlite"
 }

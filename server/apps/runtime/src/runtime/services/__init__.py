@@ -4,6 +4,7 @@ from runtime.run_store import RunStore
 from runtime.services.issue_service import IssueService
 from runtime.services.run_service import RunService
 from runtime.services.run_trigger_service import RunTriggerService
+from runtime.services.settings_service import SettingsService
 from runtime.services.snapshot_service import SnapshotService
 from runtime.services.template_service import TemplateService
 from runtime.services.workspace_service import WorkspaceService
@@ -40,3 +41,7 @@ def get_ws_manager(request: Request) -> WsManager:
 
 def get_issue_service(request: Request) -> IssueService:
     return request.app.state.issue_service
+
+
+def get_settings_service(request: Request) -> SettingsService:
+    return request.app.state.settings_service

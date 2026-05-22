@@ -6,7 +6,7 @@ from pathlib import Path
 
 from pydantic import BaseModel
 
-RUNTIME_CONFIG_PATH = Path.home() / ".zenve" / "config.json"
+RUNTIME_CONFIG_PATH = Path.home() / ".zenve" / "settings.json"
 ENV_ISSUES_ADAPTER = "ZENVE_ISSUES_ADAPTER"
 
 

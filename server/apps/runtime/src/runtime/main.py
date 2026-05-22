@@ -20,6 +20,7 @@ from runtime.routes import (
     core_router,
     issue_router,
     run_router,
+    settings_router,
     skill_router,
     snapshot_router,
     template_router,
@@ -86,6 +87,7 @@ app.add_middleware(
 )
 
 app.include_router(core_router)
+app.include_router(settings_router)
 app.include_router(workspace_router)
 app.include_router(run_router)
 app.include_router(snapshot_router)

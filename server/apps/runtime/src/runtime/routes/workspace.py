@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, WebSocket, WebSocketDisconnect, status
 
 from runtime.models.run import AgentStats
+from runtime.models.settings import WorkspaceSettings, WorkspaceSettingsUpdate
 from runtime.models.workspace import (
     AgentSummary,
     ScaffoldWorkspaceBody,
@@ -62,6 +63,23 @@ def get_agent_stats(
     service: WorkspaceService = Depends(get_workspace_service),
 ):
     return service.get_agent_stats(workspace_id, agent_slug)
+
+
+@router.get("/{workspace_id}/settings", response_model=WorkspaceSettings)
+def get_workspace_settings(
+    workspace_id: str,
+    service: WorkspaceService = Depends(get_workspace_service),
+):
+    return service.get_settings(workspace_id)
+
+
+@router.patch("/{workspace_id}/settings", response_model=WorkspaceSettings)
+def update_workspace_settings(
+    workspace_id: str,
+    body: WorkspaceSettingsUpdate,
+    service: WorkspaceService = Depends(get_workspace_service),
+):
+    return service.update_settings(workspace_id, body)
 
 
 @router.delete("/{workspace_id}", status_code=status.HTTP_204_NO_CONTENT)

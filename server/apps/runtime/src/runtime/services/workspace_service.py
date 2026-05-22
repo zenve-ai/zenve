@@ -12,6 +12,7 @@ from pathlib import Path
 
 from runtime.models.errors import ConflictError, ExternalError, NotFoundError, ValidationError
 from runtime.models.run import AgentStats, WorkspaceRunDetail
+from runtime.models.settings import WorkspaceSettings, WorkspaceSettingsUpdate
 from runtime.models.workspace import (
     AgentSummary,
     ScaffoldWorkspaceBody,
@@ -280,6 +281,35 @@ class WorkspaceService:
             self.workspaces.append(workspace)
             self.save()
         return workspace
+
+    def get_settings(self, workspace_id: str) -> WorkspaceSettings:
+        workspace = self.get(workspace_id)
+        path = Path(workspace.path)
+        settings_path = path / ZENVE_DIR / SETTINGS_FILE
+        if not settings_path.exists():
+            raise ExternalError(f"Missing {ZENVE_DIR}/{SETTINGS_FILE} at {path}")
+        try:
+            data = json.loads(settings_path.read_text(encoding="utf-8"))
+        except Exception as exc:
+            raise ExternalError(f"Could not read {SETTINGS_FILE}: {exc}") from exc
+        return WorkspaceSettings.model_validate(data)
+
+    def update_settings(self, workspace_id: str, body: WorkspaceSettingsUpdate) -> WorkspaceSettings:
+        workspace = self.get(workspace_id)
+        path = Path(workspace.path)
+        settings_path = path / ZENVE_DIR / SETTINGS_FILE
+        if not settings_path.exists():
+            raise ExternalError(f"Missing {ZENVE_DIR}/{SETTINGS_FILE} at {path}")
+        try:
+            data = json.loads(settings_path.read_text(encoding="utf-8"))
+        except Exception as exc:
+            raise ExternalError(f"Could not read {SETTINGS_FILE}: {exc}") from exc
+        patch = body.model_dump(exclude_none=True)
+        data.update(patch)
+        tmp = settings_path.with_suffix(settings_path.suffix + ".tmp")
+        tmp.write_text(json.dumps(data, indent=2), encoding="utf-8")
+        os.replace(tmp, settings_path)
+        return WorkspaceSettings.model_validate(data)
 
     def detail(self, workspace_id: str) -> WorkspaceDetail:
         workspace = self.get(workspace_id)
