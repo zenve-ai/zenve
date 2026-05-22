@@ -65,14 +65,14 @@ export default function IssueDetail() {
   }
 
   const renderLoading = () => (
-    <div className="flex flex-1 items-center justify-center gap-2">
+    <div className="flex min-h-[50vh] items-center justify-center gap-2">
       <Loader2 className="size-4 animate-spin text-muted-foreground" />
       <span className="font-mono text-[10px] font-bold tracking-widest text-muted-foreground/60">LOADING…</span>
     </div>
   )
 
   const renderError = () => (
-    <div className="flex flex-1 items-center justify-center">
+    <div className="flex min-h-[50vh] items-center justify-center">
       <span className="font-mono text-[11px] text-muted-foreground/60">Issue not found</span>
     </div>
   )
