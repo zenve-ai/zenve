@@ -6,6 +6,7 @@ import { runsApi, runsReducer } from './runs'
 import { wsReducer } from './ws'
 import { runtimeApi } from './runtime'
 import { issuesApi } from './issues'
+import { settingsApi } from './settings'
 
 export const store = configureStore({
   reducer: {
@@ -19,6 +20,7 @@ export const store = configureStore({
     [runsApi.reducerPath]: runsApi.reducer,
     [runtimeApi.reducerPath]: runtimeApi.reducer,
     [issuesApi.reducerPath]: issuesApi.reducer,
+    [settingsApi.reducerPath]: settingsApi.reducer,
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware().concat(
@@ -28,6 +30,7 @@ export const store = configureStore({
       runsApi.middleware,
       runtimeApi.middleware,
       issuesApi.middleware,
+      settingsApi.middleware,
     ),
 })
 

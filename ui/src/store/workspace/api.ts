@@ -1,7 +1,7 @@
 import { createApi } from '@reduxjs/toolkit/query/react'
 import { createRuntimeBaseQuery } from '@/lib/api'
 import config from '@/config'
-import type { WorkspaceDetail, WorkspaceIconKey, WorkspaceSummary } from '@/types'
+import type { WorkspaceDetail, WorkspaceIconKey, WorkspaceSummary, WorkspaceSettings, WorkspaceSettingsUpdate } from '@/types'
 
 interface WorkspaceResponse {
   id: string
@@ -77,7 +77,7 @@ interface ScaffoldWorkspaceBody {
 export const workspaceApi = createApi({
   reducerPath: 'workspaceApi',
   baseQuery: createRuntimeBaseQuery(config.runtimeUrl),
-  tagTypes: ['Workspace'],
+  tagTypes: ['Workspace', 'WorkspaceSettings'],
   endpoints: (builder) => ({
     listWorkspaces: builder.query<WorkspaceSummary[], void>({
       query: () => '/workspaces',
@@ -88,6 +88,14 @@ export const workspaceApi = createApi({
       query: (id) => `/workspaces/${id}`,
       transformResponse: (response: WorkspaceDetailResponse) => toWorkspaceDetail(response),
       providesTags: (_r, _e, id) => [{ type: 'Workspace', id }],
+    }),
+    getWorkspaceSettings: builder.query<WorkspaceSettings, string>({
+      query: (id) => `/workspaces/${id}/settings`,
+      providesTags: (_r, _e, id) => [{ type: 'WorkspaceSettings', id }],
+    }),
+    updateWorkspaceSettings: builder.mutation<WorkspaceSettings, { id: string; body: WorkspaceSettingsUpdate }>({
+      query: ({ id, body }) => ({ url: `/workspaces/${id}/settings`, method: 'PATCH', body }),
+      invalidatesTags: (_r, _e, { id }) => [{ type: 'WorkspaceSettings', id }, { type: 'Workspace', id }],
     }),
     registerWorkspace: builder.mutation<WorkspaceSummary, { path: string }>({
       query: (body) => ({ url: '/workspaces', method: 'POST', body }),
@@ -109,6 +117,8 @@ export const workspaceApi = createApi({
 export const {
   useListWorkspacesQuery,
   useGetWorkspaceQuery,
+  useGetWorkspaceSettingsQuery,
+  useUpdateWorkspaceSettingsMutation,
   useRegisterWorkspaceMutation,
   useScaffoldWorkspaceMutation,
   useUnregisterWorkspaceMutation,

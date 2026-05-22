@@ -16,6 +16,8 @@ export {
   workspaceApi,
   useListWorkspacesQuery,
   useGetWorkspaceQuery,
+  useGetWorkspaceSettingsQuery,
+  useUpdateWorkspaceSettingsMutation,
   useRegisterWorkspaceMutation,
   useScaffoldWorkspaceMutation,
   useUnregisterWorkspaceMutation,

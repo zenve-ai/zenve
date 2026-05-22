@@ -10,6 +10,13 @@ import Login from './pages/login'
 import NoWorkspacePage from './pages/no-workspace'
 import OnboardingPage from './pages/onboarding'
 import WorkspaceLayout from './pages/workspace-layout'
+import SettingsPage, { SettingsRedirect } from './pages/settings'
+import SettingsProfilePage from './pages/settings-profile'
+import SettingsGeneralPage from './pages/settings-general'
+import SettingsGlobalPage from './pages/settings-global'
+import SettingsPipelinePage from './pages/settings-pipeline'
+import SettingsIntegrationsPage from './pages/settings-integrations'
+import SettingsDangerPage from './pages/settings-danger'
 import { RootPathRedirect } from './pages/root-path-redirect'
 import { PrivateRoute, PublicRoute } from './components/auth'
 
@@ -39,6 +46,15 @@ export default function AppRoutes() {
         <Route path="runtime" element={<RuntimesPage />} />
         <Route path="issues" element={<IssuesList />} />
         <Route path="issues/:issueId" element={<IssueDetail />} />
+        <Route path="settings" element={<SettingsPage />}>
+          <Route index element={<SettingsRedirect />} />
+          <Route path="profile" element={<SettingsProfilePage />} />
+          <Route path="global" element={<SettingsGlobalPage />} />
+          <Route path="general" element={<SettingsGeneralPage />} />
+          <Route path="pipeline" element={<SettingsPipelinePage />} />
+          <Route path="integrations" element={<SettingsIntegrationsPage />} />
+          <Route path="danger" element={<SettingsDangerPage />} />
+        </Route>
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

@@ -198,3 +198,30 @@ export interface IssueComment {
   createdAt: string
   updatedAt: string
 }
+
+export interface GlobalSettings {
+  issues_adapter: string
+}
+
+export interface WorkspaceSettings {
+  project: string
+  description: string
+  default_branch: string
+  commit_message_prefix: string
+  run_timeout_seconds: number
+  run_schedule: string | null
+  stack: string[]
+  pipeline: Record<string, string | null>
+  issues: { adapter: string | null }
+}
+
+export interface WorkspaceSettingsUpdate {
+  description?: string
+  default_branch?: string
+  commit_message_prefix?: string
+  run_timeout_seconds?: number
+  run_schedule?: string | null
+  stack?: string[]
+  pipeline?: Record<string, string | null>
+  issues?: { adapter: string | null }
+}
