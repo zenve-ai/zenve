@@ -43,6 +43,7 @@ export default function WorkspaceLayout() {
   const listMatch = matchPath({ path: '/:workspaceId/agents', end: true }, location.pathname)
   const issuesListMatch = matchPath({ path: '/:workspaceId/issues', end: true }, location.pathname)
   const issueDetailMatch = matchPath({ path: '/:workspaceId/issues/:issueId', end: true }, location.pathname)
+  const settingsMatch = matchPath({ path: '/:workspaceId/settings/*' }, location.pathname)
   const agent = detailMatch?.params.agentSlug
     ? agents.find((a) => a.slug === detailMatch.params.agentSlug)
     : undefined
@@ -116,6 +117,30 @@ export default function WorkspaceLayout() {
       )
     }
 
+    if (settingsMatch) {
+      const section = location.pathname.split('/settings/')[1]
+      const label = section
+        ? section.charAt(0).toUpperCase() + section.slice(1)
+        : 'Settings'
+      return (
+        <>
+          <BreadcrumbItem className="hidden md:block">
+            <BreadcrumbLink asChild>
+              <Link to={`${base}/settings`}>Settings</Link>
+            </BreadcrumbLink>
+          </BreadcrumbItem>
+          {section && (
+            <>
+              <BreadcrumbSeparator className="hidden md:block" />
+              <BreadcrumbItem>
+                <BreadcrumbPage>{label}</BreadcrumbPage>
+              </BreadcrumbItem>
+            </>
+          )}
+        </>
+      )
+    }
+
     return (
       <BreadcrumbItem>
         <BreadcrumbPage>Overview</BreadcrumbPage>
@@ -147,12 +172,6 @@ export default function WorkspaceLayout() {
         <Separator orientation="vertical" className="mr-2 data-[orientation=vertical]:h-4" />
         <Breadcrumb>
           <BreadcrumbList>
-            <BreadcrumbItem className="hidden md:block">
-              <BreadcrumbLink asChild>
-                <Link to={base}>Dashboard</Link>
-              </BreadcrumbLink>
-            </BreadcrumbItem>
-            <BreadcrumbSeparator className="hidden md:block" />
             {renderBreadcrumbTrail()}
           </BreadcrumbList>
         </Breadcrumb>
@@ -166,9 +185,11 @@ export default function WorkspaceLayout() {
   const renderContent = () => (
     <SidebarProvider>
       <AppSidebar />
-      <SidebarInset>
+      <SidebarInset className="h-[calc(100vh-1rem)]">
         {renderHeader()}
-        <Outlet />
+        <div className="flex-1 overflow-y-auto min-h-0">
+          <Outlet />
+        </div>
       </SidebarInset>
     </SidebarProvider>
   )

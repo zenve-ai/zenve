@@ -23,7 +23,7 @@ export function AppSidebar(props: React.ComponentProps<typeof Sidebar>) {
         label: 'Configure',
         items: [
           { title: 'Runtime', url: `${prefix}/runtime`, icon: Server },
-          { title: 'Settings', icon: Settings },
+          { title: 'Settings', url: `${prefix}/settings`, icon: Settings },
         ],
       },
     ]
