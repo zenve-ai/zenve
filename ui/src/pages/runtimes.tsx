@@ -162,7 +162,7 @@ export default function RuntimesPage() {
   const renderMain = () => {
     if (isLoading) {
       return (
-        <div className="flex flex-1 flex-col items-center justify-center gap-2">
+        <div className="flex min-h-[50vh] flex-col items-center justify-center gap-2">
           <Loader2 className="size-4 animate-spin text-muted-foreground" />
           <span className="font-mono text-[10px] font-bold tracking-widest text-muted-foreground/60">
             LOADING…

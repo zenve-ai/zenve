@@ -90,7 +90,7 @@ export default function AgentDetail() {
   }
 
   const renderError = () => (
-    <div className="flex flex-1 flex-col items-center justify-center gap-3 p-8">
+    <div className="flex min-h-[50vh] flex-col items-center justify-center gap-3 p-8">
       <p className="text-[13px] text-muted-foreground">
         {error && 'status' in error && error.status === 404
           ? 'Agent not found.'
@@ -106,7 +106,7 @@ export default function AgentDetail() {
   )
 
   const renderLoading = () => (
-    <div className="flex flex-1 items-center justify-center p-12">
+    <div className="flex min-h-[50vh] items-center justify-center p-12">
       <div className="font-mono text-[12px] text-muted-foreground">Loading agent…</div>
     </div>
   )
