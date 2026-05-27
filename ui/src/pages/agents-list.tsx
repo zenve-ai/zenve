@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useParams } from 'react-router'
-import { Bot, LayoutGrid, LayoutList, Loader2, Plus, Search } from 'lucide-react'
+import { Bot, LayoutGrid, LayoutList, Loader2, Play, Plus, Search } from 'lucide-react'
 import { AgentCard, AgentRow } from '@/components/agents'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -13,6 +13,7 @@ import {
   EmptyTitle,
 } from '@/components/ui/empty'
 import { useListAgentsQuery } from '@/store/agents'
+import { useCreateRunMutation, useGetActiveRunQuery } from '@/store/runs'
 import { cn } from '@/lib/utils'
 import type { Agent } from '@/types'
 
@@ -36,6 +37,14 @@ export default function AgentsList() {
     { workspaceId: workspaceId! },
     { skip: !workspaceId },
   )
+
+  const { data: activeRun } = useGetActiveRunQuery(
+    { workspaceId: workspaceId! },
+    { skip: !workspaceId },
+  )
+  const [triggerRun, { isLoading: isStarting }] = useCreateRunMutation()
+
+  const isRunning = !!activeRun || isStarting
 
   const onlineCount   = agents.filter((a) => agentStatusGroup(a) === 'online').length
   const unstableCount = agents.filter((a) => agentStatusGroup(a) === 'unstable').length
@@ -128,6 +137,22 @@ export default function AgentsList() {
     </ul>
   )
 
+  const renderActiveRun = () => {
+    if (!activeRun) return null
+    //let activeRun = { run_id: '12345678-90ab-cdef-1234-567890abcdef', status: 'running' } // TODO: remove mock
+    return (
+      <div className="border-1 border-blue-500/30 bg-blue-500/5 p-2 flex items-center gap-3 m-4 mb-0">
+        <Loader2 className="size-3 shrink-0 animate-spin text-blue-400" />
+        <span className="font-mono text-[11px] text-blue-300">
+          Run <span className="text-blue-200">{activeRun.run_id.slice(0, 8)}</span> in progress
+        </span>
+        <span className="ml-auto shrink-0 font-mono text-[10px] text-blue-400/60 uppercase tracking-widest">
+          {activeRun.status}
+        </span>
+      </div>
+    )
+  }
+
   const renderMain = () => {
     if (isLoading) {
       return (
@@ -189,6 +214,19 @@ export default function AgentsList() {
             </div>
           )}
 
+          <Button
+            variant="outline"
+            size="xs"
+            className="rounded-none"
+            disabled={isRunning || !workspaceId || agents.length === 0}
+            onClick={() => triggerRun({ workspaceId: workspaceId!, body: {} })}
+          >
+            {isRunning
+              ? <Loader2 className="size-3 animate-spin" />
+              : <Play className="size-3" />}
+            Run
+          </Button>
+
           <Button variant="default" size="xs" className="rounded-none">
             <Plus className="size-3" />
             Create agent
@@ -219,6 +257,8 @@ export default function AgentsList() {
           </div>
         </div>
       )}
+
+      {renderActiveRun()}
 
       <div className="flex min-h-0 flex-1 flex-col">
         {renderMain()}

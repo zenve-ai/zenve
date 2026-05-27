@@ -10,10 +10,11 @@ import {
 } from '@/components/ui/breadcrumb'
 import { Separator } from '@/components/ui/separator'
 import { SidebarInset, SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar'
-import { AppSidebar } from '@/components/layout'
+import { AppSidebar, ScheduleCountdown } from '@/components/layout'
 import { useAppDispatch, useAppSelector } from '@/store/hooks'
 import {
   useListWorkspacesQuery,
+  useGetWorkspaceQuery,
   resolveWorkspaceFromId,
   selectCurrentWorkspaceId,
   selectWorkspaces,
@@ -48,6 +49,7 @@ export default function WorkspaceLayout() {
     ? agents.find((a) => a.slug === detailMatch.params.agentSlug)
     : undefined
   const wsStatus = useAppSelector(selectWsStatus)
+  const { data: workspace } = useGetWorkspaceQuery(workspaceId!, { skip: !workspaceId })
 
   useWorkspaceWebSocket(currentWorkspaceId ?? '')
 
@@ -175,7 +177,9 @@ export default function WorkspaceLayout() {
             {renderBreadcrumbTrail()}
           </BreadcrumbList>
         </Breadcrumb>
-        <div className="ml-auto flex items-center pr-2">
+        <div className="ml-auto flex items-center gap-3 pr-2">
+          <ScheduleCountdown schedule={workspace?.runSchedule ?? null} />
+          {workspace?.runSchedule && <span className="text-[10px] text-muted-foreground/40">|</span>}
           {renderWsStatusDot()}
         </div>
       </div>

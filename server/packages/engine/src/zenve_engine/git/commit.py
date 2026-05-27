@@ -90,6 +90,20 @@ def commit_zenve_dir(repo_root: Path, message: str, branch: str = "main") -> boo
     return True
 
 
+def stage_zenve(repo_root: Path) -> None:
+    """Stage the full .zenve/ dir without committing."""
+    run_git(["add", ".zenve"], repo_root)
+
+
+def commit_staged(repo_root: Path, message: str, branch: str = "main") -> bool:
+    """Commit whatever is already staged and push. Returns True if a commit was made."""
+    if not has_changes(repo_root):
+        return False
+    run_git(["commit", "-m", message], repo_root)
+    run_git(["push", "origin", branch], repo_root)
+    return True
+
+
 def commit_agents(
     repo_root: Path,
     run_id: str,
