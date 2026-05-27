@@ -7,6 +7,8 @@ from pathlib import Path
 
 from fastapi import FastAPI
 
+from runtime.db.database import Base, get_engine
+from runtime.db.models import UserRecord  # noqa: F401 — registers ORM model with Base
 from runtime.models.config import RuntimeConfig
 from runtime.run_store import RunStore
 from runtime.services.issue_service import IssueService
@@ -30,6 +32,9 @@ async def lifespan(app: FastAPI):
     logger.info("=" * 60)
     logger.info("Starting Zenve Runtime")
     logger.info("=" * 60)
+
+    Base.metadata.create_all(bind=get_engine())
+    logger.info("Database initialized: %s", "~/.zenve/zenve.db")
 
     config = RuntimeConfig.load()
     logger.info("Issues adapter: %s", config.issues_adapter)

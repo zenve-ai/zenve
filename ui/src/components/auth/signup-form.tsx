@@ -1,7 +1,7 @@
 import { useState } from "react"
 import { useNavigate } from "react-router"
 import { cn } from "@/lib/utils"
-import { useLoginMutation } from "@/store/auth"
+import { useSignupMutation } from "@/store/auth"
 import { Button } from "@/components/ui/button"
 import {
   Card,
@@ -18,27 +18,45 @@ import {
 } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 
-export function LoginForm({
+export function SignupForm({
   className,
   ...props
 }: React.ComponentProps<"div">) {
   const [email, setEmail] = useState("")
+  const [name, setName] = useState("")
   const [password, setPassword] = useState("")
-  const [login, { isLoading, isError }] = useLoginMutation()
+  const [signup, { isLoading, isError, error }] = useSignupMutation()
   const navigate = useNavigate()
+
+  const errorMessage =
+    isError && (error as { data?: { detail?: string } })?.data?.detail
+      ? (error as { data: { detail: string } }).data.detail
+      : isError
+        ? "Could not create account. Try a different email."
+        : null
 
   return (
     <div className={cn("flex flex-col gap-6", className)} {...props}>
       <Card>
         <CardHeader className="text-center">
-          <CardTitle className="text-xl">Welcome back</CardTitle>
+          <CardTitle className="text-xl">Create an account</CardTitle>
           <CardDescription>
-            Sign in to your account
+            Enter your details to get started
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <form onSubmit={(e) => { e.preventDefault(); login({ email, password }) }}>
+          <form onSubmit={(e) => { e.preventDefault(); signup({ email, name: name || undefined, password }) }}>
             <FieldGroup>
+              <Field>
+                <FieldLabel htmlFor="name">Name</FieldLabel>
+                <Input
+                  id="name"
+                  type="text"
+                  placeholder="Your name"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                />
+              </Field>
               <Field>
                 <FieldLabel htmlFor="email">Email</FieldLabel>
                 <Input
@@ -61,18 +79,18 @@ export function LoginForm({
                 />
               </Field>
               <Field>
-                {isError && <p className="text-sm text-destructive">Invalid credentials.</p>}
+                {errorMessage && <p className="text-sm text-destructive">{errorMessage}</p>}
                 <Button type="submit" disabled={isLoading}>
-                  {isLoading ? "Signing in..." : "Login"}
+                  {isLoading ? "Creating account..." : "Sign up"}
                 </Button>
                 <FieldDescription className="text-center">
-                  Don&apos;t have an account?{" "}
+                  Already have an account?{" "}
                   <button
                     type="button"
                     className="underline-offset-4 hover:underline"
-                    onClick={() => navigate("/signup")}
+                    onClick={() => navigate("/login")}
                   >
-                    Sign up
+                    Log in
                   </button>
                 </FieldDescription>
               </Field>

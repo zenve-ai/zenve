@@ -10,9 +10,12 @@ const BASE_DELAY_MS = 1000
 
 function buildWsUrl(workspaceId: string): string {
   const base = config.runtimeUrl
-    .replace(/^https:\/\//, 'wss://')
-    .replace(/^http:\/\//, 'ws://')
-  return `${base}/workspaces/${workspaceId}/ws`
+  if (base.startsWith('http')) {
+    const wsBase = base.replace(/^https:\/\//, 'wss://').replace(/^http:\/\//, 'ws://')
+    return `${wsBase}/workspaces/${workspaceId}/ws`
+  }
+  const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
+  return `${protocol}//${window.location.host}${base}/workspaces/${workspaceId}/ws`
 }
 
 export function useWorkspaceWebSocket(workspaceId: string): void {

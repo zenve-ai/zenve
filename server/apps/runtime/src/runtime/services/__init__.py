@@ -1,6 +1,9 @@
-from fastapi import Request
+from fastapi import Depends, Request
+from sqlalchemy.orm import Session
 
+from runtime.db.database import get_db
 from runtime.run_store import RunStore
+from runtime.services.auth_service import AuthService
 from runtime.services.issue_service import IssueService
 from runtime.services.run_service import RunService
 from runtime.services.run_trigger_service import RunTriggerService
@@ -45,3 +48,7 @@ def get_issue_service(request: Request) -> IssueService:
 
 def get_settings_service(request: Request) -> SettingsService:
     return request.app.state.settings_service
+
+
+def get_auth_service(db: Session = Depends(get_db)) -> AuthService:
+    return AuthService(db)

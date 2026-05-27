@@ -1,3 +1,4 @@
+from .auth import router as auth_router
 from .core import router as core_router
 from .issue import router as issue_router
 from .run import router as run_router
@@ -8,6 +9,7 @@ from .template import router as template_router
 from .workspace import router as workspace_router
 
 __all__ = [
+    "auth_router",
     "core_router",
     "issue_router",
     "run_router",

@@ -17,6 +17,7 @@ from runtime.models.errors import (
     ZenveError,
 )
 from runtime.routes import (
+    auth_router,
     core_router,
     issue_router,
     run_router,
@@ -86,6 +87,7 @@ app.add_middleware(
     expose_headers=["Content-Disposition"],
 )
 
+app.include_router(auth_router)
 app.include_router(core_router)
 app.include_router(settings_router)
 app.include_router(workspace_router)

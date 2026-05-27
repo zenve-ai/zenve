@@ -9,7 +9,7 @@ interface AuthResponse { access_token: string; user: User }
 
 export const authApi = createApi({
   reducerPath: 'authApi',
-  baseQuery: createBaseQueryWithReauth(config.apiUrl),
+  baseQuery: createBaseQueryWithReauth(config.runtimeUrl),
   endpoints: (builder) => ({
     login: builder.mutation<AuthResponse, LoginData>({
       query: (body) => ({ url: '/auth/login', method: 'POST', body }),
@@ -50,15 +50,10 @@ export const authApi = createApi({
       },
     }),
     logout: builder.mutation<void, void>({
-      query: () => ({ url: '/auth/logout', method: 'POST' }),
-      async onQueryStarted(_, { dispatch, queryFulfilled }) {
+      queryFn: () => ({ data: undefined }),
+      async onQueryStarted(_, { dispatch }) {
         clearAuthData()
         dispatch(clearCurrentUser())
-        try {
-          await queryFulfilled
-        } catch {
-          // Logout request may fail after local session was cleared
-        }
       },
     }),
   }),

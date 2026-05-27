@@ -7,6 +7,7 @@ import IssuesList from './pages/issues-list'
 import IssueDetail from './pages/issue-detail'
 import AuthOAuthCallback from './pages/github-auth-callback'
 import Login from './pages/login'
+import Signup from './pages/signup'
 import NoWorkspacePage from './pages/no-workspace'
 import OnboardingPage from './pages/onboarding'
 import WorkspaceLayout from './pages/workspace-layout'
@@ -24,6 +25,7 @@ export default function AppRoutes() {
   return (
     <Routes>
       <Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />
+      <Route path="/signup" element={<PublicRoute><Signup /></PublicRoute>} />
       <Route path="/auth/callback" element={<AuthOAuthCallback />} />
 
       {/* `/` is not a public page — redirect only (to /:workspaceId or /no-workspace). Guests are sent to /login by PrivateRoute. */}
