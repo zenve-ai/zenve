@@ -1,6 +1,7 @@
 from .auth import router as auth_router
 from .core import router as core_router
 from .issue import router as issue_router
+from .pr import router as pr_router
 from .run import router as run_router
 from .settings import router as settings_router
 from .skill import router as skill_router
@@ -12,6 +13,7 @@ __all__ = [
     "auth_router",
     "core_router",
     "issue_router",
+    "pr_router",
     "run_router",
     "settings_router",
     "skill_router",

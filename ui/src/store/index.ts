@@ -6,6 +6,7 @@ import { runsApi, runsReducer } from './runs'
 import { wsReducer } from './ws'
 import { runtimeApi } from './runtime'
 import { issuesApi } from './issues'
+import { pullRequestsApi } from './pull-requests'
 import { settingsApi } from './settings'
 
 export const store = configureStore({
@@ -20,6 +21,7 @@ export const store = configureStore({
     [runsApi.reducerPath]: runsApi.reducer,
     [runtimeApi.reducerPath]: runtimeApi.reducer,
     [issuesApi.reducerPath]: issuesApi.reducer,
+    [pullRequestsApi.reducerPath]: pullRequestsApi.reducer,
     [settingsApi.reducerPath]: settingsApi.reducer,
   },
   middleware: (getDefaultMiddleware) =>
@@ -30,6 +32,7 @@ export const store = configureStore({
       runsApi.middleware,
       runtimeApi.middleware,
       issuesApi.middleware,
+      pullRequestsApi.middleware,
       settingsApi.middleware,
     ),
 })

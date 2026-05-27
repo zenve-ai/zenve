@@ -19,6 +19,7 @@ from runtime.routes import (
     auth_router,
     core_router,
     issue_router,
+    pr_router,
     run_router,
     settings_router,
     skill_router,
@@ -93,6 +94,7 @@ app.include_router(workspace_router)
 app.include_router(run_router)
 app.include_router(snapshot_router)
 app.include_router(issue_router)
+app.include_router(pr_router)
 app.include_router(template_router)
 app.include_router(skill_router)
 

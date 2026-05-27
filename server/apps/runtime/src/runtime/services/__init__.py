@@ -5,6 +5,7 @@ from runtime.db.database import get_db
 from runtime.run_store import RunStore
 from runtime.services.auth_service import AuthService
 from runtime.services.issue_service import IssueService
+from runtime.services.pr_service import PRService
 from runtime.services.run_service import RunService
 from runtime.services.run_trigger_service import RunTriggerService
 from runtime.services.settings_service import SettingsService
@@ -44,6 +45,10 @@ def get_ws_manager(request: Request) -> WsManager:
 
 def get_issue_service(request: Request) -> IssueService:
     return request.app.state.issue_service
+
+
+def get_pr_service(request: Request) -> PRService:
+    return request.app.state.pr_service
 
 
 def get_settings_service(request: Request) -> SettingsService:

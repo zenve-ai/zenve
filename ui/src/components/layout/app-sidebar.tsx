@@ -1,6 +1,6 @@
 import { useMemo } from 'react'
 import { useParams } from 'react-router'
-import { CircleDot, Server, Settings, Users } from 'lucide-react'
+import { CircleDot, GitPullRequest, Server, Settings, Users } from 'lucide-react'
 import { NavMain, type NavGroup } from './nav-main'
 import { NavUser } from './nav-user'
 import { WorkspaceSwitcher } from './workspace-switcher'
@@ -17,6 +17,7 @@ export function AppSidebar(props: React.ComponentProps<typeof Sidebar>) {
         items: [
           { title: 'Agents', url: `${prefix}/agents`, icon: Users },
           { title: 'Issues', url: `${prefix}/issues`, icon: CircleDot },
+          { title: 'Pull Requests', url: `${prefix}/pull-requests`, icon: GitPullRequest },
         ],
       },
       {

@@ -71,22 +71,33 @@ class GitHubClient:
         return items
 
     def list_open_pulls(self) -> list[dict]:
+        return self.list_pulls("open")
+
+    def list_pulls(self, state: str = "open", limit: int | None = None) -> list[dict]:
         items: list[dict] = []
         page = 1
         while True:
+            remaining = (limit - len(items)) if limit is not None else 100
+            per_page = min(remaining, 100)
             resp = self.request(
                 "GET",
                 f"/repos/{self.repo}/pulls",
-                params={"state": "open", "per_page": 100, "page": page},
+                params={"state": state, "per_page": per_page, "page": page},
             )
             batch = resp.json()
             if not batch:
                 break
             items.extend(batch)
-            if len(batch) < 100:
+            if limit is not None and len(items) >= limit:
+                break
+            if len(batch) < per_page:
                 break
             page += 1
-        return items
+        return items[:limit] if limit is not None else items
+
+    def get_pull(self, number: int) -> dict:
+        resp = self.request("GET", f"/repos/{self.repo}/pulls/{number}")
+        return resp.json()
 
     def list_branches(self) -> list[str]:
         names: list[str] = []

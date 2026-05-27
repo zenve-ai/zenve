@@ -12,6 +12,7 @@ from runtime.db.models import UserRecord  # noqa: F401 — registers ORM model w
 from runtime.models.config import RuntimeConfig
 from runtime.run_store import RunStore
 from runtime.services.issue_service import IssueService
+from runtime.services.pr_service import PRService
 from runtime.services.run_service import RunService
 from runtime.services.run_trigger_service import RunTriggerService
 from runtime.services.scheduler_service import SchedulerService
@@ -66,6 +67,7 @@ async def lifespan(app: FastAPI):
     scheduler_service = SchedulerService(workspace_service, trigger_service, run_store)
     snapshot_service = SnapshotService(workspace_service, config.issues_adapter)
     issue_service = IssueService(workspace_service, config.issues_adapter)
+    pr_service = PRService(workspace_service)
     template_service = TemplateService()
 
     app.state.ws_manager = ws_manager
@@ -79,6 +81,7 @@ async def lifespan(app: FastAPI):
     app.state.scheduler_service = scheduler_service
     app.state.snapshot_service = snapshot_service
     app.state.issue_service = issue_service
+    app.state.pr_service = pr_service
     app.state.template_service = template_service
     app.state.adapter_registry = build_default_registry()
     app.state.started_at = datetime.now(UTC)

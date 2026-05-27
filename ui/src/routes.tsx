@@ -4,6 +4,8 @@ import AgentsList from './pages/agents-list'
 import RuntimesPage from './pages/runtimes'
 import IssuesList from './pages/issues-list'
 import IssueDetail from './pages/issue-detail'
+import PullRequestsList from './pages/pull-requests-list'
+import PullRequestDetail from './pages/pull-request-detail'
 import AuthOAuthCallback from './pages/github-auth-callback'
 import Login from './pages/login'
 import Signup from './pages/signup'
@@ -47,6 +49,8 @@ export default function AppRoutes() {
         <Route path="runtime" element={<RuntimesPage />} />
         <Route path="issues" element={<IssuesList />} />
         <Route path="issues/:issueId" element={<IssueDetail />} />
+        <Route path="pull-requests" element={<PullRequestsList />} />
+        <Route path="pull-requests/:prNumber" element={<PullRequestDetail />} />
         <Route path="settings" element={<SettingsPage />}>
           <Route index element={<SettingsRedirect />} />
           <Route path="profile" element={<SettingsProfilePage />} />

@@ -44,6 +44,8 @@ export default function WorkspaceLayout() {
   const listMatch = matchPath({ path: '/:workspaceId/agents', end: true }, location.pathname)
   const issuesListMatch = matchPath({ path: '/:workspaceId/issues', end: true }, location.pathname)
   const issueDetailMatch = matchPath({ path: '/:workspaceId/issues/:issueId', end: true }, location.pathname)
+  const prsListMatch = matchPath({ path: '/:workspaceId/pull-requests', end: true }, location.pathname)
+  const prDetailMatch = matchPath({ path: '/:workspaceId/pull-requests/:prNumber', end: true }, location.pathname)
   const settingsMatch = matchPath({ path: '/:workspaceId/settings/*' }, location.pathname)
   const agent = detailMatch?.params.agentSlug
     ? agents.find((a) => a.slug === detailMatch.params.agentSlug)
@@ -112,6 +114,34 @@ export default function WorkspaceLayout() {
               <BreadcrumbSeparator className="hidden md:block" />
               <BreadcrumbItem>
                 <BreadcrumbPage>All issues</BreadcrumbPage>
+              </BreadcrumbItem>
+            </>
+          )}
+        </>
+      )
+    }
+
+    if (prsListMatch || prDetailMatch) {
+      return (
+        <>
+          <BreadcrumbItem className="hidden md:block">
+            <BreadcrumbLink asChild>
+              <Link to={`${base}/pull-requests`}>Pull Requests</Link>
+            </BreadcrumbLink>
+          </BreadcrumbItem>
+          {prDetailMatch && (
+            <>
+              <BreadcrumbSeparator className="hidden md:block" />
+              <BreadcrumbItem>
+                <BreadcrumbPage>#{prDetailMatch.params.prNumber}</BreadcrumbPage>
+              </BreadcrumbItem>
+            </>
+          )}
+          {prsListMatch && (
+            <>
+              <BreadcrumbSeparator className="hidden md:block" />
+              <BreadcrumbItem>
+                <BreadcrumbPage>All pull requests</BreadcrumbPage>
               </BreadcrumbItem>
             </>
           )}

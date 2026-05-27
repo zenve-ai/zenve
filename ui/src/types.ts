@@ -199,6 +199,27 @@ export interface IssueComment {
   updatedAt: string
 }
 
+export interface PRComment {
+  author: string
+  body: string
+  createdAt: string
+}
+
+export interface PullRequest {
+  number: number
+  title: string
+  body: string | null
+  state: 'open' | 'closed'
+  labels: string[]
+  assignees: string[]
+  head: string
+  base: string
+  draft: boolean
+  createdAt: string
+  url: string | null
+  comments: PRComment[]
+}
+
 export interface GlobalSettings {
   issues_adapter: string
 }
