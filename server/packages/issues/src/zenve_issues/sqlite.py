@@ -23,25 +23,27 @@ from zenve_issues.models import (
 
 CREATE_TABLE = """
 CREATE TABLE IF NOT EXISTS issues (
-    id         INTEGER PRIMARY KEY AUTOINCREMENT,
-    title      TEXT NOT NULL,
-    body       TEXT NOT NULL DEFAULT '',
-    state      TEXT NOT NULL DEFAULT 'open',
-    labels     TEXT NOT NULL DEFAULT '[]',
-    assignees  TEXT NOT NULL DEFAULT '[]',
-    created_at TEXT NOT NULL,
-    updated_at TEXT NOT NULL
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    workspace_id TEXT NOT NULL DEFAULT '',
+    title        TEXT NOT NULL,
+    body         TEXT NOT NULL DEFAULT '',
+    state        TEXT NOT NULL DEFAULT 'open',
+    labels       TEXT NOT NULL DEFAULT '[]',
+    assignees    TEXT NOT NULL DEFAULT '[]',
+    created_at   TEXT NOT NULL,
+    updated_at   TEXT NOT NULL
 )
 """
 
 CREATE_COMMENTS_TABLE = """
 CREATE TABLE IF NOT EXISTS comments (
-    id         INTEGER PRIMARY KEY AUTOINCREMENT,
-    issue_id   INTEGER NOT NULL REFERENCES issues(id),
-    body       TEXT NOT NULL DEFAULT '',
-    author     TEXT NOT NULL DEFAULT '',
-    created_at TEXT NOT NULL,
-    updated_at TEXT NOT NULL
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    workspace_id TEXT NOT NULL DEFAULT '',
+    issue_id     INTEGER NOT NULL REFERENCES issues(id),
+    body         TEXT NOT NULL DEFAULT '',
+    author       TEXT NOT NULL DEFAULT '',
+    created_at   TEXT NOT NULL,
+    updated_at   TEXT NOT NULL
 )
 """
 
@@ -69,9 +71,10 @@ class SQLiteIssueAdapter(BaseIssueAdapter):
         with self._connect(cfg) as conn:
             self._ensure_schema(conn)
             cur = conn.execute(
-                "INSERT INTO issues (title, body, state, labels, assignees, created_at, updated_at)"
-                " VALUES (?, ?, 'open', ?, ?, ?, ?)",
+                "INSERT INTO issues (workspace_id, title, body, state, labels, assignees, created_at, updated_at)"
+                " VALUES (?, ?, ?, 'open', ?, ?, ?, ?)",
                 (
+                    cfg.workspace_id,
                     data.title,
                     data.body,
                     json.dumps(data.labels),
@@ -90,8 +93,8 @@ class SQLiteIssueAdapter(BaseIssueAdapter):
         with self._connect(cfg) as conn:
             self._ensure_schema(conn)
             query = "SELECT * FROM issues"
-            params: list = []
-            conditions: list[str] = []
+            params: list = [cfg.workspace_id]
+            conditions: list[str] = ["workspace_id = ?"]
             if f.state != "all":
                 conditions.append("state = ?")
                 params.append(f.state)
@@ -110,7 +113,10 @@ class SQLiteIssueAdapter(BaseIssueAdapter):
         cfg: SQLiteIssueConfig = self.config  # type: ignore[assignment]
         with self._connect(cfg) as conn:
             self._ensure_schema(conn)
-            row = conn.execute("SELECT * FROM issues WHERE id = ?", (issue_id,)).fetchone()
+            row = conn.execute(
+                "SELECT * FROM issues WHERE id = ? AND workspace_id = ?",
+                (issue_id, cfg.workspace_id),
+            ).fetchone()
         if row is None:
             raise IssueNotFoundError(issue_id)
         return self._row_to_issue(row)
@@ -126,10 +132,10 @@ class SQLiteIssueAdapter(BaseIssueAdapter):
             updates["assignees"] = json.dumps(updates["assignees"])
         updates["updated_at"] = now_iso()
         set_clause = ", ".join(f"{k} = ?" for k in updates)
-        values = list(updates.values()) + [issue_id]
+        values = list(updates.values()) + [issue_id, cfg.workspace_id]
         with self._connect(cfg) as conn:
             self._ensure_schema(conn)
-            cur = conn.execute(f"UPDATE issues SET {set_clause} WHERE id = ?", values)
+            cur = conn.execute(f"UPDATE issues SET {set_clause} WHERE id = ? AND workspace_id = ?", values)
             conn.commit()
             if cur.rowcount == 0:
                 raise IssueNotFoundError(issue_id)
@@ -140,7 +146,10 @@ class SQLiteIssueAdapter(BaseIssueAdapter):
         cfg: SQLiteIssueConfig = self.config  # type: ignore[assignment]
         with self._connect(cfg) as conn:
             self._ensure_schema(conn)
-            cur = conn.execute("DELETE FROM issues WHERE id = ?", (issue_id,))
+            cur = conn.execute(
+                "DELETE FROM issues WHERE id = ? AND workspace_id = ?",
+                (issue_id, cfg.workspace_id),
+            )
             conn.commit()
         if cur.rowcount == 0:
             raise IssueNotFoundError(issue_id)
@@ -188,13 +197,16 @@ class SQLiteIssueAdapter(BaseIssueAdapter):
         ts = now_iso()
         with self._connect(cfg) as conn:
             self._ensure_schema(conn)
-            exists = conn.execute("SELECT id FROM issues WHERE id = ?", (issue_id,)).fetchone()
+            exists = conn.execute(
+                "SELECT id FROM issues WHERE id = ? AND workspace_id = ?",
+                (issue_id, cfg.workspace_id),
+            ).fetchone()
             if exists is None:
                 raise IssueNotFoundError(issue_id)
             cur = conn.execute(
-                "INSERT INTO comments (issue_id, body, author, created_at, updated_at)"
-                " VALUES (?, ?, '', ?, ?)",
-                (issue_id, data.body, ts, ts),
+                "INSERT INTO comments (workspace_id, issue_id, body, author, created_at, updated_at)"
+                " VALUES (?, ?, ?, '', ?, ?)",
+                (cfg.workspace_id, issue_id, data.body, ts, ts),
             )
             conn.commit()
             row = conn.execute("SELECT * FROM comments WHERE id = ?", (cur.lastrowid,)).fetchone()
@@ -205,8 +217,8 @@ class SQLiteIssueAdapter(BaseIssueAdapter):
         with self._connect(cfg) as conn:
             self._ensure_schema(conn)
             rows = conn.execute(
-                "SELECT * FROM comments WHERE issue_id = ? ORDER BY id",
-                (issue_id,),
+                "SELECT * FROM comments WHERE issue_id = ? AND workspace_id = ? ORDER BY id",
+                (issue_id, cfg.workspace_id),
             ).fetchall()
         return [self._row_to_comment(row) for row in rows]
 
@@ -214,7 +226,10 @@ class SQLiteIssueAdapter(BaseIssueAdapter):
         cfg: SQLiteIssueConfig = self.config  # type: ignore[assignment]
         with self._connect(cfg) as conn:
             self._ensure_schema(conn)
-            row = conn.execute("SELECT * FROM comments WHERE id = ?", (comment_id,)).fetchone()
+            row = conn.execute(
+                "SELECT * FROM comments WHERE id = ? AND workspace_id = ?",
+                (comment_id, cfg.workspace_id),
+            ).fetchone()
         if row is None:
             raise CommentNotFoundError(comment_id)
         return self._row_to_comment(row)
@@ -226,10 +241,10 @@ class SQLiteIssueAdapter(BaseIssueAdapter):
             return self.get_comment(comment_id)
         updates["updated_at"] = now_iso()
         set_clause = ", ".join(f"{k} = ?" for k in updates)
-        values = list(updates.values()) + [comment_id]
+        values = list(updates.values()) + [comment_id, cfg.workspace_id]
         with self._connect(cfg) as conn:
             self._ensure_schema(conn)
-            cur = conn.execute(f"UPDATE comments SET {set_clause} WHERE id = ?", values)
+            cur = conn.execute(f"UPDATE comments SET {set_clause} WHERE id = ? AND workspace_id = ?", values)
             conn.commit()
             if cur.rowcount == 0:
                 raise CommentNotFoundError(comment_id)
@@ -240,7 +255,10 @@ class SQLiteIssueAdapter(BaseIssueAdapter):
         cfg: SQLiteIssueConfig = self.config  # type: ignore[assignment]
         with self._connect(cfg) as conn:
             self._ensure_schema(conn)
-            cur = conn.execute("DELETE FROM comments WHERE id = ?", (comment_id,))
+            cur = conn.execute(
+                "DELETE FROM comments WHERE id = ? AND workspace_id = ?",
+                (comment_id, cfg.workspace_id),
+            )
             conn.commit()
         if cur.rowcount == 0:
             raise CommentNotFoundError(comment_id)
@@ -250,7 +268,9 @@ class SQLiteIssueAdapter(BaseIssueAdapter):
         with self._connect(cfg) as conn:
             self._ensure_schema(conn)
             rows = conn.execute(
-                "SELECT DISTINCT value FROM issues, json_each(issues.labels) ORDER BY value"
+                "SELECT DISTINCT value FROM issues, json_each(issues.labels)"
+                " WHERE workspace_id = ? ORDER BY value",
+                (cfg.workspace_id,),
             ).fetchall()
         return [row[0] for row in rows]
 

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 from pydantic import BaseModel, Field
 
 
@@ -14,7 +16,8 @@ class GitHubIssueConfig(IssueAdapterConfigBase):
 
 
 class SQLiteIssueConfig(IssueAdapterConfigBase):
-    db_path: str
+    db_path: str = str(Path.home() / ".zenve" / "zenve.db")
+    workspace_id: str = ""
 
 
 class Issue(BaseModel):

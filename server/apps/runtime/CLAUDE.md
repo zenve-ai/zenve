@@ -108,7 +108,7 @@ The runtime resolves the effective adapter type per-workspace before calling the
 1. `{workspace}/.zenve/settings.json` → `issues.adapter` (workspace override)
 2. `RuntimeConfig.issues_adapter` (runtime default)
 
-For `sqlite`, the DB is always at `{workspace}/.zenve/issues.db` — one file per workspace, no shared state.
+For `sqlite`, the DB is `~/.zenve/zenve.db` — shared across all workspaces, scoped by `workspace_id` (the resolved workspace path).
 
 ## Dev Commands
 

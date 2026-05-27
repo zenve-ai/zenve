@@ -69,8 +69,9 @@ def build_issues_adapter(
     - "github" (default): uses `github_token` and `repo`.
     """
     if adapter_type == "sqlite":
-        db_path = workspace_path / ".zenve" / "issues.db"
-        return SQLiteIssueAdapter(SQLiteIssueConfig(db_path=str(db_path)))
+        db_path = Path.home() / ".zenve" / "zenve.db"
+        workspace_id = str(workspace_path.resolve())
+        return SQLiteIssueAdapter(SQLiteIssueConfig(db_path=str(db_path), workspace_id=workspace_id))
     if adapter_type == "github":
         return GitHubIssueAdapter(GitHubIssueConfig(token=github_token, repo=repo))
     raise EngineError(f"Unknown issues adapter type: {adapter_type!r}")

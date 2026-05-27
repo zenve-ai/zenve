@@ -59,13 +59,15 @@ class IssueService:
 
     def get_adapter(self, workspace_id: str) -> BaseIssueAdapter:
         detail = self.workspace_service.detail(workspace_id)
-        github_token = resolve_github_token() or ""
-        if not github_token:
-            raise ExternalError("No GitHub token. Set ZENVE_GH_TOKEN or run `gh auth login`.")
         project_dir = Path(detail.path)
         project = load_project_settings(project_dir)
         adapter_type = project.issues.adapter or self.issues_adapter_type
         repo = detail.repo or ""
+        github_token = ""
+        if adapter_type != "sqlite":
+            github_token = resolve_github_token() or ""
+            if not github_token:
+                raise ExternalError("No GitHub token. Set ZENVE_GH_TOKEN or run `gh auth login`.")
         return build_issues_adapter(adapter_type, project_dir, github_token, repo)
 
     def list_issues(self, workspace_id: str, state: str = "open", limit: int | None = None) -> list[IssueResponse]:
