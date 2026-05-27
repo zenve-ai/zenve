@@ -40,6 +40,10 @@ class EventEmitter:
         self._log_path = transcripts_dir / f"{run_id}.jsonl"
         self._lock = threading.Lock()
 
+    @property
+    def log_path(self) -> Path:
+        return self._log_path
+
     def emit(
         self,
         event_type: str,

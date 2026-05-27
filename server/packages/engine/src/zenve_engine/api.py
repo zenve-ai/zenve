@@ -30,12 +30,14 @@ from zenve_engine.exec.executor import reconcile_claims
 from zenve_engine.exec.parallel import run_all
 from zenve_engine.git.commit import (
     GitError,
-    commit_agents,
+    commit_staged,
     commit_zenve_dir,
     fetch_origin,
     has_dirty_outside_zenve,
     has_dirty_zenve,
     remote_branch_exists,
+    run_git,
+    stage_zenve,
 )
 from zenve_engine.github.client import GitHubClient
 from zenve_engine.github.snapshot import build_snapshot, write_snapshot
@@ -222,22 +224,27 @@ def run(
     )
 
     emitter.emit(et.RUN_COMMITTING)
+
+    # Stage the full .zenve/ dir first so the transcript is included in the commit.
+    # Then emit RUN_COMPLETED (which writes the final event to the transcript file),
+    # re-stage the transcript to capture that event, and only then commit+push.
     committed = False
     try:
-        committed = commit_agents(
-            repo_root=project_dir,
-            run_id=run_id,
-            prefix=project.commit_message_prefix,
-            branch=project.default_branch,
-            summary=summary,
+        stage_zenve(project_dir)
+
+        emitter.emit(
+            et.RUN_COMPLETED,
+            data={"committed": False, "summary": summary, "agents": len(summaries)},
         )
+
+        run_git(["add", str(emitter.log_path)], project_dir)
+
+        title = f"{project.commit_message_prefix} {run_id}"
+        if summary:
+            title = f"{title} — {summary}"
+        committed = commit_staged(project_dir, title, branch=project.default_branch)
     except GitError as exc:
         emitter.emit(et.RUN_FAILED, data={"error": str(exc)})
-
-    emitter.emit(
-        et.RUN_COMPLETED,
-        data={"committed": committed, "summary": summary, "agents": len(summaries)},
-    )
 
     return RunReport(
         run_id=run_id,

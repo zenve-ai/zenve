@@ -7,27 +7,28 @@ from datetime import datetime
 from croniter import croniter
 
 from runtime.models.run import RunTriggerRequest
+from runtime.run_store import RunStore
 from runtime.services.run_trigger_service import RunTriggerService
 from runtime.services.workspace_service import WorkspaceService
 
 logger = logging.getLogger(__name__)
 
 
-def scheduled_now(schedule: str, last_fired: datetime | None) -> bool:
+def scheduled_now(schedule: str) -> bool:
     now = datetime.now()
     prev = croniter(schedule, now).get_prev(datetime)
-    if last_fired is None:
-        return False
-    return prev > last_fired
+    return (now - prev).total_seconds() <= 10
 
 
 class SchedulerService:
-    def __init__(self, workspace_service: WorkspaceService, trigger_service: RunTriggerService) -> None:
+    def __init__(
+        self, workspace_service: WorkspaceService, trigger_service: RunTriggerService, run_store: RunStore
+    ) -> None:
         self.workspace_service = workspace_service
         self.trigger_service = trigger_service
+        self.run_store = run_store
         self._stop = threading.Event()
         self._thread: threading.Thread | None = None
-        self._last_fired: dict[str, datetime] = {}
 
     def start(self) -> None:
         self._thread = threading.Thread(target=self._loop, daemon=True, name="scheduler")
@@ -46,9 +47,10 @@ class SchedulerService:
                 self._tick()
             except Exception:
                 logger.exception("SchedulerService tick error")
-            self._stop.wait(timeout=60)
+            self._stop.wait(timeout=10)
 
     def _tick(self) -> None:
+        logger.info("Tick from SchedulerService")
         for ws in self.workspace_service.list():
             try:
                 detail = self.workspace_service.detail(ws.id)
@@ -56,7 +58,13 @@ class SchedulerService:
                 continue
             if not detail.run_schedule:
                 continue
-            if scheduled_now(detail.run_schedule, self._last_fired.get(ws.id)):
-                logger.info("scheduler firing run for workspace %s (schedule=%s)", ws.id, detail.run_schedule)
+            if self.run_store.get_active_for_workspace(ws.id):
+                logger.info("scheduler skipping workspace %s — run already active", ws.id)
+                continue
+            if scheduled_now(detail.run_schedule):
+                logger.info(
+                    "scheduler firing run for workspace %s (schedule=%s)",
+                    ws.id,
+                    detail.run_schedule,
+                )
                 self.trigger_service.trigger(ws.id, RunTriggerRequest())
-                self._last_fired[ws.id] = datetime.now()

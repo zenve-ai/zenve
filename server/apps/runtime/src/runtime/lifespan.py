@@ -23,12 +23,25 @@ from runtime.ws_manager import WsManager
 from zenve_engine.api import build_default_registry
 
 PID_FILE = Path.home() / ".zenve" / "runtime.pid"
+LOG_FILE = Path.home() / ".zenve" / "runtime.log"
 
 logger = logging.getLogger(__name__)
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # Configure logging here — uvicorn calls dictConfig() before lifespan runs,
+    # so any basicConfig() at module level gets overwritten. Configuring here wins.
+    LOG_FILE.parent.mkdir(exist_ok=True)
+    root = logging.getLogger()
+    root.setLevel(logging.INFO)
+    if not root.handlers:
+        root.addHandler(logging.StreamHandler())
+
+    root.addHandler(logging.FileHandler(LOG_FILE))
+    for handler in root.handlers:
+        handler.setFormatter(logging.Formatter("%(levelname)s:     %(message)s"))
+
     logger.info("=" * 60)
     logger.info("Starting Zenve Runtime")
     logger.info("=" * 60)
@@ -42,16 +55,23 @@ async def lifespan(app: FastAPI):
     loop = asyncio.get_event_loop()
     ws_manager = WsManager(loop)
     run_store = RunStore()
+
+    # Services
     settings_service = SettingsService()
     workspace_service = WorkspaceService()
     run_service = RunService(workspace_service)
-    trigger_service = RunTriggerService(workspace_service, run_store, ws_manager, config.issues_adapter)
-    scheduler_service = SchedulerService(workspace_service, trigger_service)
+    trigger_service = RunTriggerService(
+        workspace_service, run_store, ws_manager, config.issues_adapter
+    )
+    scheduler_service = SchedulerService(workspace_service, trigger_service, run_store)
     snapshot_service = SnapshotService(workspace_service, config.issues_adapter)
     issue_service = IssueService(workspace_service, config.issues_adapter)
     template_service = TemplateService()
+
     app.state.ws_manager = ws_manager
     app.state.run_store = run_store
+
+    # Register services
     app.state.settings_service = settings_service
     app.state.workspace_service = workspace_service
     app.state.run_service = run_service

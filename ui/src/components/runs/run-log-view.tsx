@@ -25,7 +25,7 @@ export function RunLogView({ workspaceId, runId, isActive, agentFilter }: RunLog
 
   const { data: historicalEvents = [] } = useGetRunEventsQuery(
     { workspaceId, runId },
-    { skip: !workspaceId || !runId },
+    { skip: !workspaceId || !runId, refetchOnMountOrArgChange: true },
   )
 
   const liveEvents = useRunStream(workspaceId, runId, isActive)
