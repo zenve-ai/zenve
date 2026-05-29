@@ -29,7 +29,7 @@ class TokenUsage(BaseModel):
 
 
 class RunResultFile(BaseModel):
-    """Shape of `.zenve/agents/{name}/runs/{run_id}.json`."""
+    """In-memory result of a single agent run."""
 
     model_config = {"extra": "ignore"}
 

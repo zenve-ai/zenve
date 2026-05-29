@@ -20,6 +20,7 @@ members = [
     "apps/cli",
     "apps/runtime",
     "packages/adapters",
+    "packages/core",
     "packages/engine",
     "packages/issues",
 ]
@@ -27,7 +28,9 @@ members = [
 [tool.uv.sources]
 zenve-adapters = { workspace = true }
 zenve-cli = { workspace = true }
+zenve-core = { workspace = true }
 zenve-engine = { workspace = true }
+zenve-issues = { workspace = true }
 zenve-runtime = { workspace = true }
 
 [dependency-groups]
@@ -60,6 +63,7 @@ ignore = ["E501", "B008"]
 [tool.ruff.lint.isort]
 known-first-party = [
     "zenve_adapters",
+    "zenve_core",
     "zenve_engine",
     "zenve_issues",
     "api",

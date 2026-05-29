@@ -13,7 +13,7 @@ LOCK_VERSION = 1
 EXCLUDED_FILES: frozenset[str] = frozenset({"settings.json"})
 
 # Subdirs created at runtime — never part of the template.
-RUNTIME_DIRS: tuple[str, ...] = ("runs/", "memory/")
+RUNTIME_DIRS: tuple[str, ...] = ("memory/",)
 
 AgentStatus = Literal["clean", "modified", "unknown", "missing"]
 

@@ -1,3 +1,4 @@
+from contextlib import contextmanager
 from pathlib import Path
 
 from sqlalchemy import Engine, create_engine
@@ -30,5 +31,40 @@ def get_db():
     db = make_session()
     try:
         yield db
+    finally:
+        db.close()
+
+
+def migrate_run_agents_columns() -> None:
+    """Add columns to run_agents that were added after initial table creation."""
+    new_columns = [
+        ("item_type", "TEXT"),
+        ("item_number", "INTEGER"),
+        ("item_title", "TEXT"),
+        ("duration_seconds", "REAL"),
+        ("pipeline_from", "TEXT"),
+        ("pipeline_to", "TEXT"),
+        ("token_input", "INTEGER"),
+        ("token_output", "INTEGER"),
+        ("token_cost_usd", "REAL"),
+    ]
+    engine = get_engine()
+    with engine.connect() as conn:
+        existing = {row[1] for row in conn.execute(__import__("sqlalchemy").text("PRAGMA table_info(run_agents)"))}
+        for col_name, col_type in new_columns:
+            if col_name not in existing:
+                conn.execute(__import__("sqlalchemy").text(f"ALTER TABLE run_agents ADD COLUMN {col_name} {col_type}"))
+        conn.commit()
+
+
+@contextmanager
+def session_scope():
+    db = make_session()
+    try:
+        yield db
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
     finally:
         db.close()

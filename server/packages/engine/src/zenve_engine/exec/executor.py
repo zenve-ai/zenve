@@ -196,14 +196,6 @@ def build_run_context(
     )
 
 
-def write_run_result(agent: DiscoveredAgent, result: RunResultFile) -> Path:
-    runs_dir = agent.path / "runs"
-    runs_dir.mkdir(parents=True, exist_ok=True)
-    path = runs_dir / f"{result.run_id}.json"
-    path.write_text(result.model_dump_json(indent=2), encoding="utf-8")
-    return path
-
-
 def now_iso() -> str:
     return datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
 
@@ -504,8 +496,6 @@ def write_and_emit(
         output=result.outcome,
         error=error_text,
     )
-    write_run_result(agent, run_result)
-
     if status == "completed":
         event_type = et.AGENT_COMPLETED
     elif status == "needs_input":
@@ -642,7 +632,6 @@ async def run_agent(
                 item=RunItem(type=item.kind, number=item.number, title=item.title),
                 error=str(exc),
             )
-            write_run_result(agent, run_result)
             return run_result
 
     started_at = now_iso()
@@ -706,7 +695,6 @@ async def run_agent(
             else None,
             error=str(exc),
         )
-        write_run_result(agent, run_result)
         if worktree_path is not None:
             delete_branch = (
                 worktree_branch

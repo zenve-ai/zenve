@@ -66,6 +66,7 @@ class ClaudeCodeAdapter(BaseAdapter):
             f"- agent_slug: {ctx.agent_slug}\n"
             f"- agent_name: {ctx.agent_name}\n"
             f"- project_slug: {ctx.project_slug}\n"
+            f"- workspace_id: {ctx.workspace_id}\n"
             f"- project_description: {ctx.project_description}\n"
             f"- project_stack: {', '.join(ctx.project_stack) if ctx.project_stack else '(unspecified)'}\n"
             f"- project_dir: {ctx.project_dir}\n"
@@ -88,6 +89,7 @@ class ClaudeCodeAdapter(BaseAdapter):
             "ZENVE_AGENT_ID": ctx.agent_id,
             "ZENVE_AGENT_SLUG": ctx.agent_slug,
             "ZENVE_PROJECT_SLUG": ctx.project_slug,
+            "ZENVE_WORKSPACE_ID": ctx.workspace_id,
             "ZENVE_RUN_ID": ctx.run_id,
             **ctx.env_vars,
         }

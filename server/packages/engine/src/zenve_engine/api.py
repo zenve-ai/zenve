@@ -172,7 +172,13 @@ def run(
 
     if not agents:
         emitter.emit(et.RUN_STARTED, data={"agents": [], "repo": repo, "dry_run": False})
-        emitter.emit(et.RUN_COMPLETED, data={"committed": False, "summary": "", "agents": 0})
+        try:
+            stage_zenve(project_dir)
+            emitter.emit(et.RUN_COMPLETED, data={"committed": False, "summary": "", "agents": 0})
+            run_git(["add", str(emitter.log_path)], project_dir)
+            commit_staged(project_dir, f"{project.commit_message_prefix} {run_id}", branch=project.default_branch)
+        except GitError as exc:
+            emitter.emit(et.RUN_FAILED, data={"error": str(exc)})
         return RunReport(run_id=run_id, agents=[])
 
     emitter.emit(

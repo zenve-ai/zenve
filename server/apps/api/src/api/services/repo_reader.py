@@ -4,7 +4,7 @@ import httpx
 
 from api.db.models import Project
 from api.models.errors import NotFoundError, ValidationError
-from api.models.repo import AgentDetail, AgentSummary, RunDetail, RunSummary
+from api.models.repo import AgentDetail, AgentSummary
 from api.services.repo_writer import validate_relpath
 from api.utils.github import get_repo_file, list_repo_dir, list_tree_paths
 
@@ -107,41 +107,6 @@ class RepoReaderService:
             ref=branch,
         )
         return [p[len(prefix):] for p in paths]
-
-    def list_runs(self, project: Project, name: str) -> list[RunSummary]:
-        installation_id, repo, branch = self.require_github(project)
-        entries = list_repo_dir(
-            installation_id,
-            repo,
-            f".zenve/agents/{name}/runs",
-            ref=branch,
-        )
-        return [
-            RunSummary(run_id=e["name"].removesuffix(".json"))
-            for e in entries
-            if e.get("type") == "file" and e["name"].endswith(".json")
-        ]
-
-    def get_run(self, project: Project, name: str, run_id: str) -> RunDetail:
-        installation_id, repo, branch = self.require_github(project)
-        try:
-            run_bytes = get_repo_file(
-                installation_id,
-                repo,
-                f".zenve/agents/{name}/runs/{run_id}.json",
-                ref=branch,
-            )
-        except httpx.HTTPStatusError as exc:
-            if exc.response.status_code == 404:
-                raise NotFoundError(f"Run '{run_id}' not found") from exc
-            raise
-        data = json.loads(run_bytes)
-        return RunDetail(
-            run_id=run_id,
-            status=data.get("status"),
-            started_at=data.get("started_at"),
-            data=data,
-        )
 
     def get_project_settings(self, project: Project) -> dict:
         installation_id, repo, branch = self.require_github(project)

@@ -29,7 +29,7 @@ class TokenUsage(BaseModel):
 
 
 class WorkspaceRunSummary(BaseModel):
-    """Summary of a single agent run on disk under `.zenve/agents/{slug}/runs/{run_id}.json`."""
+    """Summary of a single agent run sourced from the DB."""
 
     model_config = {"extra": "ignore"}
 
@@ -43,10 +43,9 @@ class WorkspaceRunSummary(BaseModel):
 
 
 class WorkspaceRunDetail(WorkspaceRunSummary):
-    """Full run record — mirrors `RunResultFile` shape written by the CLI."""
+    """Full run record sourced from the DB."""
 
     item: RunItem | None = None
-    output: str | None = None
     pipeline_transition: PipelineTransition | None = None
     token_usage: TokenUsage | None = None
     error: str | None = None
@@ -59,6 +58,7 @@ class WorkspaceRun(BaseModel):
     started_at: str
     finished_at: str
     status: str
+    error: str | None = None
     agents: list[WorkspaceRunSummary]
 
 
@@ -67,7 +67,7 @@ class AgentStats(BaseModel):
     total_runs: int
     completed_runs: int
     failed_runs: int
-    runs: list[WorkspaceRunDetail]
+    runs: list[RunHistoryAgent]
 
 
 class RunTriggerRequest(BaseModel):
@@ -78,3 +78,35 @@ class RunTriggerRequest(BaseModel):
 class RunTriggerResponse(BaseModel):
     run_id: str
     status: Literal["queued"]
+
+
+class RunHistoryAgent(BaseModel):
+    run_id: str
+    agent_name: str
+    status: str
+    skip_reason: str | None = None
+    started_at: str | None = None
+    finished_at: str | None = None
+    exit_code: int | None = None
+    error: str | None = None
+    item_type: str | None = None
+    item_number: int | None = None
+    item_title: str | None = None
+    duration_seconds: float | None = None
+    pipeline_from: str | None = None
+    pipeline_to: list[str] | None = None
+    token_input: int | None = None
+    token_output: int | None = None
+    token_cost_usd: float | None = None
+
+
+class RunHistory(BaseModel):
+    run_id: str
+    workspace_id: str
+    status: str
+    error: str | None = None
+    triggered_at: str
+    started_at: str | None = None
+    finished_at: str | None = None
+    outcome: str | None = None
+    agents: list[RunHistoryAgent] = []

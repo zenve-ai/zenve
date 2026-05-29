@@ -80,6 +80,7 @@ class RunContext:
     agent_slug: str
     agent_name: str
     project_slug: str
+    workspace_id: str
     run_id: str
     adapter_type: str
     adapter_config: dict

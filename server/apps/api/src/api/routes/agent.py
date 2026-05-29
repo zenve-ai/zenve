@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, status
 
 from api.db.models import UserRecord
 from api.models.agent import AgentCreate, AgentFileContent, AgentFileList, AgentUpdate
-from api.models.repo import AgentDetail, AgentSummary, RunDetail, RunSummary
+from api.models.repo import AgentDetail, AgentSummary
 from api.services import (
     get_agent_service,
     get_membership_service,
@@ -134,30 +134,3 @@ def write_agent_file(
     service.write_file(project, name, path, body.content.encode("utf-8"))
 
 
-@router.get("/{name}/runs", response_model=list[RunSummary])
-def list_agent_runs(
-    project_id: str,
-    name: str,
-    user: UserRecord = Depends(get_current_user),
-    project_service: ProjectService = Depends(get_project_service),
-    membership_service: MembershipService = Depends(get_membership_service),
-    reader: RepoReaderService = Depends(get_repo_reader_service),
-):
-    project = project_service.get_by_id_or_slug(project_id)
-    membership_service.require_membership(user.id, project.id)
-    return reader.list_runs(project, name)
-
-
-@router.get("/{name}/runs/{run_id}", response_model=RunDetail)
-def get_agent_run(
-    project_id: str,
-    name: str,
-    run_id: str,
-    user: UserRecord = Depends(get_current_user),
-    project_service: ProjectService = Depends(get_project_service),
-    membership_service: MembershipService = Depends(get_membership_service),
-    reader: RepoReaderService = Depends(get_repo_reader_service),
-):
-    project = project_service.get_by_id_or_slug(project_id)
-    membership_service.require_membership(user.id, project.id)
-    return reader.get_run(project, name, run_id)

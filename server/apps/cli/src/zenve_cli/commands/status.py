@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 import os
 from pathlib import Path
 
@@ -30,17 +29,26 @@ def check_service(url: str, path: str = "/") -> bool:
         return False
 
 
-def latest_run(agent_path: Path) -> dict | None:
-    runs_dir = agent_path / "runs"
-    if not runs_dir.exists():
-        return None
-    files = sorted(runs_dir.glob("*.json"), key=lambda p: p.stat().st_mtime, reverse=True)
-    if not files:
-        return None
+def agent_run_map(repo_root: Path, runtime_up: bool) -> dict[str, dict]:
+    if not runtime_up:
+        return {}
+    abs_path = str(repo_root.expanduser().resolve())
     try:
-        return json.loads(files[0].read_text(encoding="utf-8"))
-    except json.JSONDecodeError:
-        return None
+        resp = httpx.get(f"{runtime_url()}/api/v1/workspaces", timeout=2.0)
+        if resp.status_code != 200:
+            return {}
+        workspace_id = next((w["id"] for w in resp.json() if w["path"] == abs_path), None)
+        if not workspace_id:
+            return {}
+        resp2 = httpx.get(f"{runtime_url()}/api/v1/workspaces/{workspace_id}/runs/latest", timeout=2.0)
+        if resp2.status_code != 200:
+            return {}
+        run = resp2.json()
+        if not run:
+            return {}
+        return {a["agent"]: a for a in run.get("agents", [])}
+    except Exception:
+        return {}
 
 
 def cmd(repo_root: Path = Path(".")) -> None:
@@ -94,6 +102,8 @@ def cmd(repo_root: Path = Path(".")) -> None:
     table.add_column("LAST RUN", justify="center")
     table.add_column("WHEN", style="dim")
 
+    run_agents = agent_run_map(repo_root, runtime_up)
+
     for d in agent_dirs:
         s = load_agent_settings(d)
         name = d.name if s is None else s.name
@@ -105,22 +115,24 @@ def cmd(repo_root: Path = Path(".")) -> None:
         else:
             enabled_text = Text("○ off", style="dim red")
 
-        run = latest_run(d)
-        if run is None:
+        agent_info = run_agents.get(d.name)
+        if agent_info is None:
             table.add_row(name, enabled_text, Text("—", style="dim"), "—")
             continue
 
-        run_status = run.get("status", "?")
-        if run_status == "done":
+        run_status = agent_info.get("status", "?")
+        if run_status == "completed":
             run_text = Text("● done", style="green")
         elif run_status == "failed":
             run_text = Text("✗ failed", style="red")
         elif run_status == "running":
             run_text = Text("◌ running", style="cyan")
+        elif run_status == "skipped":
+            run_text = Text("— skipped", style="dim")
         else:
             run_text = Text(run_status, style="dim")
 
-        started = run.get("started_at", "")
+        started = agent_info.get("started_at", "")
         when = time_ago(started) if started else "—"
         table.add_row(name, enabled_text, run_text, when)
 

@@ -14,7 +14,12 @@ from rich.text import Text
 from zenve_cli.commands.ui import WIZARD_STYLE, sep
 from zenve_cli.models.errors import ZenveError
 from zenve_cli.models.github_template import GitHubTemplateSummary
-from zenve_cli.runtime.client import ensure_runtime, report_error, runtime_request
+from zenve_cli.runtime.client import (
+    ensure_runtime,
+    report_error,
+    resolve_workspace_id,
+    runtime_request,
+)
 from zenve_cli.services.agent import build_agent_files
 from zenve_cli.services.agent_lock import AgentLockService
 from zenve_cli.services.scaffolding import ScaffoldingService
@@ -167,24 +172,25 @@ def list_agents(repo_root: Path = typer.Option(Path("."), "--repo")) -> None:
 @agent_app.command("logs")
 def logs(name: str, repo_root: Path = typer.Option(Path("."), "--repo")) -> None:
     """Show run history for a specific agent."""
-    agent_dir = zenve_dir(repo_root) / AGENTS_SUBDIR / name
-    runs_dir = agent_dir / "runs"
-    if not runs_dir.exists():
+    ensure_runtime()
+    workspace_id = resolve_workspace_id(repo_root)
+    resp = runtime_request("GET", f"/api/v1/workspaces/{workspace_id}/runs?limit=50")
+    if resp.status_code != 200:
+        report_error(resp)
+        raise typer.Exit(1)
+    runs = resp.json()
+    found = False
+    for run in runs:
+        for a in run.get("agents", []):
+            if a.get("agent") != name:
+                continue
+            found = True
+            typer.echo(
+                f"  {run.get('run_id', '?'):<24} {a.get('status', '?'):<14} "
+                f"{a.get('finished_at') or a.get('started_at') or '?'}"
+            )
+    if not found:
         typer.echo(f"No runs for agent {name!r}.")
-        return
-    files = sorted(runs_dir.glob("*.json"), key=lambda p: p.stat().st_mtime, reverse=True)
-    if not files:
-        typer.echo(f"No runs for agent {name!r}.")
-        return
-    for f in files:
-        try:
-            data = json.loads(f.read_text(encoding="utf-8"))
-        except json.JSONDecodeError:
-            continue
-        typer.echo(
-            f"  {data.get('run_id', '?'):<24} {data.get('status', '?'):<10} "
-            f"{data.get('finished_at', '?')}"
-        )
 
 
 @agent_app.command("enable")

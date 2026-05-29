@@ -6,12 +6,14 @@ from fastapi.responses import StreamingResponse
 
 from runtime.models.errors import NotFoundError
 from runtime.models.run import (
+    RunHistory,
     RunTriggerRequest,
     RunTriggerResponse,
     WorkspaceRun,
 )
 from runtime.run_store import RunStore
-from runtime.services import get_run_service, get_run_store, get_trigger_service
+from runtime.services import get_run_db_service, get_run_service, get_run_store, get_trigger_service
+from runtime.services.run_db_service import RunDbService
 from runtime.services.run_service import RunService
 from runtime.services.run_trigger_service import RunTriggerService
 
@@ -34,6 +36,15 @@ def list_runs(
     service: RunService = Depends(get_run_service),
 ):
     return service.list_grouped(workspace_id, limit=limit)
+
+
+@router.get("/history", response_model=list[RunHistory])
+def list_run_history(
+    workspace_id: str,
+    limit: int = 50,
+    service: RunDbService = Depends(get_run_db_service),
+):
+    return service.list_runs(workspace_id, limit=limit)
 
 
 @router.get("/active-run")
