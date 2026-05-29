@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useParams } from 'react-router'
 import { toast } from 'sonner'
-import { GitBranch, Clock, Layers, MessageSquare, FileText, Database } from 'lucide-react'
+import { GitBranch, Layers, MessageSquare, FileText, Database } from 'lucide-react'
 import { Field, FieldGroup, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
@@ -33,7 +33,6 @@ export function WorkspaceSettings() {
     default_branch: 'main',
     commit_message_prefix: '[zenve]',
     run_timeout_seconds: 600,
-    run_schedule: '',
     stack: '',
     issues_adapter: '',
   })
@@ -45,7 +44,6 @@ export function WorkspaceSettings() {
         default_branch: settings.default_branch,
         commit_message_prefix: settings.commit_message_prefix,
         run_timeout_seconds: settings.run_timeout_seconds,
-        run_schedule: settings.run_schedule ?? '',
         stack: settings.stack.join(', '),
         issues_adapter: settings.issues.adapter ?? '',
       })
@@ -61,7 +59,6 @@ export function WorkspaceSettings() {
       description: form.description,
       default_branch: form.default_branch,
       commit_message_prefix: form.commit_message_prefix,
-      run_schedule: form.run_schedule.trim() || null,
       stack: form.stack.split(',').map((s) => s.trim()).filter(Boolean),
       issues: { adapter: form.issues_adapter || null },
     }
@@ -149,18 +146,6 @@ export function WorkspaceSettings() {
               />
             </Field>
             */}
-
-            <Field>
-              <FieldLabel className="text-[11px] font-mono tracking-widest uppercase text-muted-foreground/70">
-                <Clock className="h-3 w-3" /> Run schedule
-              </FieldLabel>
-              <Input
-                className="rounded-none font-mono text-[12px]"
-                placeholder="*/15 * * * *  (leave blank to disable)"
-                value={form.run_schedule}
-                onChange={(e) => set('run_schedule', e.target.value)}
-              />
-            </Field>
 
             <Field>
               <FieldLabel className="text-[11px] font-mono tracking-widest uppercase text-muted-foreground/70">

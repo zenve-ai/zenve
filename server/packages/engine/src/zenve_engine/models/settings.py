@@ -28,7 +28,6 @@ class ProjectSettings(BaseModel):
     default_branch: str = "main"
     commit_message_prefix: str = "[zenve]"
     run_timeout_seconds: int = 600
-    run_schedule: str | None = None
     pipeline: dict[str, str | None] = Field(default_factory=dict)
     stack: list[str] = Field(default_factory=list)
     issues: IssuesConfig = Field(default_factory=IssuesConfig)

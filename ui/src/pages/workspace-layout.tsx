@@ -10,7 +10,7 @@ import {
 } from '@/components/ui/breadcrumb'
 import { Separator } from '@/components/ui/separator'
 import { SidebarInset, SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar'
-import { AppSidebar, ScheduleCountdown } from '@/components/layout'
+import { AppSidebar } from '@/components/layout'
 import { useAppDispatch, useAppSelector } from '@/store/hooks'
 import {
   useListWorkspacesQuery,
@@ -208,8 +208,6 @@ export default function WorkspaceLayout() {
           </BreadcrumbList>
         </Breadcrumb>
         <div className="ml-auto flex items-center gap-3 pr-2">
-          <ScheduleCountdown schedule={workspace?.runSchedule ?? null} />
-          {workspace?.runSchedule && <span className="text-[10px] text-muted-foreground/40">|</span>}
           {renderWsStatusDot()}
         </div>
       </div>

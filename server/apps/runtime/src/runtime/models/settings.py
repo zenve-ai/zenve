@@ -21,7 +21,6 @@ class WorkspaceSettings(BaseModel):
     default_branch: str = "main"
     commit_message_prefix: str = "[zenve]"
     run_timeout_seconds: int = 600
-    run_schedule: str | None = None
     stack: list[str] = Field(default_factory=list)
     pipeline: dict[str, str | None] = Field(default_factory=dict)
     issues: IssuesConfig = Field(default_factory=IssuesConfig)
@@ -32,7 +31,6 @@ class WorkspaceSettingsUpdate(BaseModel):
     default_branch: str | None = None
     commit_message_prefix: str | None = None
     run_timeout_seconds: int | None = None
-    run_schedule: str | None = None
     stack: list[str] | None = None
     pipeline: dict[str, str | None] | None = None
     issues: IssuesConfig | None = None

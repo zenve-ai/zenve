@@ -23,7 +23,6 @@ dependencies = [
     "pydantic[email]>=2",
     "bcrypt",
     "python-jose[cryptography]",
-    "croniter>=2.0",
     "pyyaml",
     "zenve-engine>=0.1.7",
 ]

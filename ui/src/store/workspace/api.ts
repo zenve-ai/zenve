@@ -14,7 +14,6 @@ interface WorkspaceDetailResponse extends WorkspaceResponse {
   project: string
   description: string
   default_branch: string
-  run_schedule: string | null
   pipeline: Record<string, string | null>
   stack: string[]
   agents: string[]
@@ -58,7 +57,6 @@ function toWorkspaceDetail(w: WorkspaceDetailResponse): WorkspaceDetail {
     agentCount: w.agents.length,
     description: w.description,
     defaultBranch: w.default_branch,
-    runSchedule: w.run_schedule,
     pipeline: w.pipeline,
     stack: w.stack,
     agents: w.agents,

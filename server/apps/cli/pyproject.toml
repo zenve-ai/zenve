@@ -30,7 +30,6 @@ dependencies = [
     "zenve-engine>=0.1.7",
     "zenve-runtime>=0.1.7",
     "textual>=8.2.4",
-    "croniter>=1.4",
 ]
 
 [project.scripts]

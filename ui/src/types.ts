@@ -40,7 +40,6 @@ export interface WorkspaceSummary {
 export interface WorkspaceDetail extends WorkspaceSummary {
   description: string
   defaultBranch: string
-  runSchedule: string | null
   pipeline: Record<string, string | null>
   stack: string[]
   agents: string[]
@@ -124,6 +123,24 @@ export interface SkillTemplate {
   id: string
   name: string
   description: string
+}
+
+export interface WorkspaceRunAgent {
+  agent: string
+  status: string
+  started_at: string | null
+  finished_at: string | null
+  duration_seconds: number
+  exit_code: number
+}
+
+export interface WorkspaceRun {
+  run_id: string
+  started_at: string
+  finished_at: string
+  status: string
+  error: string | null
+  agents: WorkspaceRunAgent[]
 }
 
 export interface AgentRun {
@@ -230,7 +247,6 @@ export interface WorkspaceSettings {
   default_branch: string
   commit_message_prefix: string
   run_timeout_seconds: number
-  run_schedule: string | null
   stack: string[]
   pipeline: Record<string, string | null>
   issues: { adapter: string | null }
@@ -241,7 +257,6 @@ export interface WorkspaceSettingsUpdate {
   default_branch?: string
   commit_message_prefix?: string
   run_timeout_seconds?: number
-  run_schedule?: string | null
   stack?: string[]
   pipeline?: Record<string, string | null>
   issues?: { adapter: string | null }

@@ -11,7 +11,6 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from runtime.models.errors import ConflictError, ExternalError, NotFoundError, ValidationError
-from runtime.models.run import AgentStats, WorkspaceRunDetail
 from runtime.models.settings import WorkspaceSettings, WorkspaceSettingsUpdate
 from runtime.models.workspace import (
     AgentSummary,
@@ -174,28 +173,6 @@ class WorkspaceService:
                     return
             raise NotFoundError(f"Workspace {workspace_id} not found")
 
-    def get_agent_stats(self, workspace_id: str, agent_slug: str) -> AgentStats:
-        workspace = self.get(workspace_id)
-        runs_dir = Path(workspace.path) / ZENVE_DIR / AGENTS_SUBDIR / agent_slug / "runs"
-        runs: list[WorkspaceRunDetail] = []
-        if runs_dir.exists():
-            for path in sorted(runs_dir.glob("*.json"), key=lambda p: p.stem, reverse=True):
-                try:
-                    with path.open("r", encoding="utf-8") as fh:
-                        data = json.load(fh)
-                    runs.append(WorkspaceRunDetail.model_validate(data))
-                except Exception:
-                    pass
-        completed = sum(1 for r in runs if r.status == "completed")
-        failed = sum(1 for r in runs if r.status == "failed")
-        return AgentStats(
-            agent=agent_slug,
-            total_runs=len(runs),
-            completed_runs=completed,
-            failed_runs=failed,
-            runs=runs,
-        )
-
     def scaffold(self, body: ScaffoldWorkspaceBody, template_svc: object) -> Workspace:
         from runtime.services.template_service import TemplateService
         svc: TemplateService = template_svc  # type: ignore[assignment]
@@ -334,7 +311,6 @@ class WorkspaceService:
             project=settings.get("project", path.name),
             description=settings.get("description", ""),
             default_branch=settings.get("default_branch", "main"),
-            run_schedule=settings.get("run_schedule"),
             pipeline=settings.get("pipeline", {}),
             stack=settings.get("stack", []),
             agents=agent_slugs,
