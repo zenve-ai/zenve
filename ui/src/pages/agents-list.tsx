@@ -13,7 +13,7 @@ import {
   EmptyTitle,
 } from '@/components/ui/empty'
 import { useListAgentsQuery } from '@/store/agents'
-import { useCreateRunMutation, useGetActiveRunQuery } from '@/store/runs'
+import { useCreateRunMutation, useGetActiveRunQuery, useListGroupedRunsQuery } from '@/store/runs'
 import { cn } from '@/lib/utils'
 import type { Agent } from '@/types'
 
@@ -42,9 +42,19 @@ export default function AgentsList() {
     { workspaceId: workspaceId! },
     { skip: !workspaceId },
   )
+  const { data: groupedRuns = [] } = useListGroupedRunsQuery(
+    { workspaceId: workspaceId! },
+    { skip: !workspaceId, pollingInterval: 4000 },
+  )
   const [triggerRun, { isLoading: isStarting }] = useCreateRunMutation()
 
   const isRunning = !!activeRun || isStarting
+
+  // Only show the live panel if at least one agent is actively running.
+  // Runs where all agents skipped (nothing_to_do) are silently ignored.
+  const liveRun = groupedRuns.find(
+    (r) => r.status === 'running' && (r.agents.length === 0 || r.agents.some((a) => a.status === 'running')),
+  ) ?? null
 
   const onlineCount   = agents.filter((a) => agentStatusGroup(a) === 'online').length
   const unstableCount = agents.filter((a) => agentStatusGroup(a) === 'unstable').length
@@ -138,16 +148,15 @@ export default function AgentsList() {
   )
 
   const renderActiveRun = () => {
-    if (!activeRun) return null
-    //let activeRun = { run_id: '12345678-90ab-cdef-1234-567890abcdef', status: 'running' } // TODO: remove mock
+    if (!liveRun) return null
     return (
       <div className="border-1 border-blue-500/30 bg-blue-500/5 p-2 flex items-center gap-3 m-4 mb-0">
         <Loader2 className="size-3 shrink-0 animate-spin text-blue-400" />
         <span className="font-mono text-[11px] text-blue-300">
-          Run <span className="text-blue-200">{activeRun.run_id.slice(0, 8)}</span> in progress
+          Run <span className="text-blue-200">{liveRun.run_id.slice(0, 8)}</span> in progress
         </span>
         <span className="ml-auto shrink-0 font-mono text-[10px] text-blue-400/60 uppercase tracking-widest">
-          {activeRun.status}
+          {liveRun.agents.filter((a) => a.status === 'running').length} ACTIVE
         </span>
       </div>
     )

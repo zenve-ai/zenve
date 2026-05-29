@@ -1,6 +1,7 @@
 import { Route, Routes, Navigate } from 'react-router'
 import AgentDetail from './pages/agent-detail'
 import AgentsList from './pages/agents-list'
+import RunsPage from './pages/runs'
 import RuntimesPage from './pages/runtimes'
 import IssuesList from './pages/issues-list'
 import IssueDetail from './pages/issue-detail'
@@ -46,6 +47,7 @@ export default function AppRoutes() {
         <Route index element={<Navigate to="agents" replace />} />
         <Route path="agents" element={<AgentsList />} />
         <Route path="agents/:agentSlug" element={<AgentDetail />} />
+        <Route path="runs" element={<RunsPage />} />
         <Route path="runtime" element={<RuntimesPage />} />
         <Route path="issues" element={<IssuesList />} />
         <Route path="issues/:issueId" element={<IssueDetail />} />

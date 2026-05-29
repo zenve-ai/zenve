@@ -14,7 +14,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sh
 import { cn } from '@/lib/utils'
 import { MOCK_ISSUE_ROWS, type MockIssueRow } from '@/lib/mock-agent-dashboard'
 import { useGetAgentStatsQuery } from '@/store/agents'
-import { useGetActiveRunQuery, useGetRunEventsQuery } from '@/store/runs'
+import { useGetRunEventsQuery, useListGroupedRunsQuery } from '@/store/runs'
 import type { AgentRun } from '@/types'
 
 // ─── helpers ────────────────────────────────────────────────────────────────
@@ -161,14 +161,19 @@ export function AgentDashboardTab({
     { skip: !workspaceId || !agentSlug },
   )
 
-  const { data: activeRun } = useGetActiveRunQuery(
+  const { data: groupedRuns = [] } = useListGroupedRunsQuery(
     { workspaceId },
-    { skip: !workspaceId },
+    { skip: !workspaceId, pollingInterval: 4000 },
   )
 
+  // Only show "Now" panel when THIS agent is actively running in the run_agents table.
+  const liveRun = groupedRuns.find(
+    (r) => r.status === 'running' && r.agents.some((a) => a.agent === agentSlug && a.status === 'running'),
+  ) ?? null
+
   const { data: activeRunEvents } = useGetRunEventsQuery(
-    { workspaceId, runId: activeRun?.run_id ?? '' },
-    { skip: !activeRun?.run_id },
+    { workspaceId, runId: liveRun?.run_id ?? '' },
+    { skip: !liveRun?.run_id },
   )
 
   const runs = stats?.runs ?? []
@@ -188,19 +193,19 @@ export function AgentDashboardTab({
   }
 
   const renderNow = () => {
-    if (!activeRun) return null
+    if (!liveRun) return null
     const claimEvent = activeRunEvents?.find(
       (e) => e.type === 'agent.claimed_issue' || e.type === 'agent.claimed_pr',
     )
     const label = claimEvent
       ? `#${(claimEvent.data as { number: number }).number}  ${(claimEvent.data as { title: string }).title}`
-      : activeRun.run_id.slice(0, 8)
+      : liveRun.run_id.slice(0, 8)
     return (
       <section className="border border-blue-500/30 bg-blue-500/5">
         <SectionBar title="Now · 1 active task" />
         <button
           type="button"
-          onClick={() => openSheet(activeRun.run_id)}
+          onClick={() => openSheet(liveRun.run_id)}
           className="flex w-full items-center gap-3 px-3 py-2.5 text-left hover:bg-blue-500/10"
         >
           <Loader2 className="size-3 shrink-0 animate-spin text-blue-400" />
@@ -258,7 +263,7 @@ export function AgentDashboardTab({
           <RunLogView
             workspaceId={workspaceId}
             runId={selectedRunId}
-            isActive={activeRun?.run_id === selectedRunId}
+            isActive={liveRun?.run_id === selectedRunId}
             agentFilter={agentSlug}
           />
         )}
