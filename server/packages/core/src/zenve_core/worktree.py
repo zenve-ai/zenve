@@ -2,9 +2,9 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from zenve_engine.git.commit import GitError, run_git
-from zenve_engine.git.worktree import remove_worktree
-from zenve_engine.models.settings import WorkspaceSettings
+from zenve_core.git.commit import GitError, run_git
+from zenve_core.git.worktree import remove_worktree
+from zenve_core.models.settings import WorkspaceSettings
 
 
 def setup_worktree(

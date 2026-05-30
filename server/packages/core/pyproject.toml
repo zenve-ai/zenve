@@ -4,9 +4,9 @@ version = "0.1.0"
 description = "Zenve single-agent run executor — one run = one agent + one message"
 requires-python = ">=3.13"
 dependencies = [
+    "httpx>=0.27",
     "pydantic>=2",
     "zenve-adapters",
-    "zenve-engine",
     "zenve-github",
 ]
 
@@ -19,6 +19,5 @@ packages = ["src/zenve_core"]
 
 [tool.uv.sources]
 zenve-adapters = { workspace = true }
-zenve-engine   = { workspace = true }
 zenve-github   = { workspace = true }
 zenve-issues   = { workspace = true }

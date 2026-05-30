@@ -10,9 +10,9 @@ from zenve_adapters import AdapterRegistry, build_default_registry
 from zenve_core.errors import AgentNotFoundError
 from zenve_core.execution import execute
 from zenve_core.result import AgentRunResult
-from zenve_engine.config import load_workspace_settings
-from zenve_engine.discovery import discover_agents
-from zenve_engine.events.emitter import EventEmitter
+from zenve_core.config import load_workspace_settings
+from zenve_core.discovery import discover_agents
+from zenve_core.events.emitter import EventEmitter
 
 
 async def run_agent(

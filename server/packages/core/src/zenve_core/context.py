@@ -3,8 +3,8 @@ from __future__ import annotations
 from pathlib import Path
 
 from zenve_adapters.models import RunContext
-from zenve_engine.discovery import DiscoveredAgent
-from zenve_engine.models.settings import WorkspaceSettings
+from zenve_core.discovery import DiscoveredAgent
+from zenve_core.models.settings import WorkspaceSettings
 
 
 def build_run_context(

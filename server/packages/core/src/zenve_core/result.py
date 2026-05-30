@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pydantic import BaseModel
 
-from zenve_engine.models.run_result import TokenUsage
+from zenve_core.models.run_result import TokenUsage
 
 
 class AgentRunResult(BaseModel):

@@ -9,12 +9,12 @@ from zenve_adapters import AdapterRegistry
 from zenve_core.context import build_run_context
 from zenve_core.result import AgentRunResult
 from zenve_core.worktree import cleanup_worktree, setup_worktree
-from zenve_engine.discovery import DiscoveredAgent
-from zenve_engine.events import types as et
-from zenve_engine.events.emitter import EventEmitter
-from zenve_engine.exec.executor import determine_run_status
-from zenve_engine.models.run_result import TokenUsage
-from zenve_engine.models.settings import WorkspaceSettings
+from zenve_core.discovery import DiscoveredAgent
+from zenve_core.events import types as et
+from zenve_core.events.emitter import EventEmitter
+from zenve_core.exec.executor import determine_run_status
+from zenve_core.models.run_result import TokenUsage
+from zenve_core.models.settings import WorkspaceSettings
 
 _ADAPTER_EVENT_MAP = {
     "output": et.ADAPTER_OUTPUT,
