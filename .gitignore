@@ -34,3 +34,5 @@ uv.lock
 worktrees/
 
 .coverage
+
+server/examples/run_core/

@@ -17,11 +17,12 @@ def make_ctx(on_event=None, **kwargs) -> RunContext:
     """Minimal RunContext for execute() tests."""
     defaults = dict(
         agent_dir="/tmp",
-        project_dir="/tmp",
+        workspace_id="w1",
+        workspace_dir="/tmp",
         agent_id="a1",
         agent_slug="dev",
         agent_name="Dev",
-        project_slug="acme",
+        workspace_slug="acme",
         run_id="r1",
         adapter_type="open_code",
         adapter_config={},

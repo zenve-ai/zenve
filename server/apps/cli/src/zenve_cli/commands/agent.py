@@ -238,7 +238,7 @@ def add(
         None, "--agent", help="Install a specific template by slug (skips wizard)"
     ),
 ) -> None:
-    """Add new agents to an already-initialized project."""
+    """Add new agents to an already-initialized workspace."""
     zdir = zenve_dir(repo_root)
     if not zdir.exists():
         console.print(

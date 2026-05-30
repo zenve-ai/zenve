@@ -213,7 +213,7 @@ The CLI never scaffolds `.zenve/` (except via `zenve init`). Any directory insid
 
 ## Key Models
 
-### `ProjectSettings` (`.zenve/settings.json`)
+### `WorkspaceSettings` (`.zenve/settings.json`)
 | Field | Default | Description |
 |---|---|---|
 | `project` | required | Project/org slug |
@@ -382,7 +382,7 @@ zenve_adapters/
   open_code/       ← Runs open-source code agent
 ```
 
-Each adapter receives a `RunContext` containing: `agent_dir`, `project_dir`, slugs, `run_id`, `adapter_type`, `adapter_config`, `message` (pre-built prompt), `tools`, `env_vars`, and `on_event` callback for streaming events.
+Each adapter receives a `RunContext` containing: `agent_dir`, `workspace_dir`, slugs, `run_id`, `adapter_type`, `adapter_config`, `message` (pre-built prompt), `tools`, `env_vars`, and `on_event` callback for streaming events.
 
 The adapter emits events as it runs (`adapter.output`, `adapter.tool_call`, `adapter.tool_result`, `adapter.usage`, `adapter.error`). These stream to the TUI and event log in real time.
 
@@ -462,7 +462,7 @@ Run ID: auto-generated `uuid4().hex[:12]` — no env var needed.
 ## `run` Command Flow
 
 1. `load_env()` — validate required env vars
-2. `load_project_settings()` — read `.zenve/settings.json`
+2. `load_workspace_settings()` — read `.zenve/settings.json`
 3. `discover_agents()` — scan `.zenve/agents/*/settings.json`
 4. `GitHubClient` — fetch issues, PRs, branches → `Snapshot`
 5. `run_all()` — async gather over all agents via `run_agent()`

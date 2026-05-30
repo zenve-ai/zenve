@@ -84,11 +84,11 @@ export function WorkspaceSettings() {
 
   const renderForm = () => (
     <div className="flex flex-col gap-6">
-      <SettingsSection label="Project">
+      <SettingsSection label="Workspace">
         <SettingsItem
           icon={<FileText className="h-3.5 w-3.5 text-muted-foreground/60" />}
-          title={settings?.project ?? '—'}
-          description="Project slug — edit .zenve/settings.json directly to rename"
+          title={settings?.slug ?? '—'}
+          description="Workspace slug — edit .zenve/settings.json directly to rename"
         />
       </SettingsSection>
 

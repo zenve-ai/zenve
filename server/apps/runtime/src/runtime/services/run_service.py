@@ -4,7 +4,7 @@ import json
 import logging
 
 from runtime.models.errors import NotFoundError
-from runtime.models.run import TokenUsage, WorkspaceRunDetail, WorkspaceRunSummary
+from runtime.models.run import AgentStats, TokenUsage, WorkspaceRunDetail, WorkspaceRunSummary
 from runtime.services.run_db_service import RunDbService
 from runtime.services.workspace_service import ZENVE_DIR, WorkspaceService
 
@@ -70,6 +70,17 @@ class RunService:
     def get_latest(self, workspace_id: str) -> WorkspaceRunSummary | None:
         runs = self.list_runs(workspace_id, limit=1)
         return runs[0] if runs else None
+
+    def agent_stats(self, workspace_id: str, agent_slug: str) -> AgentStats:
+        runs = self.run_db_service.list_runs(workspace_id, agent=agent_slug, limit=500)
+        details = [build_detail(r) for r in runs]
+        return AgentStats(
+            agent=agent_slug,
+            total_runs=len(details),
+            completed_runs=sum(1 for d in details if d.status == "completed"),
+            failed_runs=sum(1 for d in details if d.status == "failed"),
+            runs=details,
+        )
 
     def get_events(self, workspace_id: str, run_id: str) -> list[dict]:
         transcript_path = (

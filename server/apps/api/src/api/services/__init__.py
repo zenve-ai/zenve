@@ -8,7 +8,7 @@ from api.services.api_key import ApiKeyService
 from api.services.auth import AuthService
 from api.services.github import GitHubService
 from api.services.membership import MembershipService
-from api.services.project import ProjectService
+from api.services.workspace import WorkspaceService
 from api.services.repo_reader import RepoReaderService
 from api.services.repo_writer import RepoWriterService
 from api.services.template import GitHubTemplateService
@@ -19,8 +19,8 @@ def get_auth_service(db: Session = Depends(get_db)) -> AuthService:
     return AuthService(db)
 
 
-def get_project_service(db: Session = Depends(get_db)) -> ProjectService:
-    return ProjectService(db)
+def get_workspace_service(db: Session = Depends(get_db)) -> WorkspaceService:
+    return WorkspaceService(db)
 
 
 def get_membership_service(db: Session = Depends(get_db)) -> MembershipService:

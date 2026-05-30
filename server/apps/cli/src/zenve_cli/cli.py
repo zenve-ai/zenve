@@ -62,7 +62,7 @@ def doctor(
 @app.command()
 def init(
     repo: Path = typer.Option(Path("."), "--repo", help="Path to the repo root"),
-    description: str | None = typer.Option(None, "--description", help="Project description"),
+    description: str | None = typer.Option(None, "--description", help="Workspace description"),
 ) -> None:
     """Scaffold .zenve/ folder interactively."""
     init_cmd.cmd(repo_root=repo, description=description)

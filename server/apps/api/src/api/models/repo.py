@@ -31,9 +31,9 @@ class RunDetail(RunSummary):
     data: dict
 
 
-class ProjectSettings(BaseModel):
+class WorkspaceSettings(BaseModel):
     model_config = ConfigDict(extra="allow")
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> "ProjectSettings":
+    def from_dict(cls, data: dict[str, Any]) -> "WorkspaceSettings":
         return cls.model_validate(data)

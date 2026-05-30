@@ -10,7 +10,11 @@ def json_line(obj: dict) -> bytes:
 
 
 class _AsyncLineIter:
-    """Async iterator that yields pre-loaded byte lines."""
+    """Async stdout stub supporting both `async for` and `readline()`.
+
+    Yields pre-loaded byte lines; `readline()` returns b"" at EOF, matching
+    asyncio.StreamReader (the adapters read via `await proc.stdout.readline()`).
+    """
 
     def __init__(self, lines: list[bytes]) -> None:
         self._lines = iter(lines)
@@ -23,6 +27,9 @@ class _AsyncLineIter:
             return next(self._lines)
         except StopIteration as exc:
             raise StopAsyncIteration from exc
+
+    async def readline(self) -> bytes:
+        return next(self._lines, b"")
 
 
 def make_proc(lines: list[bytes]) -> MagicMock:

@@ -1,9 +1,9 @@
 import json
 
-from api.db.models import Project
+from api.db.models import Workspace
 from api.models.agent import AgentCreate, AgentUpdate
 from api.models.errors import ConflictError, NotFoundError
-from api.models.project import ProjectInit
+from api.models.workspace import WorkspaceInit
 from api.models.repo import AgentDetail, AgentSummary
 from api.services.repo_reader import RepoReaderService
 from api.services.repo_writer import RepoWriterService
@@ -49,25 +49,25 @@ class AgentService:
         self.writer = writer
         self.template_service = template_service
 
-    def get_all(self, project: Project) -> list[AgentSummary]:
-        return self.reader.list_agents(project)
+    def get_all(self, workspace: Workspace) -> list[AgentSummary]:
+        return self.reader.list_agents(workspace)
 
-    def get(self, project: Project, name: str) -> AgentDetail:
-        return self.reader.get_agent(project, name)
+    def get(self, workspace: Workspace, name: str) -> AgentDetail:
+        return self.reader.get_agent(workspace, name)
 
-    def create(self, project: Project, data: AgentCreate) -> AgentDetail:
+    def create(self, workspace: Workspace, data: AgentCreate) -> AgentDetail:
         initial_slug = slugify(data.name)
         try:
-            self.reader.get_agent(project, initial_slug)
+            self.reader.get_agent(workspace, initial_slug)
             raise ConflictError(f"Agent '{initial_slug}' already exists")
         except NotFoundError:
             pass
         slug, files = build_agent_files(data.name, data.template, self.template_service)
-        self.writer.scaffold_agent(project, slug, files, f"feat(agents): create agent {slug}")
-        return self.reader.get_agent(project, slug)
+        self.writer.scaffold_agent(workspace, slug, files, f"feat(agents): create agent {slug}")
+        return self.reader.get_agent(workspace, slug)
 
-    def update(self, project: Project, name: str, data: AgentUpdate) -> AgentDetail:
-        agent = self.reader.get_agent(project, name)
+    def update(self, workspace: Workspace, name: str, data: AgentUpdate) -> AgentDetail:
+        agent = self.reader.get_agent(workspace, name)
         settings = {
             "name": agent.name,
             "adapter_type": agent.adapter_type,
@@ -90,21 +90,21 @@ class AgentService:
         if data.enabled is not None:
             settings["enabled"] = data.enabled
         self.writer.write_file(
-            project,
+            workspace,
             name,
             "settings.json",
             json.dumps(settings, indent=2).encode(),
             f"feat(agents): update agent {name} settings",
         )
-        return self.reader.get_agent(project, name)
+        return self.reader.get_agent(workspace, name)
 
-    def delete(self, project: Project, name: str) -> None:
-        self.writer.delete_agent(project, name, f"feat(agents): delete agent {name}")
+    def delete(self, workspace: Workspace, name: str) -> None:
+        self.writer.delete_agent(workspace, name, f"feat(agents): delete agent {name}")
 
-    def init(self, project: Project, data: ProjectInit) -> list[AgentSummary]:
-        settings = self.reader.get_project_settings(project)
+    def init(self, workspace: Workspace, data: WorkspaceInit) -> list[AgentSummary]:
+        settings = self.reader.get_workspace_settings(workspace)
         if settings:
-            raise ConflictError("Project already initialized")
+            raise ConflictError("Workspace already initialized")
 
         all_files: dict[str, bytes | None] = {}
         pipeline: dict[str, None] = {}
@@ -116,22 +116,22 @@ class AgentService:
                 all_files[f".zenve/agents/{slug}/{relpath}"] = content
 
         root_settings = {
-            "project": project.name,
+            "workspace": workspace.name,
             "description": data.description,
-            "repo": project.github_repo,
-            "default_branch": project.github_default_branch,
+            "repo": workspace.github_repo,
+            "default_branch": workspace.github_default_branch,
             "commit_message_prefix": "[zenve]",
             "run_timeout_seconds": 600,
             "pipeline": pipeline,
         }
         all_files[".zenve/settings.json"] = json.dumps(root_settings, indent=2).encode()
 
-        self.writer.scaffold_project(project, all_files, "feat(zenve): initialize project")
-        return self.reader.list_agents(project)
+        self.writer.scaffold_workspace(workspace, all_files, "feat(zenve): initialize workspace")
+        return self.reader.list_agents(workspace)
 
-    def write_file(self, project: Project, name: str, relpath: str, content: bytes) -> None:
+    def write_file(self, workspace: Workspace, name: str, relpath: str, content: bytes) -> None:
         self.writer.write_file(
-            project,
+            workspace,
             name,
             relpath,
             content,

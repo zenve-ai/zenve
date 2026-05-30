@@ -16,7 +16,7 @@ class IssuesConfig(BaseModel):
 
 
 class WorkspaceSettings(BaseModel):
-    project: str
+    slug: str
     description: str = ""
     default_branch: str = "main"
     commit_message_prefix: str = "[zenve]"

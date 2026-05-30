@@ -14,7 +14,7 @@ from zenve_engine.events import types as et
 from zenve_engine.events.emitter import EventEmitter
 from zenve_engine.exec.executor import determine_run_status
 from zenve_engine.models.run_result import TokenUsage
-from zenve_engine.models.settings import ProjectSettings
+from zenve_engine.models.settings import WorkspaceSettings
 
 _ADAPTER_EVENT_MAP = {
     "output": et.ADAPTER_OUTPUT,
@@ -31,8 +31,8 @@ def now_iso() -> str:
 
 async def execute(
     agent: DiscoveredAgent,
-    project: ProjectSettings,
-    project_dir: Path,
+    workspace: WorkspaceSettings,
+    workspace_dir: Path,
     run_id: str,
     message: str,
     env_vars: dict[str, str],
@@ -43,17 +43,17 @@ async def execute(
 ) -> AgentRunResult:
     emitter.emit(et.AGENT_STARTED, agent=agent.name)
 
-    worktree_path, worktree_branch = setup_worktree(project_dir, agent.settings.slug, run_id, project)
+    worktree_path, worktree_branch = setup_worktree(workspace_dir, agent.settings.slug, run_id, workspace)
 
     ctx = build_run_context(
         agent=agent,
         run_id=run_id,
-        project=project,
-        project_dir=project_dir,
+        workspace=workspace,
+        workspace_dir=workspace_dir,
         message=message,
         env_vars=env_vars,
         workspace_id=workspace_id,
-        project_dir_override=worktree_path,
+        workspace_dir_override=worktree_path,
     )
 
     adapter_errors: list[str] = []
@@ -75,7 +75,7 @@ async def execute(
     except Exception as exc:
         duration = time.monotonic() - start_mono
         emitter.emit(et.AGENT_FAILED, agent=agent.name, data={"error": str(exc)})
-        cleanup_worktree(project_dir, worktree_path, worktree_branch)
+        cleanup_worktree(workspace_dir, worktree_path, worktree_branch)
         return AgentRunResult(
             run_id=run_id,
             agent_slug=agent.settings.slug,
@@ -91,7 +91,7 @@ async def execute(
     finished_at = now_iso()
     duration = time.monotonic() - start_mono
 
-    cleanup_worktree(project_dir, worktree_path, worktree_branch)
+    cleanup_worktree(workspace_dir, worktree_path, worktree_branch)
 
     status, error_text = determine_run_status(result, adapter_errors)
 

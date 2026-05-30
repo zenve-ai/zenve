@@ -18,12 +18,12 @@ class IssuesConfig(BaseModel):
     adapter: str | None = None
 
 
-class ProjectSettings(BaseModel):
+class WorkspaceSettings(BaseModel):
     """Shape of `.zenve/settings.json`."""
 
     model_config = {"extra": "ignore"}
 
-    project: str
+    slug: str
     description: str = ""
     default_branch: str = "main"
     commit_message_prefix: str = "[zenve]"

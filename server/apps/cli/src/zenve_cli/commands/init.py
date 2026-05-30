@@ -40,7 +40,7 @@ def collect_stack_wizard(default: list[str] | None = None) -> list[str]:
         questionary.Choice(title=s, value=s, checked=s in default_set) for s in STACK_CHOICES
     ]
     selected = questionary.checkbox(
-        "Project stack",
+        "Workspace stack",
         choices=choices,
         style=WIZARD_STYLE,
         qmark="◆",
@@ -123,7 +123,7 @@ def cmd(repo_root: Path = Path("."), description: str | None = None) -> None:
 
     if description is None:
         description = questionary.text(
-            "Project description",
+            "Workspace description",
             default=existing_settings.get("description", ""),
             style=WIZARD_STYLE,
             qmark="◆",

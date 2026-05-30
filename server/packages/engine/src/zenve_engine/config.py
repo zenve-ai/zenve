@@ -6,7 +6,7 @@ from pathlib import Path
 from pydantic import ValidationError
 
 from zenve_engine.constants import SETTINGS_FILE, ZENVE_DIR
-from zenve_engine.models.settings import ProjectSettings
+from zenve_engine.models.settings import WorkspaceSettings
 
 
 class ConfigError(RuntimeError):
@@ -17,7 +17,7 @@ def zenve_dir(repo_root: Path) -> Path:
     return repo_root / ZENVE_DIR
 
 
-def load_project_settings(repo_root: Path) -> ProjectSettings:
+def load_workspace_settings(repo_root: Path) -> WorkspaceSettings:
     """Read and validate `.zenve/settings.json`.
 
     Raises ConfigError if the `.zenve/` folder is missing — the CLI never
@@ -40,6 +40,6 @@ def load_project_settings(repo_root: Path) -> ProjectSettings:
         raise ConfigError(f"Invalid JSON in {settings_path}: {exc}") from exc
 
     try:
-        return ProjectSettings.model_validate(raw)
+        return WorkspaceSettings.model_validate(raw)
     except ValidationError as exc:
         raise ConfigError(f"Invalid `{SETTINGS_FILE}`: {exc}") from exc

@@ -75,19 +75,19 @@ class RunContext:
     """
 
     agent_dir: str
-    project_dir: str
+    workspace_dir: str
     agent_id: str
     agent_slug: str
     agent_name: str
-    project_slug: str
+    workspace_slug: str
     workspace_id: str
     run_id: str
     adapter_type: str
     adapter_config: dict
     message: str | None
     heartbeat: bool
-    project_description: str = ""
-    project_stack: list[str] = field(default_factory=list)
+    workspace_description: str = ""
+    workspace_stack: list[str] = field(default_factory=list)
     tools: list[str] | None = None  # None = all tools allowed
     env_vars: dict = field(default_factory=dict)
     on_event: Callable[[str, str | None, dict | None], None] = field(default=lambda *a, **kw: None)

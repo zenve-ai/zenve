@@ -4,16 +4,16 @@ from fastapi import Depends, Header, HTTPException, status
 from sqlalchemy.orm import Session
 
 from api.db.database import get_db
-from api.db.models import ApiKeyRecord, Project
+from api.db.models import ApiKeyRecord, Workspace
 from api.services.api_key import ApiKeyService
-from api.services.project import ProjectService
+from api.services.workspace import WorkspaceService
 
 
-async def get_current_project(
+async def get_current_workspace(
     authorization: str = Header(..., alias="Authorization"),
     db: Session = Depends(get_db),
-) -> tuple[Project, ApiKeyRecord]:
-    """Extract Bearer token, verify API key, return (project, key_record)."""
+) -> tuple[Workspace, ApiKeyRecord]:
+    """Extract Bearer token, verify API key, return (workspace, key_record)."""
     if not authorization.startswith("Bearer "):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -29,9 +29,9 @@ async def get_current_project(
             detail="Invalid or expired API key",
         )
 
-    project_service = ProjectService(db)
-    project = project_service.get_by_id(record.project_id)
-    return project, record
+    workspace_service = WorkspaceService(db)
+    workspace = workspace_service.get_by_id(record.workspace_id)
+    return workspace, record
 
 
 def match_scope(granted: str, required: str) -> bool:
@@ -52,8 +52,8 @@ def require_scope(scope: str) -> Callable:
     """Returns a dependency that checks if the current API key has the given scope."""
 
     async def _check(
-        auth: tuple[Project, ApiKeyRecord] = Depends(get_current_project),
-    ) -> tuple[Project, ApiKeyRecord]:
+        auth: tuple[Workspace, ApiKeyRecord] = Depends(get_current_workspace),
+    ) -> tuple[Workspace, ApiKeyRecord]:
         _, key_record = auth
         granted_scopes = [s.strip() for s in key_record.scopes.split(",")]
         if not any(match_scope(g, scope) for g in granted_scopes):

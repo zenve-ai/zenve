@@ -65,14 +65,14 @@ class ClaudeCodeAdapter(BaseAdapter):
             f"- agent_id: {ctx.agent_id}\n"
             f"- agent_slug: {ctx.agent_slug}\n"
             f"- agent_name: {ctx.agent_name}\n"
-            f"- project_slug: {ctx.project_slug}\n"
+            f"- workspace_slug: {ctx.workspace_slug}\n"
             f"- workspace_id: {ctx.workspace_id}\n"
-            f"- project_description: {ctx.project_description}\n"
-            f"- project_stack: {', '.join(ctx.project_stack) if ctx.project_stack else '(unspecified)'}\n"
-            f"- project_dir: {ctx.project_dir}\n"
+            f"- workspace_description: {ctx.workspace_description}\n"
+            f"- workspace_stack: {', '.join(ctx.workspace_stack) if ctx.workspace_stack else '(unspecified)'}\n"
+            f"- workspace_dir: {ctx.workspace_dir}\n"
             f"- agent_dir: {ctx.agent_dir}\n"
             f"- run_id: {ctx.run_id}\n"
-            f"- For full project context, read: {ctx.project_dir}/README.md\n"
+            f"- For full workspace context, read: {ctx.workspace_dir}/README.md\n"
         )
 
         if ctx.heartbeat:
@@ -88,7 +88,7 @@ class ClaudeCodeAdapter(BaseAdapter):
             **os.environ,
             "ZENVE_AGENT_ID": ctx.agent_id,
             "ZENVE_AGENT_SLUG": ctx.agent_slug,
-            "ZENVE_PROJECT_SLUG": ctx.project_slug,
+            "ZENVE_WORKSPACE_SLUG": ctx.workspace_slug,
             "ZENVE_WORKSPACE_ID": ctx.workspace_id,
             "ZENVE_RUN_ID": ctx.run_id,
             **ctx.env_vars,
@@ -98,7 +98,7 @@ class ClaudeCodeAdapter(BaseAdapter):
 
         proc = await asyncio.create_subprocess_exec(
             *args,
-            cwd=ctx.project_dir,
+            cwd=ctx.workspace_dir,
             env=env,
             stdin=asyncio.subprocess.PIPE,
             stdout=asyncio.subprocess.PIPE,

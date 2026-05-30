@@ -10,7 +10,7 @@ This package is a dependency of [`zenve-cli`](https://pypi.org/project/zenve-cli
 from zenve_engine import run, snapshot, RunReport, Snapshot
 
 report = run(
-    project_dir=Path("/path/to/repo"),
+    workspace_dir=Path("/path/to/repo"),
     run_id="run_abc123",
     github_token=token,
     repo="org/name",

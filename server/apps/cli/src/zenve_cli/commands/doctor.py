@@ -14,7 +14,7 @@ from rich.text import Text
 from zenve_adapters.claude_code import ClaudeCodeAdapter
 from zenve_adapters.open_code import OpenCodeAdapter
 from zenve_cli.commands.snapshot import git_remote_slug
-from zenve_engine.config import ConfigError, load_project_settings, zenve_dir
+from zenve_engine.config import ConfigError, load_workspace_settings, zenve_dir
 from zenve_engine.discovery import DiscoveryError, discover_agents
 
 console = Console()
@@ -36,9 +36,9 @@ def cmd(repo_root: Path) -> None:
     # Check 2: settings.json exists & valid (critical)
     settings = None
     try:
-        settings = load_project_settings(repo_root)
-        project_name = getattr(settings, "project", None) or getattr(settings, "name", None)
-        detail = project_name or None
+        settings = load_workspace_settings(repo_root)
+        workspace_name = getattr(settings, "slug", None) or getattr(settings, "name", None)
+        detail = workspace_name or None
         checks.append(("Valid zenve settings (.zenve/settings.json)", True, detail))
     except ConfigError as exc:
         checks.append(("Valid zenve settings (.zenve/settings.json)", False, str(exc)))

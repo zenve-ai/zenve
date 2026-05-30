@@ -242,7 +242,7 @@ export interface GlobalSettings {
 }
 
 export interface WorkspaceSettings {
-  project: string
+  slug: string
   description: string
   default_branch: string
   commit_message_prefix: string

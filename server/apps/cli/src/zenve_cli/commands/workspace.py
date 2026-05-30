@@ -59,7 +59,7 @@ def register_path(path: Path) -> tuple[int, dict | None]:
 @workspace_app.command("init")
 def init_workspace(
     path: Path = typer.Argument(Path("."), help="Path to the repo root"),
-    description: str | None = typer.Option(None, "--description", help="Project description"),
+    description: str | None = typer.Option(None, "--description", help="Workspace description"),
 ) -> None:
     """Scaffold .zenve/ interactively and register it with the local runtime."""
     from zenve_cli.commands import init as init_cmd

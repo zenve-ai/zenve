@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 
 from api.db.models import UserRecord
-from api.models.project import GitHubInstallationResponse, GitHubRepo
+from api.models.workspace import GitHubInstallationResponse, GitHubRepo
 from api.services import get_github_service
 from api.services.github import GitHubService
 from api.utils.auth import get_current_user

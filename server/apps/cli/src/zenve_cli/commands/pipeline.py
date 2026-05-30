@@ -8,7 +8,7 @@ from rich.console import Console
 from rich.table import Table
 from rich.text import Text
 
-from zenve_engine.config import ConfigError, load_project_settings
+from zenve_engine.config import ConfigError, load_workspace_settings
 from zenve_engine.pipeline import validate_pipeline
 
 console = Console()
@@ -17,7 +17,7 @@ console = Console()
 def cmd(repo_root: Path = Path(".")) -> None:
     """Display and validate the pipeline from `.zenve/settings.json`."""
     try:
-        settings = load_project_settings(repo_root)
+        settings = load_workspace_settings(repo_root)
     except ConfigError as exc:
         console.print(f"[red]✗[/red] {exc}", highlight=False)
         raise typer.Exit(1) from exc

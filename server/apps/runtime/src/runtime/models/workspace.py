@@ -36,7 +36,7 @@ class AgentSummary(BaseModel):
 
 
 class WorkspaceDetail(Workspace):
-    project: str
+    slug: str
     description: str = ""
     default_branch: str = "main"
     pipeline: dict[str, str | None] = Field(default_factory=dict)

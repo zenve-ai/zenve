@@ -9,8 +9,8 @@ from runtime.models.workspace import (
     WorkspaceCreate,
     WorkspaceDetail,
 )
-from runtime.services import get_run_db_service, get_template_service, get_workspace_service
-from runtime.services.run_db_service import RunDbService
+from runtime.services import get_run_service, get_template_service, get_workspace_service
+from runtime.services.run_service import RunService
 from runtime.services.template_service import TemplateService
 from runtime.services.workspace_service import WorkspaceService
 
@@ -61,9 +61,9 @@ def list_agents(
 def get_agent_stats(
     workspace_id: str,
     agent_slug: str,
-    run_db_service: RunDbService = Depends(get_run_db_service),
+    service: RunService = Depends(get_run_service),
 ):
-    return run_db_service.list_agent_stats(workspace_id, agent_slug)
+    return service.agent_stats(workspace_id, agent_slug)
 
 
 @router.get("/{workspace_id}/settings", response_model=WorkspaceSettings)

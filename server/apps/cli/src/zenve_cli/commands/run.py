@@ -24,7 +24,7 @@ from zenve_cli.runtime.client import (
     runtime_request,
     runtime_url,
 )
-from zenve_engine.config import ConfigError, load_project_settings
+from zenve_engine.config import ConfigError, load_workspace_settings
 from zenve_engine.discovery import DiscoveryError, discover_agents
 from zenve_engine.env import EnvError, load_env
 from zenve_engine.events import types as et
@@ -68,7 +68,7 @@ def execute_dry(agent: str | None, repo_root: Path) -> None:
     try:
         status.update("[cyan]loading env & config…[/cyan]")
         env = load_env(repo_root)
-        project = load_project_settings(repo_root)
+        workspace = load_workspace_settings(repo_root)
         status.update("[cyan]discovering agents…[/cyan]")
         agents = discover_agents(repo_root, only=agent)
     except EnvError as exc:
@@ -115,8 +115,8 @@ def execute_dry(agent: str | None, repo_root: Path) -> None:
         try:
             commit_zenve_dir(
                 repo_root,
-                f"{project.commit_message_prefix} update .zenve config",
-                branch=project.default_branch,
+                f"{workspace.commit_message_prefix} update .zenve config",
+                branch=workspace.default_branch,
             )
         except GitError as exc:
             status.stop()
@@ -131,9 +131,9 @@ def execute_dry(agent: str | None, repo_root: Path) -> None:
         typer.echo(f"✗ git fetch origin failed: {exc}")
         raise typer.Exit(1) from exc
 
-    if not remote_branch_exists(repo_root, project.default_branch):
+    if not remote_branch_exists(repo_root, workspace.default_branch):
         status.stop()
-        typer.echo(f"✗ Remote branch origin/{project.default_branch} not found after fetch.")
+        typer.echo(f"✗ Remote branch origin/{workspace.default_branch} not found after fetch.")
         raise typer.Exit(1)
 
     status.stop()
@@ -169,7 +169,7 @@ def execute_dry(agent: str | None, repo_root: Path) -> None:
             run_all(
                 agents=agents,
                 snapshot=snapshot,
-                project=project,
+                workspace=workspace,
                 repo_root=repo_root,
                 run_id=env.run_id,
                 registry=registry,

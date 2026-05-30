@@ -9,7 +9,7 @@ from zenve_engine.events.emitter import EventEmitter
 from zenve_engine.exec.executor import DryRunResult, run_agent
 from zenve_engine.github.client import GitHubClient
 from zenve_engine.models.run_result import RunResultFile
-from zenve_engine.models.settings import ProjectSettings
+from zenve_engine.models.settings import WorkspaceSettings
 from zenve_engine.models.snapshot import Snapshot
 from zenve_issues import BaseIssueAdapter
 
@@ -17,7 +17,7 @@ from zenve_issues import BaseIssueAdapter
 async def run_all(
     agents: list[DiscoveredAgent],
     snapshot: Snapshot,
-    project: ProjectSettings,
+    workspace: WorkspaceSettings,
     repo_root: Path,
     run_id: str,
     registry: AdapterRegistry,
@@ -32,7 +32,7 @@ async def run_all(
         run_agent(
             agent=agent,
             snapshot=snapshot,
-            project=project,
+            workspace=workspace,
             repo_root=repo_root,
             run_id=run_id,
             registry=registry,

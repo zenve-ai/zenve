@@ -35,7 +35,7 @@ from zenve_engine.models.run_result import (
     RunResultFile,
     TokenUsage,
 )
-from zenve_engine.models.settings import AgentSettings, ProjectSettings
+from zenve_engine.models.settings import AgentSettings, WorkspaceSettings
 from zenve_engine.models.snapshot import Snapshot, SnapshotIssue, SnapshotPR
 from zenve_engine.pipeline import next_label, prev_labels
 from zenve_issues import BaseIssueAdapter, CommentCreate, IssueUpdate
@@ -166,26 +166,26 @@ def build_message(
 def build_run_context(
     agent: DiscoveredAgent,
     run_id: str,
-    project: ProjectSettings,
+    workspace: WorkspaceSettings,
     repo_root: Path,
     item: PlannedItem | None,
     snapshot: Snapshot,
     env_vars: dict[str, str],
-    project_dir_override: Path | None = None,
+    workspace_dir_override: Path | None = None,
 ) -> RunContext:
     config: dict = dict(agent.settings.adapter_config)
     message = build_message(run_id, agent.name, item, snapshot)
-    effective_dir = project_dir_override if project_dir_override is not None else repo_root
+    effective_dir = workspace_dir_override if workspace_dir_override is not None else repo_root
 
     return RunContext(
         agent_dir=str(agent.path),
-        project_dir=str(effective_dir.resolve()),
+        workspace_dir=str(effective_dir.resolve()),
         agent_id=agent.settings.slug,
         agent_slug=agent.settings.slug,
         agent_name=agent.settings.name,
-        project_slug=project.project,
-        project_description=project.description,
-        project_stack=list(project.stack),
+        workspace_slug=workspace.slug,
+        workspace_description=workspace.description,
+        workspace_stack=list(workspace.stack),
         run_id=run_id,
         adapter_type=agent.settings.adapter_type,
         adapter_config=config,
@@ -203,13 +203,13 @@ def now_iso() -> str:
 def apply_pipeline_transition(
     issues_adapter: BaseIssueAdapter,
     gh: GitHubClient,
-    project: ProjectSettings,
+    workspace: WorkspaceSettings,
     agent: DiscoveredAgent,
     item: PlannedItem,
     emitter: EventEmitter,
     created_pr_number: int | None = None,
 ) -> PipelineTransition | None:
-    to_label = next_label(project.pipeline, agent.settings.github_label)
+    to_label = next_label(workspace.pipeline, agent.settings.github_label)
     if created_pr_number is not None:
         transition(issues_adapter, item.number, item.labels, agent.settings.github_label, None)
         if to_label is not None:
@@ -311,7 +311,7 @@ def determine_run_status(
 def handle_worktree_pr(
     gh: GitHubClient,
     agent: DiscoveredAgent,
-    project: ProjectSettings,
+    workspace: WorkspaceSettings,
     item: PlannedItem,
     worktree_path: Path,
     worktree_branch: str,
@@ -341,7 +341,7 @@ def handle_worktree_pr(
                 else:
                     commit_and_push(
                         worktree_path,
-                        f"{project.commit_message_prefix} {run_id} — {agent.settings.slug}: #{item.number}",
+                        f"{workspace.commit_message_prefix} {run_id} — {agent.settings.slug}: #{item.number}",
                         worktree_branch,
                     )
                     pushed = True
@@ -360,17 +360,17 @@ def handle_worktree_pr(
                             title=pr_title,
                             body=pr_body,
                             head=worktree_branch,
-                            base=project.default_branch,
+                            base=workspace.default_branch,
                         )
                         gh.merge_pr(pr.number, merge_method="squash")
                         gh.delete_branch(worktree_branch)
-                        reset_to_remote(repo_root, project.default_branch)
+                        reset_to_remote(repo_root, workspace.default_branch)
                     else:  # code_pr + issue
                         pr = gh.create_pr(
                             title=item.title,
                             body=f"Closes #{item.number}",
                             head=worktree_branch,
-                            base=project.default_branch,
+                            base=workspace.default_branch,
                         )
                         created_pr_number = pr.number
             except (GitError, GitHubError) as exc:
@@ -391,7 +391,7 @@ def handle_github_post_run(
     gh: GitHubClient,
     item: PlannedItem,
     agent: DiscoveredAgent,
-    project: ProjectSettings,
+    workspace: WorkspaceSettings,
     status: str,
     outcome: str | None,
     error_text: str | None,
@@ -402,10 +402,10 @@ def handle_github_post_run(
     pipeline_transition: PipelineTransition | None = None
     if status == "completed":
         pipeline_transition = apply_pipeline_transition(
-            issues_adapter, gh, project, agent, item, emitter, created_pr_number=created_pr_number
+            issues_adapter, gh, workspace, agent, item, emitter, created_pr_number=created_pr_number
         )
     elif status == "changes_requested":
-        back_labels = prev_labels(project.pipeline, agent.settings.github_label)
+        back_labels = prev_labels(workspace.pipeline, agent.settings.github_label)
         unclaim_item(issues_adapter, item.number, item.labels)
         transition(issues_adapter, item.number, item.labels, agent.settings.github_label, None)
         if back_labels:
@@ -519,7 +519,7 @@ def write_and_emit(
 async def run_agent(
     agent: DiscoveredAgent,
     snapshot: Snapshot,
-    project: ProjectSettings,
+    workspace: WorkspaceSettings,
     repo_root: Path,
     run_id: str,
     registry: AdapterRegistry,
@@ -540,7 +540,7 @@ async def run_agent(
     agent_env_vars = {**env_vars, "GH_TOKEN": agent_token} if agent_token else env_vars
 
     if dry_run:
-        ctx = build_run_context(agent, run_id, project, repo_root, item, snapshot, agent_env_vars)
+        ctx = build_run_context(agent, run_id, workspace, repo_root, item, snapshot, agent_env_vars)
         return DryRunResult(
             agent_name=agent.name,
             picks_up=agent.settings.picks_up,
@@ -615,7 +615,7 @@ async def run_agent(
             elif item.kind == "pull_request":
                 create_writable_worktree(repo_root, worktree_path, item.head_branch)
             else:
-                create_worktree(repo_root, worktree_path, worktree_branch, project.default_branch)
+                create_worktree(repo_root, worktree_path, worktree_branch, workspace.default_branch)
         except GitError as exc:
             emitter.emit(et.AGENT_FAILED, agent=agent.name, data={"error": str(exc)})
             unclaim_item(issues_adapter, item.number, item.labels)
@@ -640,12 +640,12 @@ async def run_agent(
     ctx = build_run_context(
         agent,
         run_id,
-        project,
+        workspace,
         repo_root,
         item,
         snapshot,
         agent_env_vars,
-        project_dir_override=worktree_path,
+        workspace_dir_override=worktree_path,
     )
 
     adapter_event_map = {
@@ -728,20 +728,20 @@ async def run_agent(
                 try:
                     gh.merge_pr(item.number, merge_method="squash")
                     gh.delete_branch(worktree_branch)
-                    reset_to_remote(repo_root, project.default_branch)
+                    reset_to_remote(repo_root, workspace.default_branch)
                 except GitHubError as exc:
                     status = "failed"
                     error_text = str(exc)
         else:
             status, error_text, created_pr_number = handle_worktree_pr(
-                gh, agent, project, item, worktree_path, worktree_branch, repo_root, status, error_text, run_id
+                gh, agent, workspace, item, worktree_path, worktree_branch, repo_root, status, error_text, run_id
             )
             worktree_path = None  # already cleaned up inside
 
     pipeline_transition: PipelineTransition | None = None
     if item is not None:
         pipeline_transition = handle_github_post_run(
-            issues_adapter, gh, item, agent, project, status, result.outcome, error_text, emitter, repo_root,
+            issues_adapter, gh, item, agent, workspace, status, result.outcome, error_text, emitter, repo_root,
             created_pr_number=created_pr_number,
         )
 

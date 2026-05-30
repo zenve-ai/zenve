@@ -10,13 +10,13 @@ from zenve_adapters import AdapterRegistry, build_default_registry
 from zenve_core.errors import AgentNotFoundError
 from zenve_core.execution import execute
 from zenve_core.result import AgentRunResult
-from zenve_engine.config import load_project_settings
+from zenve_engine.config import load_workspace_settings
 from zenve_engine.discovery import discover_agents
 from zenve_engine.events.emitter import EventEmitter
 
 
 async def run_agent(
-    project_dir: Path,
+    workspace_dir: Path,
     agent_slug: str,
     message: str,
     *,
@@ -32,9 +32,9 @@ async def run_agent(
     zenve_core creates the worktree and cleans it up — nothing else.
     """
     run_id = uuid4().hex
-    project = load_project_settings(project_dir)
+    workspace = load_workspace_settings(workspace_dir)
 
-    agents = discover_agents(project_dir, only=agent_slug)
+    agents = discover_agents(workspace_dir, only=agent_slug)
     if not agents:
         raise AgentNotFoundError(agent_slug)
     agent = agents[0]
@@ -46,12 +46,12 @@ async def run_agent(
         **(env_vars or {}),
     }
 
-    emitter = EventEmitter(repo_root=project_dir, run_id=run_id, on_event=on_event)
+    emitter = EventEmitter(repo_root=workspace_dir, run_id=run_id, on_event=on_event)
 
     return await execute(
         agent=agent,
-        project=project,
-        project_dir=project_dir,
+        workspace=workspace,
+        workspace_dir=workspace_dir,
         run_id=run_id,
         message=message,
         env_vars=base_env,

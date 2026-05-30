@@ -10,7 +10,7 @@ The engine is the **read+write owner of `.zenve/` at runtime**. The CLI's `init`
 from zenve_engine import run, snapshot, build_issues_adapter, RunReport, RunResultFile, Snapshot
 
 run(
-    project_dir: Path,
+    workspace_dir: Path,
     *,
     run_id: str,
     github_token: str,
@@ -22,11 +22,11 @@ run(
     on_event: Callable[[dict], None] | None = None,
     registry: AdapterRegistry | None = None,
     issues_adapter: BaseIssueAdapter | None = None,   # explicit override (tests / custom callers)
-    issues_adapter_type: str = "github",              # passed by the runtime; falls back to ProjectSettings
+    issues_adapter_type: str = "github",              # passed by the runtime; falls back to WorkspaceSettings
 ) -> RunReport
 
 snapshot(
-    project_dir: Path,
+    workspace_dir: Path,
     *,
     run_id: str,
     github_token: str,
@@ -49,7 +49,7 @@ build_issues_adapter(
 
 ```
 issues_adapter param (explicit)
-  → ProjectSettings.issues.adapter  (.zenve/settings.json)
+  → WorkspaceSettings.issues.adapter  (.zenve/settings.json)
     → issues_adapter_type param     (passed by the runtime from ~/.zenve/config.json)
       → "github"                    (hard default)
 ```
@@ -76,7 +76,7 @@ src/zenve_engine/
 ├── api.py                 # the public run() / snapshot() entry points
 ├── constants.py           # paths, label names, GitHub API config
 ├── env.py                 # token resolution, run_id, dotenv loading
-├── config.py              # load_project_settings() → ProjectSettings
+├── config.py              # load_workspace_settings() → WorkspaceSettings
 ├── discovery.py           # discover_agents() → list[DiscoveredAgent]
 ├── pipeline.py            # next_label / prev_labels / validate_pipeline
 ├── claims.py              # local claims.json — add/remove/expired

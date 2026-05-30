@@ -11,7 +11,7 @@ interface WorkspaceResponse {
 }
 
 interface WorkspaceDetailResponse extends WorkspaceResponse {
-  project: string
+  slug: string
   description: string
   default_branch: string
   pipeline: Record<string, string | null>
@@ -50,7 +50,7 @@ function toWorkspaceSummary(w: WorkspaceResponse): WorkspaceSummary {
 function toWorkspaceDetail(w: WorkspaceDetailResponse): WorkspaceDetail {
   return {
     id: w.id,
-    name: w.project || nameFromPath(w.path),
+    name: w.slug || nameFromPath(w.path),
     path: w.path,
     registeredAt: w.registered_at,
     iconKey: assignIconKey(w.id),

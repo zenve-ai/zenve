@@ -39,7 +39,7 @@ def setup_adapters(app: FastAPI):
 def setup_ws(app: FastAPI) -> WebSocketManager:
     ws_manager = WebSocketManager()
     app.state.ws_manager = ws_manager
-    logger.info("WebSocket ready at ws://0.0.0.0:8000/api/v1/projects/{project_id}/ws")
+    logger.info("WebSocket ready at ws://0.0.0.0:8000/api/v1/workspaces/{workspace_id}/ws")
     return ws_manager
 
 

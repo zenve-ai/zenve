@@ -1,9 +1,9 @@
 import httpx
 from sqlalchemy.orm import Session
 
-from api.db.models import Project, UserRecord
+from api.db.models import Workspace, UserRecord
 from api.models.errors import ExternalError, ValidationError
-from api.models.project import GitHubRepo
+from api.models.workspace import GitHubRepo
 from api.utils.github import get_repo_info, list_installation_repos
 
 
@@ -11,7 +11,7 @@ class GitHubService:
     def __init__(self, db: Session):
         self.db = db
 
-    def connect_project(self, project: Project, installation_id: int, repo: str) -> Project:
+    def connect_workspace(self, workspace: Workspace, installation_id: int, repo: str) -> Workspace:
         """Validate the GitHub App can access the repo, then persist the connection."""
         try:
             info = get_repo_info(installation_id, repo)
@@ -24,12 +24,12 @@ class GitHubService:
         except Exception as exc:
             raise ExternalError("GitHub API unreachable") from exc
 
-        project.github_installation_id = installation_id
-        project.github_repo = repo
-        project.github_default_branch = info.get("default_branch", "main")
+        workspace.github_installation_id = installation_id
+        workspace.github_repo = repo
+        workspace.github_default_branch = info.get("default_branch", "main")
         self.db.commit()
-        self.db.refresh(project)
-        return project
+        self.db.refresh(workspace)
+        return workspace
 
     def save_installation(self, user: UserRecord, installation_id: int) -> UserRecord:
         """Persist the GitHub App installation_id on the user record."""
@@ -60,11 +60,11 @@ class GitHubService:
             for r in raw
         ]
 
-    def disconnect(self, project: Project) -> Project:
-        """Clear the GitHub connection fields from the project."""
-        project.github_installation_id = None
-        project.github_repo = None
-        project.github_default_branch = None
+    def disconnect(self, workspace: Workspace) -> Workspace:
+        """Clear the GitHub connection fields from the workspace."""
+        workspace.github_installation_id = None
+        workspace.github_repo = None
+        workspace.github_default_branch = None
         self.db.commit()
-        self.db.refresh(project)
-        return project
+        self.db.refresh(workspace)
+        return workspace

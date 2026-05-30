@@ -2,7 +2,7 @@ import json
 
 import httpx
 
-from api.db.models import Project
+from api.db.models import Workspace
 from api.models.errors import NotFoundError, ValidationError
 from api.models.repo import AgentDetail, AgentSummary
 from api.services.repo_writer import validate_relpath
@@ -10,17 +10,17 @@ from api.utils.github import get_repo_file, list_repo_dir, list_tree_paths
 
 
 class RepoReaderService:
-    def require_github(self, project: Project) -> tuple[int, str, str]:
+    def require_github(self, workspace: Workspace) -> tuple[int, str, str]:
         if (
-            not project.github_installation_id
-            or not project.github_repo
-            or not project.github_default_branch
+            not workspace.github_installation_id
+            or not workspace.github_repo
+            or not workspace.github_default_branch
         ):
-            raise ValidationError("Project has no GitHub repo connected")
-        return project.github_installation_id, project.github_repo, project.github_default_branch
+            raise ValidationError("Workspace has no GitHub repo connected")
+        return workspace.github_installation_id, workspace.github_repo, workspace.github_default_branch
 
-    def list_agents(self, project: Project) -> list[AgentSummary]:
-        installation_id, repo, branch = self.require_github(project)
+    def list_agents(self, workspace: Workspace) -> list[AgentSummary]:
+        installation_id, repo, branch = self.require_github(workspace)
         entries = list_repo_dir(
             installation_id,
             repo,
@@ -52,8 +52,8 @@ class RepoReaderService:
                 continue
         return agents
 
-    def get_agent(self, project: Project, name: str) -> AgentDetail:
-        installation_id, repo, branch = self.require_github(project)
+    def get_agent(self, workspace: Workspace, name: str) -> AgentDetail:
+        installation_id, repo, branch = self.require_github(workspace)
         try:
             settings_bytes = get_repo_file(
                 installation_id,
@@ -66,7 +66,7 @@ class RepoReaderService:
                 raise NotFoundError(f"Agent '{name}' not found") from exc
             raise
         settings = json.loads(settings_bytes)
-        files = self.list_agent_files(project, name)
+        files = self.list_agent_files(workspace, name)
         return AgentDetail(
             name=settings.get("name", name),
             slug=name,
@@ -82,8 +82,8 @@ class RepoReaderService:
             files=files,
         )
 
-    def read_agent_file(self, project: Project, name: str, relpath: str) -> bytes:
-        installation_id, repo, branch = self.require_github(project)
+    def read_agent_file(self, workspace: Workspace, name: str, relpath: str) -> bytes:
+        installation_id, repo, branch = self.require_github(workspace)
         validate_relpath(relpath)
         try:
             return get_repo_file(
@@ -97,8 +97,8 @@ class RepoReaderService:
                 raise NotFoundError(f"File '{relpath}' not found") from exc
             raise
 
-    def list_agent_files(self, project: Project, name: str) -> list[str]:
-        installation_id, repo, branch = self.require_github(project)
+    def list_agent_files(self, workspace: Workspace, name: str) -> list[str]:
+        installation_id, repo, branch = self.require_github(workspace)
         prefix = f".zenve/agents/{name}/"
         paths = list_tree_paths(
             installation_id,
@@ -108,8 +108,8 @@ class RepoReaderService:
         )
         return [p[len(prefix):] for p in paths]
 
-    def get_project_settings(self, project: Project) -> dict:
-        installation_id, repo, branch = self.require_github(project)
+    def get_workspace_settings(self, workspace: Workspace) -> dict:
+        installation_id, repo, branch = self.require_github(workspace)
         try:
             settings_bytes = get_repo_file(
                 installation_id,

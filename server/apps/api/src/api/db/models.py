@@ -24,8 +24,8 @@ class UserRecord(Base):
     )
 
 
-class Project(Base):
-    __tablename__ = "projects"
+class Workspace(Base):
+    __tablename__ = "workspaces"
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     name: Mapped[str] = mapped_column(unique=True, nullable=False)
@@ -38,32 +38,32 @@ class Project(Base):
     updated_at: Mapped[datetime] = mapped_column(default=func.now(), onupdate=func.now())
 
     api_keys: Mapped[list["ApiKeyRecord"]] = relationship(
-        back_populates="project", cascade="all, delete-orphan"
+        back_populates="workspace", cascade="all, delete-orphan"
     )
     memberships: Mapped[list["Membership"]] = relationship(
-        back_populates="project", cascade="all, delete-orphan"
+        back_populates="workspace", cascade="all, delete-orphan"
     )
 
 
 class Membership(Base):
     __tablename__ = "memberships"
-    __table_args__ = (UniqueConstraint("user_id", "project_id"),)
+    __table_args__ = (UniqueConstraint("user_id", "workspace_id"),)
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     user_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id"), nullable=False)
-    project_id: Mapped[str] = mapped_column(String(36), ForeignKey("projects.id"), nullable=False)
+    workspace_id: Mapped[str] = mapped_column(String(36), ForeignKey("workspaces.id"), nullable=False)
     role: Mapped[str] = mapped_column(String(20), nullable=False, default="member")
     created_at: Mapped[datetime] = mapped_column(default=func.now())
 
     user: Mapped["UserRecord"] = relationship(back_populates="memberships")
-    project: Mapped["Project"] = relationship(back_populates="memberships")
+    workspace: Mapped["Workspace"] = relationship(back_populates="memberships")
 
 
 class ApiKeyRecord(Base):
     __tablename__ = "api_keys"
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
-    project_id: Mapped[str] = mapped_column(String(36), ForeignKey("projects.id"), nullable=False)
+    workspace_id: Mapped[str] = mapped_column(String(36), ForeignKey("workspaces.id"), nullable=False)
     key_hash: Mapped[str] = mapped_column(nullable=False)
     key_prefix: Mapped[str] = mapped_column(String(16), nullable=False, index=True)
     name: Mapped[str] = mapped_column(nullable=False)
@@ -72,4 +72,4 @@ class ApiKeyRecord(Base):
     created_at: Mapped[datetime] = mapped_column(default=func.now())
     expires_at: Mapped[datetime | None] = mapped_column(nullable=True)
 
-    project: Mapped["Project"] = relationship(back_populates="api_keys")
+    workspace: Mapped["Workspace"] = relationship(back_populates="api_keys")

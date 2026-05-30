@@ -11,7 +11,7 @@ class ApiKeyCreate(BaseModel):
 
 class ApiKeyResponse(BaseModel):
     id: str
-    project_id: str
+    workspace_id: str
     name: str
     scopes: list[str]
     is_active: bool

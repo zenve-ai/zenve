@@ -58,7 +58,7 @@ The engine already writes `RunResultFile` JSONs to disk, so the existing
 Responsibilities:
 - Holds `dict[str, str]` in memory: `run_id → status` (`queued | running | done | failed`)
 - `trigger(workspace_id, req) -> RunTriggerResponse`:
-  1. Calls `WorkspaceService.detail()` to get `project_dir` and `repo`
+  1. Calls `WorkspaceService.detail()` to get `workspace_dir` and `repo`
   2. Resolves `GITHUB_TOKEN` from env
   3. Generates `run_id` (uuid4 hex)
   4. Marks status as `queued`

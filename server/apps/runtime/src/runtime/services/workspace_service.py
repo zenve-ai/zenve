@@ -186,7 +186,7 @@ class WorkspaceService:
         zenve_dir.mkdir(parents=True, exist_ok=True)
         agents_dir.mkdir(parents=True, exist_ok=True)
 
-        slug = re.sub(r"[^a-z0-9]+", "-", body.name.lower().strip()).strip("-") or "project"
+        slug = re.sub(r"[^a-z0-9]+", "-", body.name.lower().strip()).strip("-") or "workspace"
         pipeline: dict[str, None] = {}
 
         for template_id in body.agents:
@@ -236,7 +236,7 @@ class WorkspaceService:
             link_path.symlink_to(Path("../../.agents/skills") / skill_id)
 
         root_settings = {
-            "project": slug,
+            "slug": slug,
             "description": body.description,
             "default_branch": body.default_branch,
             "commit_message_prefix": "[zenve]",
@@ -308,7 +308,7 @@ class WorkspaceService:
             id=workspace.id,
             path=workspace.path,
             registered_at=workspace.registered_at,
-            project=settings.get("project", path.name),
+            slug=settings.get("slug", path.name),
             description=settings.get("description", ""),
             default_branch=settings.get("default_branch", "main"),
             pipeline=settings.get("pipeline", {}),

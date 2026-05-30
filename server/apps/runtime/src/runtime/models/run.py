@@ -33,6 +33,14 @@ class WorkspaceRunDetail(WorkspaceRunSummary):
     error: str | None = None
 
 
+class AgentStats(BaseModel):
+    agent: str
+    total_runs: int
+    completed_runs: int
+    failed_runs: int
+    runs: list[WorkspaceRunDetail]
+
+
 class RunTriggerRequest(BaseModel):
     agent: str
     message: str | None = None

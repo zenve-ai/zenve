@@ -45,7 +45,7 @@ class RunTriggerService:
 
     def trigger(self, workspace_id: str, req: RunTriggerRequest) -> RunTriggerResponse:
         detail = self.workspace_service.detail(workspace_id)
-        project_dir = Path(detail.path)
+        workspace_dir = Path(detail.path)
         message = build_message(req)
         run_id = uuid4().hex
         self.run_store.create(run_id, workspace_id)
@@ -54,14 +54,14 @@ class RunTriggerService:
             "type": "run.created",
             "data": {"run_id": run_id, "workspace_id": workspace_id, "status": "queued"},
         })
-        self._executor.submit(self.execute_run, run_id, workspace_id, project_dir, req, message)
+        self._executor.submit(self.execute_run, run_id, workspace_id, workspace_dir, req, message)
         return RunTriggerResponse(run_id=run_id, status="queued")
 
     def execute_run(
         self,
         run_id: str,
         workspace_id: str,
-        project_dir: Path,
+        workspace_dir: Path,
         req: RunTriggerRequest,
         message: str,
     ) -> None:
@@ -83,7 +83,7 @@ class RunTriggerService:
             github_token = resolve_github_token() or ""
             result = asyncio.run(
                 zenve_core.run_agent(
-                    project_dir=project_dir,
+                    workspace_dir=workspace_dir,
                     agent_slug=req.agent,
                     message=message,
                     workspace_id=workspace_id,

@@ -5,17 +5,17 @@ from pydantic import BaseModel
 from api.models.api_key import ApiKeyCreated
 
 
-class ProjectCreate(BaseModel):
+class WorkspaceCreate(BaseModel):
     name: str
     slug: str | None = None
 
 
-class ProjectUpdate(BaseModel):
+class WorkspaceUpdate(BaseModel):
     name: str | None = None
     slug: str | None = None
 
 
-class ProjectResponse(BaseModel):
+class WorkspaceResponse(BaseModel):
     id: str
     name: str
     slug: str
@@ -28,16 +28,16 @@ class ProjectResponse(BaseModel):
     model_config = {"from_attributes": True}
 
 
-class ProjectWithRoleResponse(ProjectResponse):
+class WorkspaceWithRoleResponse(WorkspaceResponse):
     role: str
 
 
-class ProjectCreatedResponse(ProjectResponse):
+class WorkspaceCreatedResponse(WorkspaceResponse):
     api_key: ApiKeyCreated
     role: str = "owner"
 
 
-class ProjectGitHubConnect(BaseModel):
+class WorkspaceGitHubConnect(BaseModel):
     installation_id: int | None = None
     repo: str  # format: owner/name
 
@@ -59,6 +59,6 @@ class InitAgentSpec(BaseModel):
     template: str | None = None
 
 
-class ProjectInit(BaseModel):
+class WorkspaceInit(BaseModel):
     description: str | None = None
     agents: list[InitAgentSpec] = []
