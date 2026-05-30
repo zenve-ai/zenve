@@ -12,10 +12,9 @@ from runtime.models.issue import (
     IssueUpdateRequest,
 )
 from runtime.services.workspace_service import WorkspaceService
-from zenve_engine.api import build_issues_adapter
-from zenve_engine.config import load_project_settings
-from zenve_engine.env import resolve_github_token
-from zenve_issues import BaseIssueAdapter
+from runtime.utils.settings import read_issues_adapter
+from zenve_github import resolve_github_token
+from zenve_issues import BaseIssueAdapter, build_issues_adapter
 from zenve_issues.models import (
     CommentCreate,
     CommentNotFoundError,
@@ -60,8 +59,7 @@ class IssueService:
     def get_adapter(self, workspace_id: str) -> BaseIssueAdapter:
         detail = self.workspace_service.detail(workspace_id)
         project_dir = Path(detail.path)
-        project = load_project_settings(project_dir)
-        adapter_type = project.issues.adapter or self.issues_adapter_type
+        adapter_type = read_issues_adapter(project_dir) or self.issues_adapter_type
         repo = detail.repo or ""
         github_token = ""
         if adapter_type != "sqlite":

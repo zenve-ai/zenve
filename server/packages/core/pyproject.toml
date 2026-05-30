@@ -1,0 +1,24 @@
+[project]
+name = "zenve-core"
+version = "0.1.0"
+description = "Zenve single-agent run executor — one run = one agent + one message"
+requires-python = ">=3.13"
+dependencies = [
+    "pydantic>=2",
+    "zenve-adapters",
+    "zenve-engine",
+    "zenve-github",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/zenve_core"]
+
+[tool.uv.sources]
+zenve-adapters = { workspace = true }
+zenve-engine   = { workspace = true }
+zenve-github   = { workspace = true }
+zenve-issues   = { workspace = true }

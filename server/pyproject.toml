@@ -22,6 +22,7 @@ members = [
     "packages/adapters",
     "packages/core",
     "packages/engine",
+    "packages/github",
     "packages/issues",
 ]
 
@@ -30,6 +31,7 @@ zenve-adapters = { workspace = true }
 zenve-cli = { workspace = true }
 zenve-core = { workspace = true }
 zenve-engine = { workspace = true }
+zenve-github = { workspace = true }
 zenve-issues = { workspace = true }
 zenve-runtime = { workspace = true }
 
@@ -65,6 +67,7 @@ known-first-party = [
     "zenve_adapters",
     "zenve_core",
     "zenve_engine",
+    "zenve_github",
     "zenve_issues",
     "api",
     "runtime",

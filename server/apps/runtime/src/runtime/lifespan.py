@@ -7,9 +7,8 @@ from pathlib import Path
 
 from fastapi import FastAPI
 
-from runtime.db.database import Base, get_engine, migrate_run_agents_columns
+from runtime.db.database import Base, get_engine, migrate_runs_columns
 from runtime.db.models import (  # noqa: F401 — registers ORM models with Base
-    RunAgentRecord,
     RunRecord,
     UserRecord,
 )
@@ -21,11 +20,10 @@ from runtime.services.run_db_service import RunDbService
 from runtime.services.run_service import RunService
 from runtime.services.run_trigger_service import RunTriggerService
 from runtime.services.settings_service import SettingsService
-from runtime.services.snapshot_service import SnapshotService
 from runtime.services.template_service import TemplateService
 from runtime.services.workspace_service import WorkspaceService
 from runtime.ws_manager import WsManager
-from zenve_engine.api import build_default_registry
+from zenve_adapters import build_default_registry
 
 PID_FILE = Path.home() / ".zenve" / "runtime.pid"
 LOG_FILE = Path.home() / ".zenve" / "runtime.log"
@@ -52,7 +50,7 @@ async def lifespan(app: FastAPI):
     logger.info("=" * 60)
 
     Base.metadata.create_all(bind=get_engine())
-    migrate_run_agents_columns()
+    migrate_runs_columns()
     logger.info("Database initialized: %s", "~/.zenve/zenve.db")
 
     config = RuntimeConfig.load()
@@ -67,10 +65,7 @@ async def lifespan(app: FastAPI):
     workspace_service = WorkspaceService()
     run_db_service = RunDbService()
     run_service = RunService(workspace_service, run_db_service)
-    trigger_service = RunTriggerService(
-        workspace_service, run_store, ws_manager, run_db_service, config.issues_adapter
-    )
-    snapshot_service = SnapshotService(workspace_service, config.issues_adapter)
+    trigger_service = RunTriggerService(workspace_service, run_store, ws_manager, run_db_service)
     issue_service = IssueService(workspace_service, config.issues_adapter)
     pr_service = PRService(workspace_service)
     template_service = TemplateService()
@@ -84,7 +79,6 @@ async def lifespan(app: FastAPI):
     app.state.workspace_service = workspace_service
     app.state.run_service = run_service
     app.state.trigger_service = trigger_service
-    app.state.snapshot_service = snapshot_service
     app.state.issue_service = issue_service
     app.state.pr_service = pr_service
     app.state.template_service = template_service

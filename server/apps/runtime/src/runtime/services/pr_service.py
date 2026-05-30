@@ -3,8 +3,7 @@ from __future__ import annotations
 from runtime.models.errors import ExternalError, NotFoundError, ValidationError
 from runtime.models.pr import PRCommentResponse, PRResponse
 from runtime.services.workspace_service import WorkspaceService
-from zenve_engine.env import resolve_github_token
-from zenve_engine.github.client import GitHubClient, GitHubError
+from zenve_github import GitHubClient, GitHubError, resolve_github_token
 
 
 def gh_pr_to_response(raw: dict, comments: list[dict] | None = None) -> PRResponse:

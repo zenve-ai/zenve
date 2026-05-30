@@ -35,25 +35,25 @@ def get_db():
         db.close()
 
 
-def migrate_run_agents_columns() -> None:
-    """Add columns to run_agents that were added after initial table creation."""
+def migrate_runs_columns() -> None:
+    """Add columns to runs that were added after initial table creation."""
+    from sqlalchemy import text
     new_columns = [
-        ("item_type", "TEXT"),
-        ("item_number", "INTEGER"),
-        ("item_title", "TEXT"),
+        ("agent_name", "TEXT"),
+        ("message", "TEXT"),
+        ("issue_id", "INTEGER"),
         ("duration_seconds", "REAL"),
-        ("pipeline_from", "TEXT"),
-        ("pipeline_to", "TEXT"),
+        ("exit_code", "INTEGER"),
         ("token_input", "INTEGER"),
         ("token_output", "INTEGER"),
         ("token_cost_usd", "REAL"),
     ]
     engine = get_engine()
     with engine.connect() as conn:
-        existing = {row[1] for row in conn.execute(__import__("sqlalchemy").text("PRAGMA table_info(run_agents)"))}
+        existing = {row[1] for row in conn.execute(text("PRAGMA table_info(runs)"))}
         for col_name, col_type in new_columns:
             if col_name not in existing:
-                conn.execute(__import__("sqlalchemy").text(f"ALTER TABLE run_agents ADD COLUMN {col_name} {col_type}"))
+                conn.execute(text(f"ALTER TABLE runs ADD COLUMN {col_name} {col_type}"))
         conn.commit()
 
 

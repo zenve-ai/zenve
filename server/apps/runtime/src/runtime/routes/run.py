@@ -6,14 +6,13 @@ from fastapi.responses import StreamingResponse
 
 from runtime.models.errors import NotFoundError
 from runtime.models.run import (
-    RunHistory,
     RunTriggerRequest,
     RunTriggerResponse,
-    WorkspaceRun,
+    WorkspaceRunDetail,
+    WorkspaceRunSummary,
 )
 from runtime.run_store import RunStore
-from runtime.services import get_run_db_service, get_run_service, get_run_store, get_trigger_service
-from runtime.services.run_db_service import RunDbService
+from runtime.services import get_run_service, get_run_store, get_trigger_service
 from runtime.services.run_service import RunService
 from runtime.services.run_trigger_service import RunTriggerService
 
@@ -29,22 +28,14 @@ def trigger_run(
     return service.trigger(workspace_id, body)
 
 
-@router.get("", response_model=list[WorkspaceRun])
+@router.get("", response_model=list[WorkspaceRunSummary])
 def list_runs(
     workspace_id: str,
+    agent: str | None = None,
     limit: int = 50,
     service: RunService = Depends(get_run_service),
 ):
-    return service.list_grouped(workspace_id, limit=limit)
-
-
-@router.get("/history", response_model=list[RunHistory])
-def list_run_history(
-    workspace_id: str,
-    limit: int = 50,
-    service: RunDbService = Depends(get_run_db_service),
-):
-    return service.list_runs(workspace_id, limit=limit)
+    return service.list_runs(workspace_id, agent=agent, limit=limit)
 
 
 @router.get("/active-run")
@@ -58,7 +49,7 @@ def get_active_run(
     return {"run_id": record.run_id, "status": record.status}
 
 
-@router.get("/latest", response_model=WorkspaceRun | None)
+@router.get("/latest", response_model=WorkspaceRunSummary | None)
 def get_latest_run(
     workspace_id: str,
     service: RunService = Depends(get_run_service),
@@ -66,13 +57,13 @@ def get_latest_run(
     return service.get_latest(workspace_id)
 
 
-@router.get("/{run_id}", response_model=WorkspaceRun)
+@router.get("/{run_id}", response_model=WorkspaceRunDetail)
 def get_run(
     workspace_id: str,
     run_id: str,
     service: RunService = Depends(get_run_service),
 ):
-    return service.get_grouped(workspace_id, run_id)
+    return service.get_run(workspace_id, run_id)
 
 
 @router.get("/{run_id}/events", response_model=list[dict])

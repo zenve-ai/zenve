@@ -24,7 +24,8 @@ dependencies = [
     "bcrypt",
     "python-jose[cryptography]",
     "pyyaml",
-    "zenve-engine>=0.1.7",
+    "zenve-core",
+    "zenve-github>=0.1.0",
 ]
 
 [project.scripts]
@@ -46,4 +47,5 @@ packages = ["src"]
 "src" = ""
 
 [tool.uv.sources]
-zenve-engine = { workspace = true }
+zenve-core   = { workspace = true }
+zenve-github = { workspace = true }

@@ -14,9 +14,7 @@ from rich.console import Console
 from rich.table import Table
 from rich.text import Text
 
-from zenve_adapters import AdapterRegistry
-from zenve_adapters.claude_code import ClaudeCodeAdapter
-from zenve_adapters.open_code import OpenCodeAdapter
+from zenve_adapters import build_default_registry
 from zenve_cli.commands.snapshot import git_remote_slug
 from zenve_cli.console import ZenveTUI
 from zenve_cli.runtime.client import (
@@ -58,12 +56,6 @@ def run_callback(
     if ctx.invoked_subcommand is None:
         execute(agent=agent, dry_run=dry_run, repo=repo)
 
-
-def build_registry() -> AdapterRegistry:
-    registry = AdapterRegistry()
-    registry.register(ClaudeCodeAdapter())
-    registry.register(OpenCodeAdapter())
-    return registry
 
 
 
@@ -172,7 +164,7 @@ def execute_dry(agent: str | None, repo_root: Path) -> None:
             },
         )
 
-        registry = build_registry()
+        registry = build_default_registry()
         results = asyncio.run(
             run_all(
                 agents=agents,

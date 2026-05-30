@@ -18,12 +18,10 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from zenve_adapters import AdapterRegistry
-from zenve_adapters.claude_code import ClaudeCodeAdapter
-from zenve_adapters.open_code import OpenCodeAdapter
+from zenve_adapters import AdapterRegistry, build_default_registry
 from zenve_engine.config import load_project_settings
 from zenve_engine.discovery import DiscoveredAgent, discover_agents
-from zenve_engine.errors import DirtyTreeError, EngineError, MissingRemoteBranchError
+from zenve_engine.errors import DirtyTreeError, MissingRemoteBranchError
 from zenve_engine.events import types as et
 from zenve_engine.events.emitter import EventEmitter
 from zenve_engine.exec.executor import reconcile_claims
@@ -43,9 +41,7 @@ from zenve_engine.github.client import GitHubClient
 from zenve_engine.github.snapshot import build_snapshot, write_snapshot
 from zenve_engine.models.run_result import RunResultFile
 from zenve_engine.models.snapshot import Snapshot
-from zenve_issues import BaseIssueAdapter, SQLiteIssueAdapter
-from zenve_issues.github import GitHubIssueAdapter
-from zenve_issues.models import GitHubIssueConfig, SQLiteIssueConfig
+from zenve_issues import BaseIssueAdapter, build_issues_adapter
 
 
 @dataclass
@@ -55,33 +51,6 @@ class RunReport:
     results: list[RunResultFile] = field(default_factory=list)
     committed: bool = False
     summary: str = ""
-
-
-def build_issues_adapter(
-    adapter_type: str,
-    workspace_path: Path,
-    github_token: str,
-    repo: str,
-) -> BaseIssueAdapter:
-    """Build an issues adapter from an adapter type string.
-
-    - "sqlite": DB at `{workspace_path}/.zenve/issues.db` — no extra config needed.
-    - "github" (default): uses `github_token` and `repo`.
-    """
-    if adapter_type == "sqlite":
-        db_path = Path.home() / ".zenve" / "zenve.db"
-        workspace_id = str(workspace_path.resolve())
-        return SQLiteIssueAdapter(SQLiteIssueConfig(db_path=str(db_path), workspace_id=workspace_id))
-    if adapter_type == "github":
-        return GitHubIssueAdapter(GitHubIssueConfig(token=github_token, repo=repo))
-    raise EngineError(f"Unknown issues adapter type: {adapter_type!r}")
-
-
-def build_default_registry() -> AdapterRegistry:
-    registry = AdapterRegistry()
-    registry.register(ClaudeCodeAdapter())
-    registry.register(OpenCodeAdapter())
-    return registry
 
 
 def snapshot(
